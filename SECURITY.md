@@ -14,10 +14,14 @@
   validated, and options that could read or write other files are refused.
 - **The native windows** (the Linux Qt window and the macOS app) let the page read only the files you opened, and
   save only where you choose in the Save dialog.
+- **On Windows**, there is no server at all. The launcher copies the files you open into a temporary page in your
+  profile, and only reads the registry, to find the browser. The installer writes only to your user profile and
+  to `HKEY_CURRENT_USER`.
 - **Text from files is never treated as markup.** Titles, atom and residue names, labels and file names are escaped
   before they are displayed. `tests/browser_xss_test.js` checks this with crafted files.
-- **The installers** do not run `sudo` without asking. The Linux installer offers the command that installs Qt
-  WebEngine and asks before running it.
+- **The installers** never ask for administrator rights on their own. The Linux installer offers the command that
+  installs Qt WebEngine and asks before running it with `sudo`. The Windows installer needs no administrator rights
+  at all.
 
 ## Reporting a vulnerability
 

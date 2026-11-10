@@ -1,7 +1,8 @@
 # Developer guide
 
 BlueMolecule is plain JavaScript, HTML and CSS for the viewer, and Python standard library for the launcher and the
-Linux window. The optional macOS app is a single Swift file. There are no runtime dependencies, no framework and no
+Linux window. The optional macOS app is a single Swift file, and the Windows launcher a single C# file. There are no
+runtime dependencies, no framework and no
 build step for development: open `src/index.html` in a browser and you are running the current source.
 
 ## Repository layout
@@ -11,7 +12,8 @@ src/                 the viewer: index.html, style.css and 22 JavaScript modules
 launcher/            bluemolecule.py: command line, window selection, local server, Open Babel bridge
 native/linux/        Qt WebEngine window (bluemolecule_qt.py), install.sh / uninstall.sh, desktop file, MIME types
 native/macos/        WKWebView app (BlueMolecule.swift), Info.plist, "Install BlueMolecule.command"
-native/icons/        app icons rendered from tools/icon.svg (generated, kept in the repository)
+native/windows/      launcher (BlueMolecule.cs), install.ps1 / uninstall.ps1, "Install BlueMolecule.cmd"
+native/icons/        app icons rendered from tools/icon.svg and BlueMolecule.ico (generated, kept in the repository)
 tools/               build.py, the icon, fixture and example generators, docs_screenshots.js
 tests/               test suites, run_all.py, fixtures/ (example files), synth.js (synthetic macromolecules)
 docs/                this documentation; docs/images/ is produced by tools/docs_screenshots.js
@@ -133,6 +135,7 @@ ideally as a round trip that writes, reads back and compares.
 | `linux-app` | `native/linux/bluemolecule_qt.py` (Qt WebEngine) | QWebChannel: `bmHost.post(name, json)` |
 | `macos-app` | `native/macos/BlueMolecule.swift` (WKWebView) | `webkit.messageHandlers` |
 | `launcher` | `launcher/bluemolecule.py` serving the page to a browser app window | HTTP on `127.0.0.1` |
+| `launcher` | `native/windows/BlueMolecule.exe`: a copy of the page with the files embedded, opened in an Edge app window | `window.BM_LAUNCH` only: files as `data:` URLs, no ping or Open Babel |
 | `browser` | A plain browser | None: the page uses downloads and the clipboard API |
 
 The messages are:
@@ -163,13 +166,15 @@ server:
 
 ```bash
 python3 tools/build.py                 # dist/BlueMolecule.html + the package for this OS
-python3 tools/build.py --target all    # also the other package
+python3 tools/build.py --target all    # the Linux, Windows and macOS packages
 ```
 
 The build needs only Python 3. Two kinds of generated files are kept in the repository so that this stays true:
 - `src/examples.js`: delete it and build again to regenerate it with `tools/make_examples.py` (needs numpy);
 - `native/icons/*.png`: delete them to re-render them from `tools/icon.svg` with `tools/render_icons.js` (needs
-  Node.js and Playwright).
+  Node.js and Playwright);
+- `native/icons/BlueMolecule.ico`, the Windows icon: regenerate it from the PNGs with `python3 tools/make_ico.py`
+  (needs Pillow).
 
 The version number lives in `tools/build.py`, `src/app.js`, `launcher/bluemolecule.py` and
 `native/linux/bluemolecule_qt.py`; keep them equal. `native-bridge.js` has its own bridge-protocol version.
@@ -198,6 +203,7 @@ Each suite can also be run alone, e.g. `node tests/test_parsers.js`.
 | `test_chem.js`, `test_ff.js`, `test_templates.js`, `test_symmetry.js`, `test_analysis.js` | SMILES, bond orders, hydrogens, force field, building library, point groups, convergence analysis |
 | `test_reps.js`, `test_cartoon.js` | Selection language, residue and sugar classification, presets, cartoon geometry (synthetic structures from `tests/synth.js`) |
 | `test_native_bridge.js`, `test_launcher.py`, `test_native_packaging.py` | Host bridge, launcher (server, security, window selection with simulated browsers and a simulated Qt), packages and installers |
+| `test_windows_package.py`, `browser_windows_launch_test.js` | The Windows package without Windows: C# 5 and PowerShell 5.1 syntax limits, delimiter balance, registry symmetry of install and uninstall, the icon, and the launch page opened from `file://` in Chromium |
 | `test_renderer.js`, `browser_*.js`, `test_bigfiles.js` | The renderer and the interface in headless Chromium (they save screenshots to `tests/shots/`), injection safety, large files |
 
 **Fixtures.**

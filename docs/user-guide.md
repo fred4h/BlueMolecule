@@ -28,7 +28,7 @@ panel collapses it.
 - **Open** in the toolbar, or **Ctrl/⌘ + O**. You can select several files at once.
 - **Drag and drop** files anywhere in the window.
 - From a terminal: `bluemolecule opt.log freq.out orbital.cube`.
-- From your file manager: **Open With → BlueMolecule** (see [installation](installation.md)).
+- From your file manager: **Open With → BlueMolecule** on Linux and Windows (see [installation](installation.md)).
 - From the **start screen**:
   - **Open files…**;
   - **New molecule** (an empty document for building);
@@ -185,5 +185,6 @@ The **Export** menu offers:
   optionally, a transparent background. For publications, choose a white background in the toolbar first.
 - **Vibration animation**: the selected mode as a multi-frame XYZ file, which other viewers can play.
 
-In the Linux and macOS apps, saving opens the system's Save dialog. The single HTML file saves through the
-browser's downloads. Geometries changed in the Build tab are saved as edited. The original file is never modified.
+Saving opens the system's Save dialog: in the Linux, Windows and macOS versions, and in Chrome or Edge. Firefox and
+Safari save to the downloads folder. Geometries changed in the Build tab are saved as edited. The original file is
+never modified.

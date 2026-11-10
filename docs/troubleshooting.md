@@ -30,6 +30,19 @@ BlueMolecule only gets its own taskbar entry and icon in the **native Qt window*
   BlueMolecule's desktop entry. If the taskbar still shows the browser's icon, run `./install.sh` again. It
   refreshes KDE's desktop-file cache. Then log out and in.
 
+## Windows
+
+- **"Windows protected your PC"** when you start `Install BlueMolecule.cmd`: click **More info → Run anyway**. The
+  file comes from the internet and is not signed.
+- **The installer could not compile BlueMolecule.exe:** it prints the compiler's messages. Please report them. The
+  Start-menu entry then opens BlueMolecule directly, without **Open with**.
+- **Diagnostics:** run `"%LOCALAPPDATA%\Programs\BlueMolecule\BlueMolecule.exe" --diagnose`. It shows the
+  browser, page and folders it uses. The log is `%LOCALAPPDATA%\BlueMolecule\bluemolecule.log`.
+- **A file was "not opened automatically":** files over 64 MB are not handed over by **Open with**. Open them from
+  the window with **Open…** or drag them in.
+- **The wrong browser opens:** set the environment variable `BLUEMOLECULE_BROWSER` to the browser's `.exe`, for
+  example `C:\Program Files\Google\Chrome\Application\chrome.exe`.
+
 ## "Open With BlueMolecule" is missing for a file type
 
 The installer registers `.xyz .cube .fchk .molden .mol .sdf .mol2 .pdb .cif .gro .gjf .cml .cjson .xsf`. Outputs
@@ -66,8 +79,8 @@ BlueMolecule needs **WebGL 2**.
 
 ## Saving does not show a dialog
 
-In the single HTML file, saving goes through the browser's downloads. Check your downloads folder. The installed
-Linux and macOS versions show the system's Save dialog.
+In Firefox and Safari, the single HTML file saves to the downloads folder. Check that folder. Chrome, Edge and the
+installed versions show a Save dialog.
 
 ## Open Babel is not found
 

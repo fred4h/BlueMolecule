@@ -5,7 +5,7 @@ as honestly as possible, what has been checked, what has not, and what the progr
 
 ## What has been checked
 
-- **About 8,000 automated checks in 25 test suites**, all passing for this release
+- **About 8,000 automated checks in 27 test suites**, all passing for this release
   ([how to run them](developer-guide.md#tests)). They cover:
   - every reader and writer, including format detection and the units and conventions of each program;
   - the chemistry routines;
@@ -29,12 +29,13 @@ as honestly as possible, what has been checked, what has not, and what the progr
   - CP2K QM/MM;
   - xtb ONIOM.
 - **The macOS app** has never been compiled or run on a Mac. It was written and checked on Linux.
+- **The Windows version** has never been run on Windows. Its launcher (C# 5) and installer (Windows PowerShell)
+  were written and checked on Linux. The checks cover syntax limits, registry symmetry and the page they produce,
+  which is opened in Chromium the way Edge would open it. The launcher itself has not been compiled yet.
 - **The Linux Qt window** has been tested against a simulated Qt in the test suite, and the app-window fallbacks in
   a headless browser. It still needs confirmation on real desktops.
 - **The macromolecule views** were tested on generated protein, membrane, glycan and DNA structures, not yet on
   structures from the PDB or from simulation set-up tools.
-- **Windows** is not supported by an installer. The single HTML file should work in a modern browser, but this has
-  not been tested.
 
 ## Known limitations
 
@@ -51,7 +52,8 @@ as honestly as possible, what has been checked, what has not, and what the progr
 | Gaussian inputs | ONIOM layer columns in `.gjf` files are skipped; layers are read from outputs |
 | Clean-up | A generic force field for tidying sketches; not a published force field and not a physical method |
 | Building | No conformer search, crystal builder or download from PubChem or the PDB |
-| Browser-only use | The single HTML file has no Open Babel, saves through downloads and is limited by the browser's memory |
+| Windows | "Open with" hands over files up to 64 MB (larger ones: Open… or drag and drop in the window); no Open Babel yet |
+| Browser-only use | The single HTML file has no Open Babel and is limited by the browser's memory |
 | Language | The interface and documentation are in English only |
 
 ## Ideas for future versions

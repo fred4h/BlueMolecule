@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
-"""Build BlueMolecule: a single self-contained HTML file plus macOS and Linux packages.
+"""Build BlueMolecule: a single self-contained HTML file plus Linux, Windows and macOS packages.
 
-    python3 tools/build.py [--target linux|macos|all]     # writes dist/; default: this computer's OS family
+    python3 tools/build.py [--target linux|windows|macos|all]     # writes dist/; default: this computer's OS family
 
 Needs only Python 3. src/examples.js and native/icons/*.png are generated files kept in the repository: delete
-them to regenerate them (tools/make_examples.py needs numpy; tools/render_icons.js needs Node.js + Playwright).
+them to regenerate them (tools/make_examples.py needs numpy; tools/render_icons.js needs Node.js + Playwright;
+tools/make_ico.py, for native/icons/BlueMolecule.ico, needs Pillow).
 
 dist/BlueMolecule-VERSION-macOS.zip   "Install BlueMolecule.command" builds the native app (native/macos)
                                       on the user's Mac; fallback/BlueMolecule.app is the browser-window app
 dist/BlueMolecule-VERSION-linux.tar.gz  launcher, Qt WebEngine window (native/linux/bluemolecule_qt.py),
                                       install.sh/uninstall.sh, desktop file, icons, MIME types
+dist/BlueMolecule-VERSION-windows.zip "Install BlueMolecule.cmd" compiles the launcher (native/windows/BlueMolecule.cs)
+                                      on the user's PC and adds the Start-menu and Open-with entries
 dist/BlueMolecule.html is always rebuilt; the package of a target that is not built is left as it was.
 """
 import argparse
@@ -260,17 +263,80 @@ def build_linux(icons):
         tf.add(lin, arcname=name)
 
 
+WINDOWS_README = '''BlueMolecule {v} for Windows (experimental)
+===========================================
+
+This Windows version has not yet been tested on a real Windows PC. Please report what happens:
+https://github.com/fred4h/BlueMolecule/issues
+
+Install: extract this zip file first (right-click it > Extract All), then double-click
+"Install BlueMolecule.cmd". If Windows says it protected your PC, click "More info" > "Run anyway".
+  It installs for your user only (no administrator rights) in %LOCALAPPDATA%\\Programs\\BlueMolecule:
+  - it compiles the small BlueMolecule.exe launcher with the C# compiler that is part of Windows
+    (the .NET Framework), so nothing has to be installed first;
+  - it adds BlueMolecule to the Start menu and to "Open with" for chemistry files (.log .out .xyz .gjf
+    .fchk .cube .molden .pdb .cif .sdf .mol2 .gro ...), without changing their default programs;
+  - it registers an uninstaller: Settings > Apps > Installed apps > BlueMolecule.
+  Running it again updates the installation.
+
+BlueMolecule opens in an app window of Microsoft Edge (or Chrome, Brave or Vivaldi) with its own
+browser profile. Files given to it with "Open with" are handed to the window inside a temporary copy of
+the page; files larger than 64 MB must be opened from the window instead (Open... or drag and drop).
+Open Babel conversions are not available in the Windows version yet.
+
+Without installing: open BlueMolecule.html in Edge or Chrome.
+Diagnostics:  "%LOCALAPPDATA%\\Programs\\BlueMolecule\\BlueMolecule.exe" --diagnose
+Log:          %LOCALAPPDATA%\\BlueMolecule\\bluemolecule.log
+'''
+
+
+def windows_text(path):
+    """A Windows source file (cmd, ps1, cs): ASCII only, version filled in, CRLF line ends."""
+    text = path.read_text(encoding='utf-8')
+    bad = sorted({c for c in text if ord(c) > 126 or (ord(c) < 32 and c not in '\n\t')})
+    if bad:
+        raise SystemExit('build: %s must be ASCII (Windows PowerShell 5.1 and cmd read it as ANSI): %r' % (path.name, bad))
+    v4 = '.'.join((VERSION.split('.') + ['0', '0', '0'])[:4])
+    text = text.replace('@VERSION4@', v4).replace('@VERSION@', VERSION)
+    return text.replace('\r\n', '\n').replace('\n', '\r\n').encode('ascii')
+
+
+def build_windows():
+    name = 'BlueMolecule-%s-windows' % VERSION
+    win = DIST / 'build' / name
+    sub = win / 'windows'
+    sub.mkdir(parents=True)
+    for f in ('install.ps1', 'BlueMolecule.cs'):
+        if '@VERSION@' not in (NATIVE / 'windows' / f).read_text(encoding='utf-8'):
+            raise SystemExit('build: VERSION placeholder missing in native/windows/' + f)
+    for f in ('install.ps1', 'uninstall.ps1', 'BlueMolecule.cs'):
+        (sub / f).write_bytes(windows_text(NATIVE / 'windows' / f))
+    (win / 'Install BlueMolecule.cmd').write_bytes(windows_text(NATIVE / 'windows' / 'Install BlueMolecule.cmd'))
+    shutil.copy(NATIVE / 'icons' / 'BlueMolecule.ico', sub / 'BlueMolecule.ico')
+    shutil.copy(DIST / 'BlueMolecule.html', win / 'BlueMolecule.html')
+    (win / 'README.txt').write_bytes((WINDOWS_README.format(v=VERSION) + ABOUT).replace('\n', '\r\n').encode('ascii'))
+    copy_license(win)
+    with zipfile.ZipFile(DIST / (name + '.zip'), 'w') as zf:
+        add_tree_zip(zf, win, name, set())
+
+
 def host_target():
-    """The package for this computer's OS family: macos on a Mac, linux on Linux, otherwise both."""
+    """The package for this computer's OS family: macos on a Mac, windows on Windows, linux on Linux, else all."""
     if sys.platform == 'darwin':
         return 'macos'
+    if sys.platform == 'win32':
+        return 'windows'
     return 'linux' if sys.platform.startswith('linux') else 'all'
+
+
+PACKAGE_SUFFIX = {'macos': ('macOS', '.zip'), 'linux': ('linux', '.tar.gz'), 'windows': ('windows', '.zip')}
 
 
 def outputs(target):
     """What one target writes in dist/ (the package and its build folder)."""
-    name = 'BlueMolecule-%s-%s' % (VERSION, 'macOS' if target == 'macos' else 'linux')
-    return [DIST / (name + ('.zip' if target == 'macos' else '.tar.gz')), DIST / 'build' / name]
+    label, ext = PACKAGE_SUFFIX[target]
+    name = 'BlueMolecule-%s-%s' % (VERSION, label)
+    return [DIST / (name + ext), DIST / 'build' / name]
 
 
 def clean(targets):
@@ -290,10 +356,10 @@ def check_python_sources():
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description='Build dist/BlueMolecule.html and the installable packages.')
-    ap.add_argument('--target', choices=('linux', 'macos', 'all'), default=host_target(),
+    ap.add_argument('--target', choices=('linux', 'macos', 'windows', 'all'), default=host_target(),
                     help="package(s) to build (default for this computer: %s)" % host_target())
     args = ap.parse_args(argv)
-    targets = ('macos', 'linux') if args.target == 'all' else (args.target,)
+    targets = ('macos', 'linux', 'windows') if args.target == 'all' else (args.target,)
     if 'linux' in targets:
         check_python_sources()
     if not (SRC / 'examples.js').is_file():   # generated and committed; delete it to regenerate (needs numpy)
@@ -311,6 +377,8 @@ def main(argv=None):
         build_macos(icons)
     if 'linux' in targets:
         build_linux(icons)
+    if 'windows' in targets:
+        build_windows()
 
     built = {outputs(t)[0].name for t in targets} | {'BlueMolecule.html'}
     for p in sorted(DIST.iterdir()):

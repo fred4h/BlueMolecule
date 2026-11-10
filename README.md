@@ -42,7 +42,7 @@
   - Hydrogen and bond-order handling, a clean-up force field, point-group detection and symmetrization, and a coordinate editor.
 - **Exports.** Writes 24 structure, crystal and MD formats and calculation inputs for 10 programs. Other formats go through Open Babel when it is installed. Images can be saved at higher resolution.
 - **Large files.** Outputs of hundreds of megabytes or more are read in chunks. Long DCD, TRR or XTC trajectories are thinned to fit in memory.
-- **Its own window.** On Linux it opens a Qt WebEngine window, or a browser app window if Qt is missing, with its own name and icon. On macOS it is a small native app (experimental). The single HTML file also works in any modern browser.
+- **Its own window.** On Linux it opens a Qt WebEngine window, or a browser app window if Qt is missing, with its own name and icon. On macOS it is a small native app, and on Windows an Edge app window started by its own launcher. Both are experimental. The single HTML file also works in any modern browser.
 - **Private by design.** Nothing is uploaded. The only network traffic is between the window and its own launcher on `127.0.0.1`.
 
 <table>
@@ -77,11 +77,15 @@ cd BlueMolecule-1.4.1-linux
 bluemolecule calc.log        # or start it from the applications menu, or use "Open With" on a file
 ```
 
+**Windows 10 and 11** (experimental, not yet tested on a real PC): extract `BlueMolecule-1.4.1-windows.zip`, then
+double-click **Install BlueMolecule.cmd**. It needs no administrator rights and nothing installed first. It adds
+BlueMolecule to the Start menu and to **Open with** for chemistry files.
+
 **macOS** (experimental, not yet tested on a real Mac): unzip `BlueMolecule-1.4.1-macOS.zip`, then double-click
 **Install BlueMolecule.command**. It needs Apple's free Command Line Tools.
 
-**Any computer:** open `BlueMolecule.html` in Chrome, Edge, Firefox or Safari. It works offline, but saving goes
-through the browser's downloads and Open Babel is not available.
+**Any computer:** open `BlueMolecule.html` in Chrome, Edge, Firefox or Safari. It works offline, but Open Babel is
+not available.
 
 More detail, options and uninstalling: [docs/installation.md](docs/installation.md).
 Building from source needs only Python 3: `python3 tools/build.py`.
@@ -90,7 +94,7 @@ Building from source needs only Python 3: `python3 tools/build.py`.
 
 | | |
 |---|---|
-| [Installation](docs/installation.md) | Linux, macOS and browser; window types; Open Babel; uninstalling |
+| [Installation](docs/installation.md) | Linux, Windows, macOS and browser; window types; Open Babel; uninstalling |
 | [User guide](docs/user-guide.md) | The window, mouse and keyboard, toolbar, tabs, plots, exporting |
 | [Analysing outputs](docs/analysing-outputs.md) | Contents overview, optimisations, scans and IRC, vibrations, spectra, excited states, NMR, orbitals, charges |
 | [QM/MM and ONIOM](docs/qmmm-oniom.md) | What is read from each program, energies, layer views |
@@ -106,7 +110,7 @@ Building from source needs only Python 3: `python3 tools/build.py`.
 
 ## Status
 
-BlueMolecule 1.4.1 is the first public release. The automated test suite has about 8,000 checks:
+BlueMolecule 1.4.1 is the first public release. The automated test suite has about 8,000 checks in 27 suites:
 - format readers and writers against example files;
 - chemistry routines;
 - the selection language;

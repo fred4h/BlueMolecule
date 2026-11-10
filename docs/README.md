@@ -6,7 +6,7 @@
 
 **Using BlueMolecule**
 
-1. [Installation](installation.md): Linux, macOS and the single HTML file; window types; Open Babel.
+1. [Installation](installation.md): Linux, Windows, macOS and the single HTML file; window types; Open Babel.
 2. [User guide](user-guide.md): the window, mouse and keyboard, toolbar, tabs, plots, saving and exporting.
 3. [Analysing outputs](analysing-outputs.md): contents overview, optimisations and convergence, scans and IRC,
    vibrations, IR, Raman, UV-Vis, ECD and NMR spectra, excited states, orbitals and volumes, charges.

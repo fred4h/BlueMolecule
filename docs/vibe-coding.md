@@ -30,7 +30,7 @@ and look at screenshots of the interface. The versions from 1.0 to 1.4.1 were ma
 
 ## How the program was checked
 
-- **Automated tests.** Every feature came with tests: about 8,000 checks in 25 suites, run with
+- **Automated tests.** Every feature came with tests: about 8,000 checks in 27 suites, run with
   `python3 tests/run_all.py --browser` ([developer guide](developer-guide.md#tests)). They cover:
   - the readers and writers of each format;
   - format detection;

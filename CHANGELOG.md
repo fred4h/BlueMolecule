@@ -7,6 +7,9 @@ author's requests and bug reports.
 
 - Full documentation in `docs/`, with a clear notice that the project is vibe-coded. The notice also appears in the
   Help dialog and the package READMEs.
+- **An experimental Windows package.** A double-click installer (no administrator rights) adds a Start-menu entry
+  and "Open with" for chemistry files. BlueMolecule opens in its own Edge window, through a small launcher compiled
+  on the PC from C# source. It has not yet been tested on a real Windows PC.
 - MIT License; the packages now include the license.
 - New test that crafted files cannot inject markup or scripts into the page (`tests/browser_xss_test.js`).
 - One command runs every test suite: `python3 tests/run_all.py [--browser] [--big]`.

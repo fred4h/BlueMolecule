@@ -20,9 +20,9 @@ T = ROOT / 'tests'
 NODE_UNIT = ['test_parsers.js', 'test_parsers2.js', 'test_readers_qc.js', 'test_readers_struct.js', 'test_writers.js',
              'test_writers_struct.js', 'test_chem.js', 'test_ff.js', 'test_templates.js', 'test_symmetry.js', 'test_analysis.js',
              'test_audit.js', 'test_qmmm.js', 'test_native_bridge.js', 'test_reps.js', 'test_cartoon.js']
-PY_UNIT = ['test_launcher.py', 'test_native_packaging.py']
+PY_UNIT = ['test_launcher.py', 'test_native_packaging.py', 'test_windows_package.py']
 BROWSER = ['test_renderer.js', 'browser_test.js', 'browser_build_test.js', 'browser_formats_test.js', 'browser_reps_test.js',
-           'browser_xss_test.js', 'test_bigfiles.js']
+           'browser_xss_test.js', 'browser_windows_launch_test.js', 'test_bigfiles.js']
 
 
 def run(cmd, label):
@@ -31,7 +31,7 @@ def run(cmd, label):
     out = p.stdout.strip()
     last = out.splitlines()[-1] if out else ''
     ok = p.returncode == 0
-    print('%-4s %-28s %6.1f s  %s' % ('ok' if ok else 'FAIL', label, time.time() - t0, last[:110]))
+    print('%-4s %-32s %6.1f s  %s' % ('ok' if ok else 'FAIL', label, time.time() - t0, last[:110]))
     if not ok:
         print('\n'.join('     | ' + s for s in out.splitlines()[-60:]))
     return ok
