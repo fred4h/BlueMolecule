@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Chemistry file types for BlueMolecule (install.sh puts this in share/mime/packages).
+     Generic extensions such as .log, .out, .com and .txt are deliberately not claimed. -->
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="chemical/x-gaussian-cube">
+    <comment>Gaussian cube file</comment>
+    <sub-class-of type="text/plain"/>
+    <glob pattern="*.cube"/>
+  </mime-type>
+  <mime-type type="chemical/x-gaussian-checkpoint">
+    <comment>Gaussian formatted checkpoint</comment>
+    <sub-class-of type="text/plain"/>
+    <glob pattern="*.fchk"/>
+    <glob pattern="*.fch"/>
+  </mime-type>
+  <mime-type type="chemical/x-molden">
+    <comment>Molden file</comment>
+    <sub-class-of type="text/plain"/>
+    <glob pattern="*.molden"/>
+  </mime-type>
+  <mime-type type="chemical/x-xyz">
+    <comment>XYZ coordinates</comment>
+    <sub-class-of type="text/plain"/>
+    <glob pattern="*.xyz"/>
+  </mime-type>
+  <mime-type type="chemical/x-mdl-molfile">
+    <comment>MDL Molfile</comment>
+    <sub-class-of type="text/plain"/>
+    <glob pattern="*.mol"/>
+  </mime-type>
+  <mime-type type="chemical/x-mdl-sdfile">
+    <comment>MDL SD file</comment>
+    <sub-class-of type="text/plain"/>
+    <glob pattern="*.sdf"/>
+  </mime-type>
+  <mime-type type="chemical/x-mol2">
+    <comment>Tripos Mol2 file</comment>
+    <sub-class-of type="text/plain"/>
+    <glob pattern="*.mol2"/>
+  </mime-type>
+  <mime-type type="chemical/x-pdb">
+    <comment>Protein Data Bank file</comment>
+    <sub-class-of type="text/plain"/>
+    <glob pattern="*.pdb"/>
+  </mime-type>
+  <mime-type type="chemical/x-cif">
+    <comment>Crystallographic Information File</comment>
+    <sub-class-of type="text/plain"/>
+    <glob pattern="*.cif"/>
+  </mime-type>
+  <mime-type type="chemical/x-gromacs-gro">
+    <comment>GROMACS structure file</comment>
+    <sub-class-of type="text/plain"/>
+    <glob pattern="*.gro"/>
+  </mime-type>
+  <mime-type type="chemical/x-gaussian-input">
+    <comment>Gaussian input file</comment>
+    <sub-class-of type="text/plain"/>
+    <glob pattern="*.gjf"/>
+  </mime-type>
+  <mime-type type="chemical/x-cml">
+    <comment>Chemical Markup Language file</comment>
+    <sub-class-of type="application/xml"/>
+    <glob pattern="*.cml"/>
+  </mime-type>
+  <mime-type type="chemical/x-cjson">
+    <comment>Chemical JSON file</comment>
+    <sub-class-of type="application/json"/>
+    <glob pattern="*.cjson"/>
+  </mime-type>
+  <mime-type type="chemical/x-xsf">
+    <comment>XCrySDen structure file</comment>
+    <sub-class-of type="text/plain"/>
+    <glob pattern="*.xsf"/>
+  </mime-type>
+</mime-info>

@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Info.plist of the native BlueMolecule.app; "Install BlueMolecule.command" fills in @VERSION@. -->
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key><string>BlueMolecule</string>
+  <key>CFBundleDisplayName</key><string>BlueMolecule</string>
+  <key>CFBundleIdentifier</key><string>org.bluemolecule.viewer</string>
+  <key>CFBundleVersion</key><string>@VERSION@</string>
+  <key>CFBundleShortVersionString</key><string>@VERSION@</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleSignature</key><string>????</string>
+  <key>CFBundleExecutable</key><string>BlueMolecule</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
+  <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+  <key>CFBundleDevelopmentRegion</key><string>en</string>
+  <key>LSMinimumSystemVersion</key><string>11.0</string>
+  <key>LSApplicationCategoryType</key><string>public.app-category.education</string>
+  <key>NSPrincipalClass</key><string>NSApplication</string>
+  <key>NSHighResolutionCapable</key><true/>
+  <key>NSSupportsAutomaticGraphicsSwitching</key><true/>
+  <key>NSHumanReadableCopyright</key><string>Copyright © 2026 Frederico Henrique Do. C. R. Ferreira. MIT License.</string>
+  <key>CFBundleDocumentTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleTypeName</key><string>Chemical structure or calculation file</string>
+      <key>CFBundleTypeRole</key><string>Viewer</string>
+      <key>LSHandlerRank</key><string>Alternate</string>
+      <key>LSItemContentTypes</key>
+      <array>
+        <string>org.bluemolecule.cube</string>
+        <string>org.bluemolecule.fchk</string>
+        <string>org.bluemolecule.molden</string>
+        <string>org.bluemolecule.xyz</string>
+        <string>org.bluemolecule.mol</string>
+        <string>org.bluemolecule.sdf</string>
+        <string>org.bluemolecule.mol2</string>
+        <string>org.bluemolecule.pdb</string>
+        <string>org.bluemolecule.cif</string>
+        <string>org.bluemolecule.gro</string>
+        <string>org.bluemolecule.gjf</string>
+        <string>org.bluemolecule.cml</string>
+        <string>org.bluemolecule.cjson</string>
+        <string>org.bluemolecule.xsf</string>
+      </array>
+    </dict>
+    <!-- Any other file (Gaussian .log, ORCA .out, ...) can be dropped on the Dock icon or opened with
+         open -a, but BlueMolecule never offers itself for those types (rank None). -->
+    <dict>
+      <key>CFBundleTypeName</key><string>Other file</string>
+      <key>CFBundleTypeRole</key><string>Viewer</string>
+      <key>LSHandlerRank</key><string>None</string>
+      <key>LSItemContentTypes</key><array><string>public.data</string></array>
+    </dict>
+  </array>
+  <key>UTImportedTypeDeclarations</key>
+  <array>
+    <dict>
+      <key>UTTypeIdentifier</key><string>org.bluemolecule.cube</string>
+      <key>UTTypeDescription</key><string>Gaussian cube file</string>
+      <key>UTTypeConformsTo</key><array><string>public.plain-text</string></array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key><array><string>cube</string></array>
+        <key>public.mime-type</key><string>chemical/x-gaussian-cube</string>
+      </dict>
+    </dict>
+    <dict>
+      <key>UTTypeIdentifier</key><string>org.bluemolecule.fchk</string>
+      <key>UTTypeDescription</key><string>Gaussian formatted checkpoint</string>
+      <key>UTTypeConformsTo</key><array><string>public.plain-text</string></array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key><array><string>fchk</string><string>fch</string></array>
+        <key>public.mime-type</key><string>chemical/x-gaussian-checkpoint</string>
+      </dict>
+    </dict>
+    <dict>
+      <key>UTTypeIdentifier</key><string>org.bluemolecule.molden</string>
+      <key>UTTypeDescription</key><string>Molden file</string>
+      <key>UTTypeConformsTo</key><array><string>public.plain-text</string></array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key><array><string>molden</string></array>
+        <key>public.mime-type</key><string>chemical/x-molden</string>
+      </dict>
+    </dict>
+    <dict>
+      <key>UTTypeIdentifier</key><string>org.bluemolecule.xyz</string>
+      <key>UTTypeDescription</key><string>XYZ coordinates</string>
+      <key>UTTypeConformsTo</key><array><string>public.plain-text</string></array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key><array><string>xyz</string></array>
+        <key>public.mime-type</key><string>chemical/x-xyz</string>
+      </dict>
+    </dict>
+    <dict>
+      <key>UTTypeIdentifier</key><string>org.bluemolecule.mol</string>
+      <key>UTTypeDescription</key><string>MDL Molfile</string>
+      <key>UTTypeConformsTo</key><array><string>public.plain-text</string></array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key><array><string>mol</string></array>
+        <key>public.mime-type</key><string>chemical/x-mdl-molfile</string>
+      </dict>
+    </dict>
+    <dict>
+      <key>UTTypeIdentifier</key><string>org.bluemolecule.sdf</string>
+      <key>UTTypeDescription</key><string>MDL SD file</string>
+      <key>UTTypeConformsTo</key><array><string>public.plain-text</string></array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key><array><string>sdf</string></array>
+        <key>public.mime-type</key><string>chemical/x-mdl-sdfile</string>
+      </dict>
+    </dict>
+    <dict>
+      <key>UTTypeIdentifier</key><string>org.bluemolecule.mol2</string>
+      <key>UTTypeDescription</key><string>Tripos Mol2 file</string>
+      <key>UTTypeConformsTo</key><array><string>public.plain-text</string></array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key><array><string>mol2</string></array>
+        <key>public.mime-type</key><string>chemical/x-mol2</string>
+      </dict>
+    </dict>
+    <dict>
+      <key>UTTypeIdentifier</key><string>org.bluemolecule.pdb</string>
+      <key>UTTypeDescription</key><string>Protein Data Bank file</string>
+      <key>UTTypeConformsTo</key><array><string>public.plain-text</string></array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key><array><string>pdb</string></array>
+        <key>public.mime-type</key><string>chemical/x-pdb</string>
+      </dict>
+    </dict>
+    <dict>
+      <key>UTTypeIdentifier</key><string>org.bluemolecule.cif</string>
+      <key>UTTypeDescription</key><string>Crystallographic Information File</string>
+      <key>UTTypeConformsTo</key><array><string>public.plain-text</string></array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key><array><string>cif</string></array>
+        <key>public.mime-type</key><string>chemical/x-cif</string>
+      </dict>
+    </dict>
+    <dict>
+      <key>UTTypeIdentifier</key><string>org.bluemolecule.gro</string>
+      <key>UTTypeDescription</key><string>GROMACS structure file</string>
+      <key>UTTypeConformsTo</key><array><string>public.plain-text</string></array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key><array><string>gro</string></array>
+        <key>public.mime-type</key><string>chemical/x-gromacs-gro</string>
+      </dict>
+    </dict>
+    <dict>
+      <key>UTTypeIdentifier</key><string>org.bluemolecule.gjf</string>
+      <key>UTTypeDescription</key><string>Gaussian input file</string>
+      <key>UTTypeConformsTo</key><array><string>public.plain-text</string></array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key><array><string>gjf</string></array>
+        <key>public.mime-type</key><string>chemical/x-gaussian-input</string>
+      </dict>
+    </dict>
+    <dict>
+      <key>UTTypeIdentifier</key><string>org.bluemolecule.cml</string>
+      <key>UTTypeDescription</key><string>Chemical Markup Language file</string>
+      <key>UTTypeConformsTo</key><array><string>public.xml</string></array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key><array><string>cml</string></array>
+        <key>public.mime-type</key><string>chemical/x-cml</string>
+      </dict>
+    </dict>
+    <dict>
+      <key>UTTypeIdentifier</key><string>org.bluemolecule.cjson</string>
+      <key>UTTypeDescription</key><string>Chemical JSON file</string>
+      <key>UTTypeConformsTo</key><array><string>public.json</string></array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key><array><string>cjson</string></array>
+        <key>public.mime-type</key><string>chemical/x-cjson</string>
+      </dict>
+    </dict>
+    <dict>
+      <key>UTTypeIdentifier</key><string>org.bluemolecule.xsf</string>
+      <key>UTTypeDescription</key><string>XCrySDen structure file</string>
+      <key>UTTypeConformsTo</key><array><string>public.plain-text</string></array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key><array><string>xsf</string></array>
+        <key>public.mime-type</key><string>chemical/x-xsf</string>
+      </dict>
+    </dict>
+  </array>
+</dict>
+</plist>

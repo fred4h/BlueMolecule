@@ -1,0 +1,294 @@
+----- GAMESS execution script 'rungms' -----
+This job is running on host node01
+under operating system Linux at Wed Nov  4 21:00:00 UTC 2026
+Available scratch disk space (Kbyte units) at beginning of the job is
+Filesystem     1K-blocks     Used Available Use% Mounted on
+/dev/sda1      976762584 12345678 964416906   2% /scratch
+ Distributed Data Interface kickoff program.
+ Initiating 1 compute processes on 1 nodes to run the following command:
+ /opt/gamess/gamess.00.x water
+
+          ******************************************************
+          *         GAMESS VERSION = 30 SEP 2021 (R2)          *
+          *             FROM IOWA STATE UNIVERSITY             *
+          * M.W.SCHMIDT, K.K.BALDRIDGE, J.A.BOATZ, S.T.ELBERT, *
+          *   M.S.GORDON, J.H.JENSEN, S.KOSEKI, N.MATSUNAGA,   *
+          *          K.A.NGUYEN, S.J.SU, T.L.WINDUS,           *
+          *       TOGETHER WITH M.DUPUIS, J.A.MONTGOMERY       *
+          *         J.COMPUTATIONAL CHEM.  14, 1347-1363(1993) *
+          **************** 64 BIT LINUX VERSION ****************
+
+ EXECUTION OF GAMESS BEGUN Wed Nov  4 21:00:00 2026
+
+            ECHO OF THE FIRST FEW INPUT CARDS -
+ INPUT CARD> $CONTRL SCFTYP=RHF RUNTYP=OPTIMIZE DFTTYP=B3LYP ICHARG=0 MULT=1 $END
+ INPUT CARD> $BASIS GBASIS=N31 NGAUSS=6 NDFUNC=1 $END
+ INPUT CARD> $STATPT OPTTOL=1.0E-4 NSTEP=50 HSSEND=.TRUE. $END
+ INPUT CARD> $DATA
+ INPUT CARD>water opt+hessian
+ INPUT CARD>C1
+ INPUT CARD>O  8.0   0.0000000000   0.0000000000   0.1173000000
+ INPUT CARD>H  1.0   0.0000000000   0.7572000000  -0.4692000000
+ INPUT CARD>H  1.0   0.0000000000  -0.7572000000  -0.4692000000
+ INPUT CARD> $END
+  500000000 WORDS OF MEMORY AVAILABLE
+
+     RUN TITLE
+     ---------
+ water opt+hessian
+
+ THE POINT GROUP OF THE MOLECULE IS C1      
+ THE ORDER OF THE PRINCIPAL AXIS IS     0
+
+ ATOM      ATOMIC                      COORDINATES (BOHR)
+           CHARGE         X                   Y                   Z
+ O           8.0     0.0000000000        0.0000000000        0.2216648744
+ H           1.0     0.0000000000        1.4309006216       -0.8866594977
+ H           1.0     0.0000000000       -1.4309006216       -0.8866594977
+
+          INTERNUCLEAR DISTANCES (ANGS.)
+          ------------------------------
+
+                1 O          2 H          3 H     
+
+   1 O       0.0000000    0.9594755 *  0.9594755 *
+   2 H       0.9594755 *  0.0000000    1.5144000 *
+   3 H       0.9594755 *  1.5144000 *  0.0000000  
+
+  * ... LESS THAN  3.000
+
+
+ TOTAL NUMBER OF BASIS SET SHELLS             =   10
+ NUMBER OF CARTESIAN GAUSSIAN BASIS FUNCTIONS =   19
+ NUMBER OF ELECTRONS                          =   10
+ CHARGE OF MOLECULE                           =    0
+ SPIN MULTIPLICITY                            =    1
+ NUMBER OF OCCUPIED ORBITALS (ALPHA)          =    5
+ NUMBER OF OCCUPIED ORBITALS (BETA )          =    5
+ TOTAL NUMBER OF ATOMS                        =    3
+ THE NUCLEAR REPULSION ENERGY IS        9.1681932328
+
+     $CONTRL OPTIONS
+     ---------------
+ SCFTYP=RHF          RUNTYP=OPTIMIZE     EXETYP=RUN     
+ MPLEVL=       0     CITYP =NONE         CCTYP =NONE         VBTYP =NONE    
+ DFTTYP=B3LYP        TDDFT =NONE    
+ MULT  =       1     ICHARG=         0   NZVAR =         0   COORD =UNIQUE  
+ PP    =NONE         RELWFN=NONE         LOCAL =NONE         NUMGRD=       F
+ ISPHER=      -1     NOSYM =         0   MAXIT =        30   UNITS =ANGS    
+
+     BASIS OPTIONS
+     -------------
+     GBASIS=N31          IGAUSS=       6      POLAR=POPN31  
+     NDFUNC=       1     NFFUNC=       0     DIFFSP=       F
+     NPFUNC=       0      DIFFS=       F     BASNAM=        
+
+     PARAMETERS CONTROLLING GEOMETRY SEARCH ARE
+     METHOD =QA                  UPHESS =BFGS    
+     NNEG   =         0          NFRZ   =         0
+     NSTEP  =        50          IFOLOW =         1
+     HESS   =GUESS               RESTAR =         F
+     IHREP  =         0          HSSEND =         T
+     NPRT   =         0          NPUN   =         0
+     OPTTOL = 1.000E-04          RMIN   = 1.500E-03
+     RMAX   = 1.000E-01          RLIM   = 7.000E-02
+     DXMAX  = 3.000E-01          PURIFY =         F
+
+          *****************************************
+          * BEGINNING GEOMETRY SEARCH POINT NSERCH=   0 *
+          *****************************************
+
+ COORDINATES OF ALL ATOMS ARE (ANGS)
+   ATOM   CHARGE       X              Y              Z
+ ------------------------------------------------------------
+ O           8.0   0.0000000000   0.0000000000   0.1173000000
+ H           1.0   0.0000000000   0.7572000000  -0.4692000000
+ H           1.0   0.0000000000  -0.7572000000  -0.4692000000
+
+          ------------------------
+          RHF SCF CALCULATION
+          ------------------------
+ DENSITY MATRIX CONV=  1.00E-05
+  ITER EX DEM     TOTAL ENERGY        E CHANGE  DENSITY CHANGE    DIIS ERROR
+    1  0  0      -76.2898331043   -76.2898331043   0.087453622   0.000000000
+   12  6  0      -76.4089074962    -0.0000000005   0.000004571   0.000001334
+
+          -----------------
+          DENSITY CONVERGED
+          -----------------
+
+ FINAL R-B3LYP ENERGY IS      -76.4089074962 AFTER  12 ITERATIONS
+
+                         ----------------------
+                         GRADIENT OF THE ENERGY
+                         ----------------------
+
+ UNITS ARE HARTREE/BOHR    E'X               E'Y               E'Z 
+    1 O                0.000000000       0.000000000       0.012346000
+    2 H                0.000000000       0.008765432      -0.006173000
+    3 H                0.000000000      -0.008765432      -0.006173000
+                         MAXIMUM GRADIENT =  0.0123460    RMS GRADIENT = 0.0067890
+
+1     NSERCH:   0  E=      -76.4089074962  GRAD. MAX=  0.0123460  R.M.S.=  0.0067890
+
+          *****************************************
+          * BEGINNING GEOMETRY SEARCH POINT NSERCH=   1 *
+          *****************************************
+
+ COORDINATES OF ALL ATOMS ARE (ANGS)
+   ATOM   CHARGE       X              Y              Z
+ ------------------------------------------------------------
+ O           8.0   0.0000000000   0.0000000000   0.1189000000
+ H           1.0   0.0000000000   0.7598000000  -0.4756000000
+ H           1.0   0.0000000000  -0.7598000000  -0.4756000000
+
+ FINAL R-B3LYP ENERGY IS      -76.4098631177 AFTER  10 ITERATIONS
+
+1     NSERCH:   1  E=      -76.4098631177  GRAD. MAX=  0.0016340  R.M.S.=  0.0009510
+
+          *****************************************
+          * BEGINNING GEOMETRY SEARCH POINT NSERCH=   2 *
+          *****************************************
+
+ COORDINATES OF ALL ATOMS ARE (ANGS)
+   ATOM   CHARGE       X              Y              Z
+ ------------------------------------------------------------
+ O           8.0   0.0000000000   0.0000000000   0.1190180000
+ H           1.0   0.0000000000   0.7592420000  -0.4759270000
+ H           1.0   0.0000000000  -0.7592420000  -0.4759270000
+
+ FINAL R-B3LYP ENERGY IS      -76.4098717230 AFTER   8 ITERATIONS
+
+1     NSERCH:   2  E=      -76.4098717230  GRAD. MAX=  0.0000120  R.M.S.=  0.0000080
+
+1     ***** EQUILIBRIUM GEOMETRY LOCATED *****
+ COORDINATES OF ALL ATOMS ARE (ANGS)
+   ATOM   CHARGE       X              Y              Z
+ ------------------------------------------------------------
+ O           8.0   0.0000000000   0.0000000000   0.1190180000
+ H           1.0   0.0000000000   0.7592420000  -0.4759270000
+ H           1.0   0.0000000000  -0.7592420000  -0.4759270000
+
+          ------------
+          EIGENVECTORS
+          ------------
+
+                      1          2          3          4          5
+                  -19.1351    -0.9971    -0.5203    -0.3662    -0.2921
+                     A          A          A          A          A   
+    1  O  1  S    0.994380  -0.232565   0.000000  -0.102345   0.000000
+    2  O  1  S    0.026810   0.835542   0.000000   0.512339   0.000000
+
+                      6          7
+                    0.0654     0.1491
+                     A          A   
+    1  O  1  S   -0.098756   0.000000
+    2  O  1  S    0.145322   0.000000
+ ...... END OF RHF CALCULATION ......
+
+          ----------------------------------------
+          TOTAL MULLIKEN AND LOWDIN ATOMIC POPULATIONS
+          ----------------------------------------
+       ATOM         MULL.POP.    CHARGE          LOW.POP.     CHARGE
+    1 O             8.684245   -0.684245         8.453412   -0.453412
+    2 H             0.657878    0.342122         0.773294    0.226706
+    3 H             0.657878    0.342122         0.773294    0.226706
+
+          ---------------------
+          ELECTROSTATIC MOMENTS
+          ---------------------
+
+ POINT   1           X           Y           Z (BOHR)    CHARGE
+                 0.000000    0.000000    0.000000        0.00 (A.U.)
+         DX          DY          DZ         /D/  (DEBYE)
+     0.000000    0.000000    2.093745    2.093745
+ ...... END OF PROPERTY EVALUATION ......
+
+          ...... END OF GEOMETRY SEARCH ......
+
+     NORMAL COORDINATE ANALYSIS IN THE HARMONIC APPROXIMATION
+     -------------------------------------------------------
+
+     ATOMIC WEIGHTS (AMU)
+
+    1     O                15.99491
+    2     H                 1.00782
+    3     H                 1.00782
+
+     MODES 1 TO 6 ARE TAKEN AS ROTATIONS AND TRANSLATIONS.
+
+     FREQUENCIES IN CM**-1, IR INTENSITIES IN DEBYE**2/AMU-ANGSTROM**2,
+     REDUCED MASSES IN AMU.
+
+                          1           2           3           4           5
+       FREQUENCY:        12.61       10.83        0.07        0.02        0.03  
+    SYMMETRY:         A           A           A           A           A    
+ REDUCED MASS:      1.07941     1.07941     5.38431     1.00782     6.58591
+ IR INTENSITY:      0.00000     0.00000     0.00000     0.00000     0.00000
+
+  1   O            X  0.00000000  0.00000000  0.05874906  0.00000000 -0.25000440
+                   Y  0.00000000  0.06718378  0.00000000  0.00000000  0.00000000
+                   Z -0.06718378  0.00000000  0.00000000  0.25000000  0.00000000
+  2   H            X  0.00000000  0.00000000  0.46586015  0.00000000 -0.25000440
+                   Y  0.00000000 -0.53275321  0.00000000  0.00000000  0.00000000
+                   Z  0.53275321  0.00000000  0.00000000  0.25000000  0.00000000
+  3   H            X  0.00000000  0.00000000  0.46586015  0.00000000 -0.25000440
+                   Y  0.00000000 -0.53275321  0.00000000  0.00000000  0.00000000
+                   Z  0.53275321  0.00000000  0.00000000  0.25000000  0.00000000
+
+ TRANS. SAYVETZ    X  0.00000000  0.00000000  0.00000000  0.00000000 -1.00000000
+                   Y  0.00000000  0.00000000  0.00000000  0.00000000  0.00000000
+                   Z  0.00000000  0.00000000  0.00000000  1.00000000  0.00000000
+                TOTAL  0.00000000  0.00000000  0.00000000  1.00000000  1.00000000
+
+                          6           7           8           9
+       FREQUENCY:        25.65     1626.80     3773.58     3884.37  
+    SYMMETRY:         A           A           A           A    
+ REDUCED MASS:      1.00782     1.08280     1.04470     1.08170
+ IR INTENSITY:      0.00000     1.64084     0.09909     0.87353
+
+  1   O            X  0.25000440  0.00000000  0.00000000  0.00000000
+                   Y  0.00000000  0.00000000  0.00000000 -0.06810000
+                   Z  0.00000000 -0.06800000  0.04780000  0.00000000
+  2   H            X  0.25000440  0.00000000  0.00000000  0.00000000
+                   Y  0.00000000 -0.41650000  0.58350000  0.53820000
+                   Z  0.00000000  0.54010000 -0.37950000 -0.45310000
+  3   H            X  0.25000440  0.00000000  0.00000000  0.00000000
+                   Y  0.00000000  0.41650000 -0.58350000  0.53820000
+                   Z  0.00000000  0.54010000 -0.37950000  0.45310000
+
+ TRANS. SAYVETZ    X  1.00000000  0.00000000  0.00000000  0.00000000
+                   Y  0.00000000  0.00000000  0.00000000  0.00000000
+                   Z  0.00000000  0.00000000  0.00000000  0.00000000
+                TOTAL  1.00000000  0.00000000  0.00000000  0.00000000
+
+     THERMOCHEMISTRY AT T=  298.15 K
+     -------------------------------
+
+     USING IDEAL GAS, RIGID ROTOR, HARMONIC NORMAL MODE APPROXIMATIONS.
+     P=  1.01325E+05 PASCAL.
+     ALL FREQUENCIES ARE SCALED BY   1.00000
+     THE HARMONIC ZERO POINT ENERGY IS (SCALED BY   1.000)
+            0.021245 HARTREE/MOLECULE     4662.8 CM-1/MOLECULE
+           13.331 KCAL/MOL                55.778 KJ/MOL
+
+               E         H         G         CV        CP        S
+            KJ/MOL    KJ/MOL    KJ/MOL   J/MOL-K   J/MOL-K   J/MOL-K
+ ELEC.       0.000     0.000     0.000     0.000     0.000     0.000
+ TRANS.      3.718     6.197   -36.975    12.472    20.786   144.801
+ ROT.        3.718     3.718   -10.974    12.472    12.472    49.276
+ VIB.       55.787    55.787    55.786     0.276     0.276     0.004
+ TOTAL      63.223    65.702     7.837    25.220    33.534   194.081
+
+               E         H         G         CV        CP        S
+          KCAL/MOL  KCAL/MOL  KCAL/MOL CAL/MOL-K CAL/MOL-K CAL/MOL-K
+ ELEC.       0.000     0.000     0.000     0.000     0.000     0.000
+ TRANS.      0.889     1.481    -8.837     2.981     4.968    34.608
+ ROT.        0.889     0.889    -2.623     2.981     2.981    11.777
+ VIB.       13.333    13.333    13.333     0.066     0.066     0.001
+ TOTAL      15.111    15.703     1.873     6.028     8.015    46.386
+
+ ...... END OF THERMOCHEMISTRY ......
+
+ EXECUTION OF GAMESS TERMINATED NORMALLY Wed Nov  4 21:00:12 2026
+ DDI: 263624 bytes (0.3 MB / 0 MWords) used by master data server.

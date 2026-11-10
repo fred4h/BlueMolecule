@@ -1,0 +1,49 @@
+     Program PWSCF v.7.2 starts on  1Jan2024 at 10: 0: 0
+
+     bravais-lattice index     =            0
+     lattice parameter (alat)  =      10.2000  a.u.
+     number of atoms/cell      =            2
+     number of atomic types    =            1
+
+     crystal axes: (cart. coord. in units of alat)
+               a(1) = (  -0.500000   0.000000   0.500000 )
+               a(2) = (   0.000000   0.500000   0.500000 )
+               a(3) = (  -0.500000   0.500000   0.000000 )
+
+     atomic species   valence    mass     pseudopotential
+        Si             4.00    28.08550     Si( 1.00)
+
+     Cartesian axes
+
+     site n.     atom                  positions (alat units)
+         1           Si  tau(   1) = (   0.0000000   0.0000000   0.0000000  )
+         2           Si  tau(   2) = (   0.2600000   0.2500000   0.2500000  )
+
+!    total energy              =     -15.80000000 Ry
+
+     Forces acting on atoms (cartesian axes, Ry/au):
+
+     atom    1 type  1   force =     0.01000000    0.00000000    0.00000000
+     atom    2 type  1   force =    -0.01000000    0.00000000    0.00000000
+
+ATOMIC_POSITIONS (alat)
+Si            0.0000000000        0.0000000000        0.0000000000
+Si            0.2550000000        0.2500000000        0.2500000000
+
+!    total energy              =     -15.84000000 Ry
+
+     Forces acting on atoms (cartesian axes, Ry/au):
+
+     atom    1 type  1   force =     0.00010000    0.00000000    0.00000000
+     atom    2 type  1   force =    -0.00010000    0.00000000    0.00000000
+
+     bfgs converged in   2 scf cycles and   1 bfgs steps
+
+     End of BFGS Geometry Optimization
+
+Begin final coordinates
+
+ATOMIC_POSITIONS (crystal)
+Si            0.0000000000        0.0000000000        0.0000000000
+Si           -0.2550000000        0.7550000000       -0.2550000000
+End final coordinates

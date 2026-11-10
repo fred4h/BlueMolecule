@@ -1,0 +1,42 @@
+ Entering Gaussian System, Link 0=g16
+ Input=job.gjf
+ Output=job.log
+ Cite this work as:
+ Gaussian 16, Revision C.01,
+ M. J. Frisch, G. W. Trucks, H. B. Schlegel, G. E. Scuseria, et al.
+ 
+ ******************************************
+ Gaussian 16:  ES64L-G16RevC.01  3-Jul-2019
+                 4-Nov-2026 
+ ******************************************
+ %chk=job.chk
+ -----------------
+ #p pm6 opt nosymm
+ -----------------
+ 1/18=20,19=15,38=1/1,3;
+ 99/5=1,9=1/99;
+ ----------------------------------
+ far from the origin, still running
+ ----------------------------------
+ Symbolic Z-matrix:
+ Charge =  0 Multiplicity = 1
+                          Input orientation:                          
+ ---------------------------------------------------------------------
+ Center     Atomic      Atomic             Coordinates (Angstroms)
+ Number     Number       Type             X           Y           Z
+ ---------------------------------------------------------------------
+      1          6           0    -1234.567891-1000.100000   12.500000
+      2          1           0    -1233.480000-1000.100000   12.500000
+      3          1           0    -1234.930000 -999.070000   12.500000
+      4          1           0    -1234.930000-1000.610000   13.390000
+ ---------------------------------------------------------------------
+ SCF Done:  E(RPM6) =  -0.0112345678     A.U. after   12 cycles
+ Step number   1 out of a maximum of  100
+                          Input orientation:                          
+ ---------------------------------------------------------------------
+ Center     Atomic      Atomic             Coordinates (Angstroms)
+ Number     Number       Type             X           Y           Z
+ ---------------------------------------------------------------------
+      1          6           0    -1234.566891-1000.100000   12.500000
+      2          1           0    -1233.479000-1000.100000   12.500000
+      3          1           0    -1234.9

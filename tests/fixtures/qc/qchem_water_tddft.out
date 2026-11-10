@@ -1,0 +1,69 @@
+                  Welcome to Q-Chem
+     A Quantum Leap Into The Future Of Chemistry
+
+
+ Q-Chem 6.0.2, Q-Chem, Inc., Pleasanton, CA (2022)
+
+--------------------------------------------------------------
+User input:
+--------------------------------------------------------------
+$molecule
+0 1
+O   0.0000000000   0.0000000000   0.1190180000
+H   0.0000000000   0.7592420000  -0.4759270000
+H   0.0000000000  -0.7592420000  -0.4759270000
+$end
+
+$rem
+   METHOD          b3lyp
+   BASIS           6-31G*
+   CIS_N_ROOTS     3
+   CIS_TRIPLETS    false
+$end
+--------------------------------------------------------------
+ ----------------------------------------------------------------
+             Standard Nuclear Orientation (Angstroms)
+    I     Atom           X                Y                Z
+ ----------------------------------------------------------------
+    1      O       0.0000000000     0.0000000000     0.1190180000
+    2      H       0.0000000000     0.7592420000    -0.4759270000
+    3      H       0.0000000000    -0.7592420000    -0.4759270000
+ ----------------------------------------------------------------
+ There are        5 alpha and        5 beta electrons
+ Total energy in the final basis set =      -76.4098717230
+
+ ---------------------------------------------------
+         TDDFT/TDA Excitation Energies              
+ ---------------------------------------------------
+
+ Excited state   1: excitation energy (eV) =    7.2961
+    Total energy for state   1:                   -76.14174520 au
+    Multiplicity: Singlet
+    Trans. Mom.:  0.0000 X   0.2689 Y   0.0000 Z
+    Strength   :     0.0129
+    D(    5) --> V(    1) amplitude =  0.9963
+
+ Excited state   2: excitation energy (eV) =    9.0971
+    Total energy for state   2:                   -76.07555963 au
+    Multiplicity: Singlet
+    Trans. Mom.:  0.0000 X   0.0000 Y   0.0000 Z
+    Strength   :     0.0000
+    D(    5) --> V(    2) amplitude =  0.9982
+
+ Excited state   3: excitation energy (eV) =    9.8418
+    Total energy for state   3:                   -76.04819161 au
+    Multiplicity: Singlet
+    Trans. Mom.:  0.0000 X   0.0000 Y  -0.4321 Z
+    Strength   :     0.0450
+    D(    4) --> V(    1) amplitude =  0.9891
+    D(    3) --> V(    2) amplitude = -0.1104
+
+ ---------------------------------------------------
+
+ Total job time:  5.12s(wall), 4.80s(cpu) 
+
+        *************************************************************
+        *                                                           *
+        *  Thank you very much for using Q-Chem.  Have a nice day.  *
+        *                                                           *
+        *************************************************************

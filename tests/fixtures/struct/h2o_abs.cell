@@ -1,0 +1,12 @@
+%block lattice_cart
+bohr
+  18.0 0.0 0.0
+  0.0 18.0 0.0
+  0.0 0.0 18.0
+%endblock lattice_cart
+%block positions_abs
+ang
+O 0.0 0.0 0.1173
+H 0.0 0.7572 -0.4692
+H 0.0 -0.7572 -0.4692
+%endblock positions_abs

@@ -1,0 +1,163 @@
+ DBCSR| CPU Multiplication driver                                           XSMM
+ DBCSR| Multrec recursion limit                                              512
+
+  **** **** ******  **  PROGRAM STARTED AT               2026-11-04 21:00:00.123
+ ***** ** ***  *** **   PROGRAM STARTED ON                                node01
+ **    ****   ******    PROGRAM STARTED BY                                  user
+ ***** **    ** ** **   PROGRAM PROCESS ID                                 12345
+  **** **  *******  **  PROGRAM STARTED IN /home/user/water
+
+ CP2K| version string:                                          CP2K version 9.1
+ CP2K| source code revision number:                                  git:d8d7100
+ CP2K| is freely available from                            https://www.cp2k.org/
+
+ GLOBAL| Force Environment number                                              1
+ GLOBAL| Basis set file name                                           BASIS_MOLOPT
+ GLOBAL| Project name                                                        water
+ GLOBAL| Run type                                                          GEO_OPT
+ GLOBAL| Global print level                                                 MEDIUM
+
+ CELL| Volume [angstrom^3]:                                             1000.000
+ CELL| Vector a [angstrom]:      10.000     0.000     0.000    |a| =      10.000
+ CELL| Vector b [angstrom]:       0.000    10.000     0.000    |b| =      10.000
+ CELL| Vector c [angstrom]:       0.000     0.000    10.000    |c| =      10.000
+
+ DFT| Spin restricted Kohn-Sham (RKS) calculation                            RKS
+ DFT| Multiplicity                                                             1
+ DFT| Number of spin states                                                    1
+ DFT| Charge                                                                   0
+ DFT| Self-interaction correction (SIC)                                       NO
+
+ FUNCTIONAL| PBE:
+ FUNCTIONAL| J.P.Perdew, K.Burke, M.Ernzerhof, Phys. Rev. Letter, vol. 77, n 18,
+
+ ATOMIC KIND INFORMATION
+
+  1. Atomic kind: O                                     Number of atoms:       1
+
+     Orbital Basis Set                                       DZVP-MOLOPT-SR-GTH
+
+ MODULE QUICKSTEP:  ATOMIC COORDINATES IN angstrom
+
+  Atom  Kind  Element       X           Y           Z          Z(eff)       Mass
+
+       1     1 O    8    5.000000    5.000000    5.117300      6.00      15.9994
+       2     2 H    1    5.000000    5.757200    4.530800      1.00       1.0079
+       3     2 H    1    5.000000    4.242800    4.530800      1.00       1.0079
+
+  ENERGY| Total FORCE_EVAL ( QS ) energy [a.u.]:              -17.153450812345
+
+ --------------------------
+ OPTIMIZATION STEP:      1
+ --------------------------
+
+  ENERGY| Total FORCE_EVAL ( QS ) energy [a.u.]:              -17.154632123400
+
+ --------  Informations at step =     1 ------------
+  Optimization Method        =                 BFGS
+  Total Energy               =       -17.1546321234
+  Real energy change         =        -0.0011814111
+  Predicted change in energy =        -0.0012050393
+  Scaling factor             =         0.0000000000
+  Step size                  =         0.0234567890
+  Trust radius               =         0.4724315332
+  Decrease in energy         =                  YES
+  Used time                  =                1.234
+
+  Convergence check :
+  Max. step size             =         0.0234567890
+  Conv. limit for step size  =         0.0030000000
+  Convergence in step size   =                   NO
+  RMS step size              =         0.0123456789
+  Conv. limit for RMS step   =         0.0015000000
+  Convergence in RMS step    =                   NO
+  Max. gradient              =         0.0123456789
+  Conv. limit for gradients  =         0.0004500000
+  Conv. for gradients        =                   NO
+  RMS gradient               =         0.0067890123
+  Conv. limit for RMS grad.  =         0.0003000000
+  Conv. in RMS gradients     =                   NO
+ ---------------------------------------------------
+
+ --------------------------
+ OPTIMIZATION STEP:      2
+ --------------------------
+
+  ENERGY| Total FORCE_EVAL ( QS ) energy [a.u.]:              -17.154987654300
+
+ --------  Informations at step =     2 ------------
+  Optimization Method        =                 BFGS
+  Total Energy               =       -17.1549876543
+  Real energy change         =        -0.0003555309
+  Predicted change in energy =        -0.0003626415
+  Scaling factor             =         0.0000000000
+  Step size                  =         0.0234567890
+  Trust radius               =         0.4724315332
+  Decrease in energy         =                  YES
+  Used time                  =                1.234
+
+  Convergence check :
+  Max. step size             =         0.0023671000
+  Conv. limit for step size  =         0.0030000000
+  Convergence in step size   =                  YES
+  RMS step size              =         0.0015260000
+  Conv. limit for RMS step   =         0.0015000000
+  Convergence in RMS step    =                   NO
+  Max. gradient              =         0.0016340000
+  Conv. limit for gradients  =         0.0004500000
+  Conv. for gradients        =                   NO
+  RMS gradient               =         0.0009510000
+  Conv. limit for RMS grad.  =         0.0003000000
+  Conv. in RMS gradients     =                   NO
+ ---------------------------------------------------
+
+ --------------------------
+ OPTIMIZATION STEP:      3
+ --------------------------
+
+  ENERGY| Total FORCE_EVAL ( QS ) energy [a.u.]:              -17.154996221000
+
+ --------  Informations at step =     3 ------------
+  Optimization Method        =                 BFGS
+  Total Energy               =       -17.1549962210
+  Real energy change         =        -0.0000085667
+  Predicted change in energy =        -0.0000087380
+  Scaling factor             =         0.0000000000
+  Step size                  =         0.0234567890
+  Trust radius               =         0.4724315332
+  Decrease in energy         =                  YES
+  Used time                  =                1.234
+
+  Convergence check :
+  Max. step size             =         0.0000450000
+  Conv. limit for step size  =         0.0030000000
+  Convergence in step size   =                  YES
+  RMS step size              =         0.0000300000
+  Conv. limit for RMS step   =         0.0015000000
+  Convergence in RMS step    =                  YES
+  Max. gradient              =         0.0000120000
+  Conv. limit for gradients  =         0.0004500000
+  Conv. for gradients        =                  YES
+  RMS gradient               =         0.0000080000
+  Conv. limit for RMS grad.  =         0.0003000000
+  Conv. in RMS gradients     =                  YES
+ ---------------------------------------------------
+
+ *******************************************************************************
+ ***                    GEOMETRY OPTIMIZATION COMPLETED                      ***
+ *******************************************************************************
+
+                    Reevaluating energy at the minimum
+
+ Mulliken Population Analysis
+
+ #  Atom  Element  Kind  Atomic population                           Net charge
+       1     O        1          6.665234                             -0.665234
+       2     H        2          0.667383                              0.332617
+       3     H        2          0.667383                              0.332617
+ # Total charge                              8.000000                 -0.000000
+
+  ENERGY| Total FORCE_EVAL ( QS ) energy [a.u.]:              -17.154996221000
+
+  **** **** ******  **  PROGRAM ENDED AT                 2026-11-04 21:00:30.456
+ ***** ** ***  *** **   PROGRAM RAN ON                                    node01

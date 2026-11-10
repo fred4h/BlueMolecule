@@ -1,0 +1,427 @@
+ Entering Gaussian System, Link 0=g16
+ Input=job.gjf
+ Output=job.log
+ Initial command:
+ /opt/g16/l1.exe "/scratch/Gau-12345.inp" -scrdir="/scratch/"
+ Entering Link 1 = /opt/g16/l1.exe PID=     12345.
+  
+ Copyright (c) 1988-2019, Gaussian, Inc.  All Rights Reserved.
+  
+ This is part of the Gaussian(R) 16 program.  It is based on
+ the Gaussian(R) 09 system (copyright 2009, Gaussian, Inc.),
+ ... (legal notice abridged) ...
+  
+ Cite this work as:
+ Gaussian 16, Revision C.01,
+ M. J. Frisch, G. W. Trucks, H. B. Schlegel, G. E. Scuseria, et al.
+ Gaussian, Inc., Wallingford CT, 2016.
+ 
+ ******************************************
+ Gaussian 16:  ES64L-G16RevC.01  3-Jul-2019
+                 4-Nov-2026 
+ ******************************************
+ %nprocshared=4
+ Will use up to    4 processors via shared memory.
+ %mem=4GB
+ %chk=water.chk
+ ----------------------------------------------------------------------
+ #p opt freq=raman b3lyp/6-31g(d) pop=hirshfeld scrf=(pcm,solvent=water
+ ) int=ultrafine
+ ----------------------------------------------------------------------
+ 1/18=20,19=15,26=3,38=1/1,3;
+ 2/9=110,12=2,17=6,18=5,40=1/2;
+ 3/5=1,6=6,7=1,11=2,25=1,30=1,71=1,74=-5/1,2,3;
+ 4//1;
+ 5/5=2,38=5/2;
+ 6/7=2,8=2,9=2,10=2,28=1/1;
+ 99/5=1,9=1/99;
+ ----------------------------------
+ Water optimization and frequencies
+ ----------------------------------
+ Symbolic Z-matrix:
+ Charge =  0 Multiplicity = 1
+ O               0.09714  -0.24029   0.40768 
+ H              -0.27387   0.57387   0.08830 
+ H               0.49676  -0.65154  -0.34974 
+ 
+ GradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGrad
+ Berny optimization.
+ Initialization pass.
+                          Input orientation:                          
+ ---------------------------------------------------------------------
+ Center     Atomic      Atomic             Coordinates (Angstroms)
+ Number     Number       Type             X           Y           Z
+ ---------------------------------------------------------------------
+      1          8           0        0.097138   -0.240291    0.407679
+      2          1           0       -0.273866    0.573867    0.088301
+      3          1           0        0.496759   -0.651541   -0.349735
+ ---------------------------------------------------------------------
+ Stoichiometry    H2O
+ Framework group  C2V[C2(O),SGV(H2)]
+ Deg. of freedom     2
+ Full point group                 C2V     NOp   4
+                         Standard orientation:                         
+ ---------------------------------------------------------------------
+ Center     Atomic      Atomic             Coordinates (Angstroms)
+ Number     Number       Type             X           Y           Z
+ ---------------------------------------------------------------------
+      1          8           0        0.000000    0.000000    0.115006
+      2          1           0        0.000000    0.756202   -0.460023
+      3          1           0        0.000000   -0.756202   -0.460023
+ ---------------------------------------------------------------------
+ Rotational constants (GHZ):    823.8149880    437.8516440    285.8733330
+ Standard basis: 6-31G(d) (6D, 7F)
+    19 basis functions,    36 primitive gaussians,    19 cartesian basis functions
+     5 alpha electrons        5 beta electrons
+       nuclear repulsion energy         9.1681207385 Hartrees.
+ ------------------------------------------------------------------------------
+ Polarizable Continuum Model (PCM)
+ Solvent              : Water, Eps=  78.355300 Eps(inf)=   1.777849
+ ------------------------------------------------------------------------------
+ SCF Done:  E(RB3LYP) =   -76.4082676378     A.U. after   12 cycles
+            NFock= 12  Conv=0.12D-08     -V/T= 2.0101
+ **********************************************************************
+
+            Population analysis using the SCF Density.
+
+ **********************************************************************
+
+ Orbital symmetries:
+       Occupied  (A1) (A1) (B2) (A1) (B1)
+       Virtual   (A1) (B2) (B2) (A1) (B1) (A1) (B2) (A1) (A2) (A1)
+ The electronic state is 1-A1.
+ Alpha  occ. eigenvalues -- -19.13998  -0.99966  -0.52136  -0.37403  -0.29415
+ Alpha virt. eigenvalues --   0.06424   0.14857   0.79948   0.84744   0.88786
+ Alpha virt. eigenvalues --   0.89907   1.03163   1.12895   1.71745   1.74055
+ Alpha virt. eigenvalues --   1.80276   2.40306   2.41802   3.31468
+          Condensed to atoms (all electrons):
+ Mulliken charges:
+               1
+     1  O   -0.872345
+     2  H    0.436172
+     3  H    0.436173
+ Sum of Mulliken charges =  -0.00000
+ Mulliken charges with hydrogens summed into heavy atoms:
+               1
+     1  O   -0.000000
+ Electronic spatial extent (au):  <R**2>=             19.0123
+ Charge=              0.0000 electrons
+ Dipole moment (field-independent basis, Debye):
+    X=              0.0000    Y=              0.0000    Z=             -2.1234  Tot=              2.1234
+ Quadrupole moment (field-independent basis, Debye-Ang):
+   XX=             -7.1234   YY=             -4.0123   ZZ=             -6.0123
+ GradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGrad
+ Berny optimization.
+ Search for a local minimum.
+ Step number   1 out of a maximum of   20
+ All quantities printed in internal units (Hartrees-Bohrs-Radians).
+         Item               Value     Threshold  Converged?
+ Maximum Force            0.024710     0.000450     NO 
+ RMS     Force            0.011854     0.000300     NO 
+ Maximum Displacement     0.043681     0.001800     NO 
+ RMS     Displacement     0.021274     0.001200     NO 
+ Predicted change in Energy=-6.678598D-04
+ GradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGrad
+                          Input orientation:                          
+ ---------------------------------------------------------------------
+ Center     Atomic      Atomic             Coordinates (Angstroms)
+ Number     Number       Type             X           Y           Z
+ ---------------------------------------------------------------------
+      1          8           0        0.096995   -0.242315    0.413090
+      2          1           0       -0.275530    0.585526    0.067932
+      3          1           0        0.499573   -0.647004   -0.372650
+ ---------------------------------------------------------------------
+ Stoichiometry    H2O
+ Framework group  C2V[C2(O),SGV(H2)]
+ Deg. of freedom     2
+ Full point group                 C2V     NOp   4
+                         Standard orientation:                         
+ ---------------------------------------------------------------------
+ Center     Atomic      Atomic             Coordinates (Angstroms)
+ Number     Number       Type             X           Y           Z
+ ---------------------------------------------------------------------
+      1          8           0        0.000000    0.000000    0.120785
+      2          1           0        0.000000    0.760596   -0.483138
+      3          1           0        0.000000   -0.760596   -0.483138
+ ---------------------------------------------------------------------
+ Rotational constants (GHZ):    823.8149880    437.8516440    285.8733330
+ SCF Done:  E(RB3LYP) =   -76.4089354966     A.U. after    8 cycles
+            NFock=  8  Conv=0.12D-08     -V/T= 2.0101
+ GradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGrad
+ Berny optimization.
+ Search for a local minimum.
+ Step number   2 out of a maximum of   20
+ All quantities printed in internal units (Hartrees-Bohrs-Radians).
+         Item               Value     Threshold  Converged?
+ Maximum Force            0.004050     0.000450     NO 
+ RMS     Force            0.001785     0.000300     NO 
+ Maximum Displacement     0.007471     0.001800     NO 
+ RMS     Displacement     0.003655     0.001200     NO 
+ Predicted change in Energy=-1.773871D-05
+ GradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGrad
+                          Input orientation:                          
+ ---------------------------------------------------------------------
+ Center     Atomic      Atomic             Coordinates (Angstroms)
+ Number     Number       Type             X           Y           Z
+ ---------------------------------------------------------------------
+      1          8           0        0.097019   -0.241969    0.412164
+      2          1           0       -0.276060    0.584827    0.071879
+      3          1           0        0.499906   -0.649075   -0.369194
+ ---------------------------------------------------------------------
+ Stoichiometry    H2O
+ Framework group  C2V[C2(O),SGV(H2)]
+ Deg. of freedom     2
+ Full point group                 C2V     NOp   4
+                         Standard orientation:                         
+ ---------------------------------------------------------------------
+ Center     Atomic      Atomic             Coordinates (Angstroms)
+ Number     Number       Type             X           Y           Z
+ ---------------------------------------------------------------------
+      1          8           0        0.000000    0.000000    0.119796
+      2          1           0        0.000000    0.761443   -0.479185
+      3          1           0        0.000000   -0.761443   -0.479185
+ ---------------------------------------------------------------------
+ Rotational constants (GHZ):    823.8149880    437.8516440    285.8733330
+ SCF Done:  E(RB3LYP) =   -76.4089532343     A.U. after    8 cycles
+            NFock=  8  Conv=0.12D-08     -V/T= 2.0101
+ GradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGrad
+ Berny optimization.
+ Search for a local minimum.
+ Step number   3 out of a maximum of   20
+ All quantities printed in internal units (Hartrees-Bohrs-Radians).
+         Item               Value     Threshold  Converged?
+ Maximum Force            0.000288     0.000450     YES
+ RMS     Force            0.000132     0.000300     YES
+ Maximum Displacement     0.000449     0.001800     YES
+ RMS     Displacement     0.000215     0.001200     YES
+ Predicted change in Energy=-8.825706D-08
+ GradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGrad
+                          Input orientation:                          
+ ---------------------------------------------------------------------
+ Center     Atomic      Atomic             Coordinates (Angstroms)
+ Number     Number       Type             X           Y           Z
+ ---------------------------------------------------------------------
+      1          8           0        0.097021   -0.241948    0.412109
+      2          1           0       -0.276068    0.584747    0.072103
+      3          1           0        0.499902   -0.649162   -0.368973
+ ---------------------------------------------------------------------
+ Stoichiometry    H2O
+ Framework group  C2V[C2(O),SGV(H2)]
+ Deg. of freedom     2
+ Full point group                 C2V     NOp   4
+                         Standard orientation:                         
+ ---------------------------------------------------------------------
+ Center     Atomic      Atomic             Coordinates (Angstroms)
+ Number     Number       Type             X           Y           Z
+ ---------------------------------------------------------------------
+      1          8           0        0.000000    0.000000    0.119737
+      2          1           0        0.000000    0.761448   -0.478947
+      3          1           0        0.000000   -0.761448   -0.478947
+ ---------------------------------------------------------------------
+ Rotational constants (GHZ):    823.8149880    437.8516440    285.8733330
+ SCF Done:  E(RB3LYP) =   -76.4089533216     A.U. after    8 cycles
+            NFock=  8  Conv=0.12D-08     -V/T= 2.0101
+ GradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGrad
+ Berny optimization.
+ Search for a local minimum.
+ Step number   4 out of a maximum of   20
+ All quantities printed in internal units (Hartrees-Bohrs-Radians).
+         Item               Value     Threshold  Converged?
+ Maximum Force            0.000027     0.000450     YES
+ RMS     Force            0.000013     0.000300     YES
+ Maximum Displacement     0.000052     0.001800     YES
+ RMS     Displacement     0.000038     0.001200     YES
+ Predicted change in Energy=-1.000000D-09
+ Optimization completed.
+    -- Stationary point found.
+                           ----------------------------
+                           !   Optimized Parameters   !
+                           ! (Angstroms and Degrees)  !
+ --------------------------                            --------------------------
+ ! Name  Definition              Value          Derivative Info.                !
+ --------------------------------------------------------------------------------
+ ! R1    R(1,2)                  0.9686         -DE/DX =    0.0                 !
+ ! R2    R(1,3)                  0.9686         -DE/DX =    0.0                 !
+ ! A1    A(2,1,3)              103.6480         -DE/DX =    0.0                 !
+ --------------------------------------------------------------------------------
+ GradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGrad
+ Largest change from initial coordinates is atom    2       0.031 Angstoms.
+                          Input orientation:                          
+ ---------------------------------------------------------------------
+ Center     Atomic      Atomic             Coordinates (Angstroms)
+ Number     Number       Type             X           Y           Z
+ ---------------------------------------------------------------------
+      1          8           0        0.097021   -0.241948    0.412109
+      2          1           0       -0.276068    0.584747    0.072103
+      3          1           0        0.499902   -0.649162   -0.368973
+ ---------------------------------------------------------------------
+                         Standard orientation:                         
+ ---------------------------------------------------------------------
+ Center     Atomic      Atomic             Coordinates (Angstroms)
+ Number     Number       Type             X           Y           Z
+ ---------------------------------------------------------------------
+      1          8           0        0.000000    0.000000    0.119737
+      2          1           0        0.000000    0.761448   -0.478947
+      3          1           0        0.000000   -0.761448   -0.478947
+ ---------------------------------------------------------------------
+ **********************************************************************
+
+            Population analysis using the SCF Density.
+
+ **********************************************************************
+
+ Orbital symmetries:
+       Occupied  (A1) (A1) (B2) (A1) (B1)
+       Virtual   (A1) (B2) (B2) (A1) (B1) (A1) (B2) (A1) (A2) (A1)
+ The electronic state is 1-A1.
+ Alpha  occ. eigenvalues -- -19.13798  -0.99766  -0.51936  -0.37203  -0.29215
+ Alpha virt. eigenvalues --   0.06424   0.14857   0.79948   0.84744   0.88786
+ Alpha virt. eigenvalues --   0.89907   1.03163   1.12895   1.71745   1.74055
+ Alpha virt. eigenvalues --   1.80276   2.40306   2.41802   3.31468
+          Condensed to atoms (all electrons):
+ Mulliken charges:
+               1
+     1  O   -0.868866
+     2  H    0.434433
+     3  H    0.434433
+ Sum of Mulliken charges =   0.00000
+ Mulliken charges with hydrogens summed into heavy atoms:
+               1
+     1  O    0.000000
+ Electronic spatial extent (au):  <R**2>=             19.0123
+ Charge=              0.0000 electrons
+ Dipole moment (field-independent basis, Debye):
+    X=              0.0000    Y=              0.0000    Z=             -2.0985  Tot=              2.0985
+ Quadrupole moment (field-independent basis, Debye-Ang):
+   XX=             -7.1234   YY=             -4.0123   ZZ=             -6.0123
+ Hirshfeld charges, spin densities, dipoles, and CM5 charges using IRadAn=      4:
+              Q-H        S-H        Dx         Dy         Dz        Q-CM5
+     1  O   -0.330523   0.000000   0.000000   0.000000  -0.188839  -0.648178
+     2  H    0.165262   0.000000   0.000000   0.105386   0.038936   0.324089
+     3  H    0.165261   0.000000   0.000000  -0.105386   0.038936   0.324089
+       Tot   -0.000000   0.000000   0.000000   0.000000  -0.110967   0.000000
+ 1\1\GINC-NODE01\SP\RB3LYP\6-31G(d)\H2O1\USER\04-Nov-2026\0\\#p\\title\\0,1\O,0.,0.,0.1\@
+
+ THE ONLY WAY TO HAVE A FRIEND IS TO BE ONE.  -- EMERSON
+ Job cpu time:       0 days  0 hours  0 minutes 12.3 seconds.
+ Elapsed time:       0 days  0 hours  0 minutes  3.4 seconds.
+ File lengths (MBytes):  RWF=      6 Int=      0 D2E=      0 Chk=      1 Scr=      1
+ Normal termination of Gaussian 16 at Wed Nov  4 21:00:00 2026.
+ Link1:  Proceeding to internal job step number  2.
+ --------------------------------------------------------------------------
+ #P Geom=AllCheck Guess=TCheck SCRF=Check GenChk RB3LYP/6-31G(d) Freq=Raman
+ --------------------------------------------------------------------------
+ 1/10=4,29=7,30=1,38=1,40=1/1,3;
+ 2/12=2,40=1/2;
+ 99//99;
+ Structure from the checkpoint file:  "water.chk"
+ ----------------------------------
+ Water optimization and frequencies
+ ----------------------------------
+ Charge =  0 Multiplicity = 1
+ Redundant internal coordinates found in file.  (old form).
+ O,0,0.,0.,0.1197367676
+ H,0,0.,0.7614475468,-0.4789470704
+ H,0,0.,-0.7614475468,-0.4789470704
+ Recover connectivity data from disk.
+                          Input orientation:                          
+ ---------------------------------------------------------------------
+ Center     Atomic      Atomic             Coordinates (Angstroms)
+ Number     Number       Type             X           Y           Z
+ ---------------------------------------------------------------------
+      1          8           0        0.097021   -0.241948    0.412109
+      2          1           0       -0.276068    0.584747    0.072103
+      3          1           0        0.499902   -0.649162   -0.368973
+ ---------------------------------------------------------------------
+                         Standard orientation:                         
+ ---------------------------------------------------------------------
+ Center     Atomic      Atomic             Coordinates (Angstroms)
+ Number     Number       Type             X           Y           Z
+ ---------------------------------------------------------------------
+      1          8           0        0.000000    0.000000    0.119737
+      2          1           0        0.000000    0.761448   -0.478947
+      3          1           0        0.000000   -0.761448   -0.478947
+ ---------------------------------------------------------------------
+ SCF Done:  E(RB3LYP) =   -76.4089533216     A.U. after    1 cycles
+            NFock=  1  Conv=0.12D-08     -V/T= 2.0101
+ **********************************************************************
+
+            Population analysis using the SCF Density.
+
+ **********************************************************************
+
+ Orbital symmetries:
+       Occupied  (A1) (A1) (B2) (A1) (B1)
+       Virtual   (A1) (B2) (B2) (A1) (B1) (A1) (B2) (A1) (A2) (A1)
+ The electronic state is 1-A1.
+ Alpha  occ. eigenvalues -- -19.13798  -0.99766  -0.51936  -0.37203  -0.29215
+ Alpha virt. eigenvalues --   0.06424   0.14857   0.79948   0.84744   0.88786
+ Alpha virt. eigenvalues --   0.89907   1.03163   1.12895   1.71745   1.74055
+ Alpha virt. eigenvalues --   1.80276   2.40306   2.41802   3.31468
+          Condensed to atoms (all electrons):
+ Mulliken charges:
+               1
+     1  O   -0.868866
+     2  H    0.434433
+     3  H    0.434433
+ Sum of Mulliken charges =   0.00000
+ Mulliken charges with hydrogens summed into heavy atoms:
+               1
+     1  O    0.000000
+ Electronic spatial extent (au):  <R**2>=             19.0123
+ Charge=              0.0000 electrons
+ Dipole moment (field-independent basis, Debye):
+    X=              0.0000    Y=              0.0000    Z=             -2.0985  Tot=              2.0985
+ Quadrupole moment (field-independent basis, Debye-Ang):
+   XX=             -7.1234   YY=             -4.0123   ZZ=             -6.0123
+ Hirshfeld charges, spin densities, dipoles, and CM5 charges using IRadAn=      4:
+              Q-H        S-H        Dx         Dy         Dz        Q-CM5
+     1  O   -0.330523   0.000000   0.000000   0.000000  -0.188839  -0.648178
+     2  H    0.165262   0.000000   0.000000   0.105386   0.038936   0.324089
+     3  H    0.165261   0.000000   0.000000  -0.105386   0.038936   0.324089
+       Tot   -0.000000   0.000000   0.000000   0.000000  -0.110967   0.000000
+ Full mass-weighted force constant matrix:
+ Low frequencies ---   -0.0012    0.0009    0.0012   10.5236   15.0987   19.0000
+ Low frequencies --- 1632.1065 3832.7837 3939.5705
+ Harmonic frequencies (cm**-1), IR intensities (KM/Mole), Raman scattering
+ activities (A**4/AMU), depolarization ratios for plane and unpolarized
+ incident light, reduced masses (AMU), force constants (mDyne/A),
+ and normal coordinates:
+                      1                      2                      3
+                     A1                     A1                     B2
+ Frequencies --   1632.1065              3832.7837              3939.5705
+ Red. masses --      1.0807                 1.0471                 1.0810
+ Frc consts  --      1.6960                 9.0625                 9.8850
+ IR Inten    --    152.4723                84.7565               153.1500
+ Raman Activ --      4.8971               105.3392                42.1957
+ Depolar (P) --      0.6934                 0.1521                 0.7500
+ Depolar (U) --      0.8189                 0.2640                 0.8571
+  Atom  AN      X      Y      Z        X      Y      Z        X      Y      Z
+     1   8     0.00   0.00  -0.07     0.00   0.00   0.05     0.00  -0.07   0.00
+     2   1     0.00   0.44   0.55     0.00   0.58  -0.41     0.00   0.55  -0.44
+     3   1     0.00  -0.44   0.55     0.00  -0.58  -0.41     0.00   0.55   0.44
+ -------------------
+ - Thermochemistry -
+ -------------------
+ Temperature   298.150 Kelvin.  Pressure   1.00000 Atm.
+ Atom     1 has atomic number  8 and mass  15.99491
+ Atom     2 has atomic number  1 and mass   1.00783
+ Atom     3 has atomic number  1 and mass   1.00783
+ Molecular mass:    18.01056 amu.
+ Zero-point vibrational energy      55424.3 (Joules/Mol)
+                                   13.24671 (Kcal/Mol)
+ Zero-point correction=                           0.021425 (Hartree/Particle)
+ Thermal correction to Energy=                    0.024260
+ Thermal correction to Enthalpy=                  0.025205
+ Thermal correction to Gibbs Free Energy=         0.003776
+ Sum of electronic and zero-point Energies=              -76.387528
+ Sum of electronic and thermal Energies=                 -76.384693
+ Sum of electronic and thermal Enthalpies=               -76.383749
+ Sum of electronic and thermal Free Energies=            -76.405177
+ 1\1\GINC-NODE01\SP\RB3LYP\6-31G(d)\H2O1\USER\04-Nov-2026\0\\#p\\title\\0,1\O,0.,0.,0.1\@
+
+ THE ONLY WAY TO HAVE A FRIEND IS TO BE ONE.  -- EMERSON
+ Job cpu time:       0 days  0 hours  0 minutes 12.3 seconds.
+ Elapsed time:       0 days  0 hours  0 minutes  3.4 seconds.
+ File lengths (MBytes):  RWF=      6 Int=      0 D2E=      0 Chk=      1 Scr=      1
+ Normal termination of Gaussian 16 at Wed Nov  4 21:00:00 2026.

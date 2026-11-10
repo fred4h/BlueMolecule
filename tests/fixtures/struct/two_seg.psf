@@ -1,0 +1,15 @@
+PSF EXT XPLOR
+
+         2 !NTITLE
+ REMARKS original generated structure x-plor psf file
+ REMARKS tiny test system
+
+         4 !NATOM
+         1 PROA     1        GLY      N        NH3     -0.300000       14.0070           0
+         2 PROA     1        GLY      HT1      HC       0.330000        1.0080           0
+         3 WAT      5        TIP3     OH2      OT      -0.834000       15.9994           0
+         4 IONS     7        SOD      SOD      SOD      1.000000       22.9898           0
+
+         1 !NBOND: bonds
+         1         2
+

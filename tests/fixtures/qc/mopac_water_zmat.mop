@@ -1,0 +1,7 @@
+PM7 CHARGE=0 SINGLET 1SCF
+water, Z-matrix input
+internal coordinates
+  O   0.000000 0   0.000000 0   0.000000 0   0 0 0
+  H   0.959476 1   0.000000 0   0.000000 0   1 0 0
+  H   0.959476 1 104.250000 1   0.000000 0   1 2 0
+

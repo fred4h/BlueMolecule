@@ -1,0 +1,257 @@
+
+                                 *****************
+                                 * O   R   C   A *
+                                 *****************
+
+           --- An Ab Initio, DFT and Semiempirical electronic structure package ---
+
+                  #######################################################
+                  #                        -***-                        #
+                  #          Department of theory and spectroscopy      #
+                  #    Directorship and core code : Frank Neese         #
+                  #        Max Planck Institute fuer Kohlenforschung    #
+                  #                Kaiser Wilhelm Platz 1               #
+                  #                 D-45470 Muelheim/Ruhr               #
+                  #                      Germany                        #
+                  #                                                     #
+                  #                  All rights reserved                #
+                  #                        -***-                        #
+                  #######################################################
+
+
+                         Program Version 4.2.1 -  RELEASE  -
+
+================================================================================
+                                       INPUT FILE
+================================================================================
+NAME = water_freq.inp
+|  1> ! B3LYP def2-SVP Freq
+|  2> * xyz 0 1
+|  3>   O      0.000000     0.000000     0.120453
+|  4>   H      0.000000     0.753095    -0.481812
+|  5>   H      0.000000    -0.753095    -0.481812
+|  6> *
+|  7> 
+|  8>                          ****END OF INPUT****
+================================================================================
+
+
+---------------------------------
+CARTESIAN COORDINATES (ANGSTROEM)
+---------------------------------
+  O       0.000000    0.000000    0.120453
+  H       0.000000    0.753095   -0.481812
+  H       0.000000   -0.753095   -0.481812
+
+----------------------------
+CARTESIAN COORDINATES (A.U.)
+----------------------------
+  NO LB      ZA    FRAG     MASS         X           Y           Z
+   0 O    8.0000    0    15.995    0.000000    0.000000    0.227623
+   1 H    1.0000    0     1.008    0.000000    1.423143   -0.910492
+   2 H    1.0000    0     1.008    0.000000   -1.423143   -0.910492
+
+--------------------
+ General Settings:
+--------------------
+ Integral files         IntName         .... water
+ Hartree-Fock type      HFTyp           .... RHF
+ Total Charge           Charge          ....    0
+ Multiplicity           Mult            ....    1
+ Number of Electrons    NEL             ....   10
+ Basis Dimension        Dim             ....   24
+
+Your calculation utilizes the basis: def2-SVP
+
+
+               *****************************************************
+               *                     SUCCESS                       *
+               *           SCF CONVERGED AFTER   9 CYCLES          *
+               *****************************************************
+
+----------------
+TOTAL SCF ENERGY
+----------------
+
+Total Energy       :          -76.31794234 Eh              -2076.71701 eV
+
+Components:
+Nuclear Repulsion  :            9.16812074 Eh             249.47652 eV
+
+----------------
+ORBITAL ENERGIES
+----------------
+
+  NO   OCC          E(Eh)            E(eV) 
+   0   2.0000       -18.817393        -512.0473 
+   1   2.0000        -0.998734         -27.1769 
+   2   2.0000        -0.522553         -14.2194 
+   3   2.0000        -0.368372         -10.0239 
+   4   2.0000        -0.292829          -7.9683 
+   5   0.0000         0.058823           1.6007 
+   6   0.0000         0.140112           3.8126 
+   7   0.0000         0.812345          22.1050 
+   8   0.0000         0.854321          23.2473 
+   9   0.0000         1.123456          30.5708 
+
+-----------------------
+MULLIKEN ATOMIC CHARGES
+-----------------------
+   0 O :   -0.371632
+   1 H :    0.185816
+   2 H :    0.185816
+Sum of atomic charges:   0.0000000
+
+----------------------
+LOEWDIN ATOMIC CHARGES
+----------------------
+   0 O :   -0.213456
+   1 H :    0.106728
+   2 H :    0.106728
+Sum of atomic charges:   0.0000000
+
+
+-------------------------   --------------------
+FINAL SINGLE POINT ENERGY        -76.317942343500
+-------------------------   --------------------
+
+
+-------------
+DIPOLE MOMENT
+-------------
+                                X             Y             Z
+Electronic contribution:       0.00000      -0.00000      -1.76681
+Nuclear contribution   :       0.00000       0.00000       0.94282
+                        -----------------------------------------
+Total Dipole Moment    :       0.00000       0.00000      -0.82399
+                        -----------------------------------------
+Magnitude (a.u.)       :       0.82399
+Magnitude (Debye)      :       2.09437
+
+
+-----------------------
+VIBRATIONAL FREQUENCIES
+-----------------------
+
+Scaling factor for frequencies =  1.000000000  (already applied!)
+
+   0:         0.00 cm**-1
+   1:         0.00 cm**-1
+   2:         0.00 cm**-1
+   3:         0.00 cm**-1
+   4:         0.00 cm**-1
+   5:         0.00 cm**-1
+   6:      1615.57 cm**-1
+   7:      3786.08 cm**-1
+   8:      3870.36 cm**-1
+
+
+------------
+NORMAL MODES
+------------
+
+These modes are the Cartesian displacements weighted by the diagonal matrix
+M(i,i)=1/sqrt(m[i]) where m[i] is the mass of the displaced atom
+Thus, these vectors are normalized but *not* orthogonal
+
+                    0          1          2          3          4          5    
+     0        0.000000   0.000000   0.000000   0.000000   0.000000   0.000000
+     1        0.000000   0.000000   0.000000   0.000000   0.000000   0.000000
+     2        0.000000   0.000000   0.000000   0.000000   0.000000   0.000000
+     3        0.000000   0.000000   0.000000   0.000000   0.000000   0.000000
+     4        0.000000   0.000000   0.000000   0.000000   0.000000   0.000000
+     5        0.000000   0.000000   0.000000   0.000000   0.000000   0.000000
+     6        0.000000   0.000000   0.000000   0.000000   0.000000   0.000000
+     7        0.000000   0.000000   0.000000   0.000000   0.000000   0.000000
+     8        0.000000   0.000000   0.000000   0.000000   0.000000   0.000000
+                    6          7          8    
+     0        0.000000   0.000000   0.000000
+     1        0.000000   0.000000  -0.069424
+     2       -0.069175   0.051844   0.000000
+     3        0.000000   0.000000   0.000000
+     4        0.443047   0.573942   0.550901
+     5        0.548923  -0.411396  -0.440566
+     6        0.000000   0.000000   0.000000
+     7       -0.443047  -0.573942   0.550901
+     8        0.548923  -0.411396   0.440566
+
+
+-----------
+IR SPECTRUM
+-----------
+
+ Mode    freq (cm**-1)   T**2         TX         TY         TZ
+-------------------------------------------------------------------
+   6:      1615.57  150.283958  (  -0.000000    0.000000   12.259036)
+   7:      3786.08   86.944866  (   0.000000    0.000000   -9.324423)
+   8:      3870.36  151.296271  (   0.000000   12.300255    0.000000)
+
+The first frequency considered to be a vibration is 6
+The total number of vibrations considered is 3
+
+
+--------------------------
+THERMOCHEMISTRY AT 298.15K
+--------------------------
+
+Temperature         ...   298.15 K
+Pressure            ...     1.00 atm
+Total Mass          ...    18.02 AMU
+
+Throughout the following assumptions are being made:
+  (1) The electronic state is orbitally nondegenerate
+
+------------
+INNER ENERGY
+------------
+
+The inner energy is: U= E(el) + E(ZPE) + E(vib) + E(rot) + E(trans)
+     E(el)   - is the total energy from the electronic structure calculation
+
+Summary of contributions to the inner energy U:
+Electronic energy                ...     -76.31794234 Eh
+Zero point energy                ...       0.02112320 Eh      13.26 kcal/mol
+Thermal vibrational correction   ...       0.00094718 Eh       0.00 kcal/mol
+Thermal rotational correction    ...       0.00094418 Eh       0.59 kcal/mol
+Thermal translational correction ...       0.00094418 Eh       0.59 kcal/mol
+-----------------------------------------------------------------------
+Total thermal energy                     -76.29398359 Eh
+
+Summary of corrections to the electronic energy:
+(perhaps to be used in another calculation)
+Total thermal correction                 0.00283555 Eh       1.78 kcal/mol
+Non-thermal (ZPE) correction             0.02112320 Eh      13.26 kcal/mol
+-----------------------------------------------------------------------
+Total correction                         0.02395876 Eh      15.03 kcal/mol
+
+--------
+ENTHALPY
+--------
+
+The enthalpy is H = U + kB*T
+                kB*T =   0.00094418 Eh       0.59 kcal/mol
+Total Enthalpy                    ...     -76.29303940 Eh
+
+-------
+ENTROPY
+-------
+
+Final entropy term                ...       0.02142847 Eh      13.45 kcal/mol
+
+-------------------
+GIBBS FREE ENERGY
+-------------------
+
+The Gibbs free energy is G = H - T*S
+
+Total enthalpy                    ...     -76.29303940 Eh
+Total entropy correction          ...      -0.02142847 Eh     -13.45 kcal/mol
+-----------------------------------------------------------------------
+Final Gibbs free energy         ...     -76.31446787 Eh
+
+For completeness - the Gibbs free energy minus the electronic energy
+G-E(el)                           ...       0.00347448 Eh       2.18 kcal/mol
+
+
+                             ****ORCA TERMINATED NORMALLY****
+TOTAL RUN TIME: 0 days 0 hours 0 minutes 12 seconds 345 msec

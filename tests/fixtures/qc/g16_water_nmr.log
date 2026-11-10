@@ -1,0 +1,73 @@
+ Entering Gaussian System, Link 0=g16
+ Input=job.gjf
+ Output=job.log
+ Initial command:
+ /opt/g16/l1.exe "/scratch/Gau-12345.inp" -scrdir="/scratch/"
+ Entering Link 1 = /opt/g16/l1.exe PID=     12345.
+  
+ Copyright (c) 1988-2019, Gaussian, Inc.  All Rights Reserved.
+  
+ This is part of the Gaussian(R) 16 program.  It is based on
+ the Gaussian(R) 09 system (copyright 2009, Gaussian, Inc.),
+ ... (legal notice abridged) ...
+  
+ Cite this work as:
+ Gaussian 16, Revision C.01,
+ M. J. Frisch, G. W. Trucks, H. B. Schlegel, G. E. Scuseria, et al.
+ Gaussian, Inc., Wallingford CT, 2016.
+ 
+ ******************************************
+ Gaussian 16:  ES64L-G16RevC.01  3-Jul-2019
+                 4-Nov-2026 
+ ******************************************
+ ----------------------------------
+ #p nmr=(giao,spinspin) b3lyp/6-31g(d)
+ ----------------------------------
+ ---------------
+ water NMR
+ ---------------
+ Symbolic Z-matrix:
+ Charge =  0 Multiplicity = 1
+                         Standard orientation:                         
+ ---------------------------------------------------------------------
+ Center     Atomic      Atomic             Coordinates (Angstroms)
+ Number     Number       Type             X           Y           Z
+ ---------------------------------------------------------------------
+      1          8           0         0.000000    0.000000    0.119018
+      2          1           0         0.000000    0.759242   -0.475927
+      3          1           0         0.000000   -0.759242   -0.475927
+ ---------------------------------------------------------------------
+ SCF Done:  E(RB3LYP) =  -76.4098717230     A.U. after   10 cycles
+ **********************************************************************
+
+            Calculating GIAO nuclear magnetic shielding tensors.
+
+ SCF GIAO Magnetic shielding tensor (ppm):
+      1  O    Isotropic =   325.5673   Anisotropy =    51.2234
+   XX=   311.7700   YX=     0.0000   ZX=     0.0000
+   XY=     0.0000   YY=   355.1500   ZY=     0.0000
+   XZ=     0.0000   YZ=     0.0000   ZZ=   309.7819
+   Eigenvalues:   309.7819   311.7700   355.1500
+      2  H    Isotropic =    31.2341   Anisotropy =    19.5672
+   XX=    24.3131   YX=     0.0000   ZX=     0.0000
+   XY=     0.0000   YY=    34.6230   ZY=    -4.5678
+   XZ=     0.0000   YZ=    -4.1234   ZZ=    34.7662
+   Eigenvalues:    24.3131    30.1234    44.2658
+      3  H    Isotropic =    31.2341   Anisotropy =    19.5672
+   XX=    24.3131   YX=     0.0000   ZX=     0.0000
+   XY=     0.0000   YY=    34.6230   ZY=     4.5678
+   XZ=     0.0000   YZ=     4.1234   ZZ=    34.7662
+   Eigenvalues:    24.3131    30.1234    44.2658
+ There are a total of        22 points.
+ Total nuclear spin-spin coupling K (Hz): 
+                1             2             3
+      1  0.000000D+00
+      2  0.612345D+02  0.000000D+00
+      3  0.612345D+02 -0.150000D+01  0.000000D+00
+ Total nuclear spin-spin coupling J (Hz): 
+                1             2             3
+      1  0.000000D+00
+      2 -0.754321D+02  0.000000D+00
+      3 -0.754321D+02 -0.712345D+01  0.000000D+00
+ End of Minotr F.D. properties file   721 does not exist.
+ Normal termination of Gaussian 16 at Wed Nov  4 21:00:00 2026.

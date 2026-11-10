@@ -1,0 +1,19 @@
+&control
+/
+&system
+  ibrav = 0
+  nat = 2
+  ntyp = 1
+/
+&electrons
+/
+ATOMIC_SPECIES
+H1 1.008 H.pbe-rrkjus.UPF
+CELL_PARAMETERS bohr
+ 20.0 0.0 0.0
+ 0.0 20.0 0.0
+ 0.0 0.0 20.0
+ATOMIC_POSITIONS bohr
+H1 0.0 0.0 0.0
+H1 1.4 0.0 0.0
+K_POINTS gamma

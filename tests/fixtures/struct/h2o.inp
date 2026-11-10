@@ -1,0 +1,22 @@
+&GLOBAL
+  PROJECT water_test
+  RUN_TYPE ENERGY
+&END GLOBAL
+&FORCE_EVAL
+  METHOD Quickstep
+  &SUBSYS
+    &CELL
+      ABC [angstrom] 10.0 11.0 12.0
+      ALPHA_BETA_GAMMA 90 90 90
+    &END CELL
+    &COORD
+      Wat  0.0  0.0     0.1173
+      H    0.0  0.7572 -0.4692
+      H    0.0 -0.7572 -0.4692
+    &END COORD
+    &KIND Wat
+      ELEMENT O
+      BASIS_SET DZVP-MOLOPT-SR-GTH
+    &END KIND
+  &END SUBSYS
+&END FORCE_EVAL

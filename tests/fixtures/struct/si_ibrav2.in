@@ -1,0 +1,16 @@
+&control
+ calculation='relax'
+/
+&system
+ ibrav=2, celldm(1)=10.20, nat=2, ntyp=1, ecutwfc=18.0
+/
+&electrons
+/
+&ions
+/
+ATOMIC_SPECIES
+ Si 28.086 Si.pz-vbc.UPF
+ATOMIC_POSITIONS alat
+ Si 0.00 0.00 0.00
+ Si 0.25 0.25 0.25
+K_POINTS gamma

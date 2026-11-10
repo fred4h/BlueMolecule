@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- attribute form; this comment mentions <atom elementType="U"/> and must be ignored -->
+<cml xmlns="http://www.xml-cml.org/schema">
+ <molecule id="mol1" title="methylammonium">
+  <crystal>
+   <scalar title="a" dictRef="cml:a" units="units:angstrom">10.0</scalar>
+   <scalar title="b" dictRef="cml:b" units="units:angstrom">11.0</scalar>
+   <scalar title="c" dictRef="cml:c" units="units:angstrom">12.0</scalar>
+   <scalar title="alpha" dictRef="cml:alpha" units="units:degree">90</scalar>
+   <scalar title="beta" dictRef="cml:beta" units="units:degree">90</scalar>
+   <scalar title="gamma" dictRef="cml:gamma" units="units:degree">90</scalar>
+  </crystal>
+  <atomArray>
+   <atom id="a1" elementType="C" x3="0.0" y3="0.0" z3="0.0"/>
+   <atom id="a2" elementType="N" x3="1.49" y3="0.0" z3="0.0" formalCharge="1"/>
+   <atom id="a3" elementType="H" x3="-0.36" y3="1.03" z3="0.0"/>
+   <atom id="a4" elementType="H" x3="-0.36" y3="-0.51" z3="0.89"/>
+   <atom id="a5" elementType="H" x3="-0.36" y3="-0.51" z3="-0.89"/>
+   <atom id="a6" elementType="H" x3="1.85" y3="0.95" z3="0.0"/>
+   <atom id="a7" elementType="H" x3="1.85" y3="-0.47" z3="0.82"/>
+   <atom id="a8" elementType="H" x3="1.85" y3="-0.47" z3="-0.82"/>
+  </atomArray>
+  <bondArray>
+   <bond atomRefs2="a1 a2" order="1"/>
+   <bond atomRefs2="a1 a3" order="S"/>
+   <bond atomRefs2="a1 a4" order="S"/>
+   <bond atomRefs2="a1 a5" order="S"/>
+   <bond atomRefs2="a2 a6" order="1"/>
+   <bond atomRefs2="a2 a7" order="1"/>
+   <bond atomRefs2="a2 a8" order="1"/>
+  </bondArray>
+ </molecule>
+</cml>

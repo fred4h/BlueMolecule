@@ -1,0 +1,37 @@
+%VERSION  VERSION_STAMP = V0001.000  DATE = 01/01/24  00:00:00
+%FLAG TITLE
+%FORMAT(20a4)
+water and sodium
+%FLAG POINTERS
+%FORMAT(10I8)
+       4       3       2       0       1       0       0       0       0       0
+      10       2       0       0       0       1       0       0       2       1
+       0       0       0       0       0       0       0       1       3       0
+       0
+%FLAG ATOM_NAME
+%FORMAT(20a4)
+O   H1  H2  Na+ 
+%FLAG CHARGE
+%FORMAT(5E16.8)
+ -1.51973982E+01  7.59869910E+00  7.59869910E+00  1.82223000E+01
+%FLAG ATOMIC_NUMBER
+%FORMAT(10I8)
+       8       1       1      11
+%FLAG MASS
+%FORMAT(5E16.8)
+  1.60000000E+01  1.00800000E+00  1.00800000E+00  2.29900000E+01
+%FLAG RESIDUE_LABEL
+%FORMAT(20a4)
+WAT Na+ 
+%FLAG RESIDUE_POINTER
+%FORMAT(10I8)
+       1       4
+%FLAG BONDS_INC_HYDROGEN
+%FORMAT(10I8)
+       0       3       1       0       6       1
+%FLAG BONDS_WITHOUT_HYDROGEN
+%FORMAT(10I8)
+
+%FLAG BOX_DIMENSIONS
+%FORMAT(5E16.8)
+  9.00000000E+01  2.00000000E+01  2.10000000E+01  2.20000000E+01

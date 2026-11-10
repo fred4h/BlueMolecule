@@ -1,0 +1,42 @@
+data_1ABC
+_entry.id 1ABC
+_struct.title 'Tiny test peptide'
+_cell.length_a 1.000
+_cell.length_b 1.000
+_cell.length_c 1.000
+loop_
+_atom_site.group_PDB
+_atom_site.id
+_atom_site.type_symbol
+_atom_site.label_atom_id
+_atom_site.label_alt_id
+_atom_site.label_comp_id
+_atom_site.label_asym_id
+_atom_site.label_seq_id
+_atom_site.pdbx_PDB_ins_code
+_atom_site.Cartn_x
+_atom_site.Cartn_y
+_atom_site.Cartn_z
+_atom_site.occupancy
+_atom_site.auth_seq_id
+_atom_site.auth_asym_id
+_atom_site.pdbx_PDB_model_num
+ATOM   1   N  N      . GLY A 1 ? 1.000 2.000 3.000 1.00 10 X 1
+ATOM   2   C  CA     . GLY A 1 ? 2.000 2.000 3.000 1.00 10 X 1
+ATOM   3   C  CB     A SER A 2 ? 3.000 2.000 3.000 1.00 11 X 1
+ATOM   4   C  CB     B SER A 2 ? 3.100 2.100 3.100 1.00 11 X 1
+ATOM   5   O  OG     A SER A 2 ? 4.000 2.000 3.000 1.00 11 X 1
+ATOM   6   O  OG     B SER A 2 ? 4.100 2.100 3.100 1.00 11 X 1
+ATOM   7   O  "O5'"  . DA  B 1 ? 5.000 1.000 1.000 1.00 20 Y 1
+HETATM 8   O  O      . HOH C . ? 6.000 6.000 6.000 1.00 101 W 1
+HETATM 9   ZN ZN     . ZN  D . ? 7.000 7.000 7.000 1.00 201 W 1
+ATOM   10  N  N      . GLY A 1 ? 1.500 2.000 3.000 1.00 10 X 2
+ATOM   11  C  CA     . GLY A 1 ? 2.500 2.000 3.000 1.00 10 X 2
+ATOM   12  C  CB     A SER A 2 ? 3.500 2.000 3.000 1.00 11 X 2
+ATOM   13  C  CB     B SER A 2 ? 3.600 2.100 3.100 1.00 11 X 2
+ATOM   14  O  OG     A SER A 2 ? 4.500 2.000 3.000 1.00 11 X 2
+ATOM   15  O  OG     B SER A 2 ? 4.600 2.100 3.100 1.00 11 X 2
+ATOM   16  O  "O5'"  . DA  B 1 ? 5.500 1.000 1.000 1.00 20 Y 2
+HETATM 17  O  O      . HOH C . ? 6.500 6.000 6.000 1.00 101 W 2
+HETATM 18  ZN ZN     . ZN  D . ? 7.500 7.000 7.000 1.00 201 W 2
+#

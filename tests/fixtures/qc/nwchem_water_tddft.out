@@ -1,0 +1,69 @@
+============================== echo of input deck ==============================
+start water_td
+geometry units angstrom
+  O   0.00000000   0.00000000   0.11901800
+  H   0.00000000   0.75924200  -0.47592700
+  H   0.00000000  -0.75924200  -0.47592700
+end
+basis
+  * library 6-31g*
+end
+dft
+  xc b3lyp
+end
+tddft
+  nroots 3
+  notriplet
+end
+task tddft energy
+================================================================================
+
+              Northwest Computational Chemistry Package (NWChem) 7.0.2
+              --------------------------------------------------------
+
+                             Geometry "geometry" -> ""
+                             -------------------------
+
+ Output coordinates in angstroms (scale by  1.889725989 to convert to a.u.)
+
+  No.       Tag          Charge          X              Y              Z
+ ---- ---------------- ---------- -------------- -------------- --------------
+    1 O                    8.0000     0.00000000     0.00000000     0.11901800
+    2 H                    1.0000     0.00000000     0.75924200    -0.47592700
+    3 H                    1.0000     0.00000000    -0.75924200    -0.47592700
+
+         Total DFT energy =      -76.409871723000
+
+                                NWChem TDDFT Module
+                                -------------------
+
+  ----------------------------------------------------------------------------
+  Root   1 singlet b2             0.268126520 a.u.                7.2961 eV 
+  ----------------------------------------------------------------------------
+     Transition Moments    X  0.00000   Y -0.26890   Z  0.00000
+     Transition Moments   XX  0.00000  XY  0.00000  XZ  0.00000
+     Transition Moments   YY  0.00000  YZ  0.07162  ZZ  0.00000
+     Dipole Oscillator Strength                         0.01292
+
+     Occ.    5  b1   ---  Virt.    6  a1    0.99630 X
+  ----------------------------------------------------------------------------
+  Root   2 singlet a2             0.334312088 a.u.                9.0971 eV 
+  ----------------------------------------------------------------------------
+     Transition Moments    X  0.00000   Y  0.00000   Z  0.00000
+     Transition Moments   XX  0.00000  XY  0.00000  XZ  0.00000
+     Transition Moments   YY  0.00000  YZ  0.00000  ZZ  0.00000
+     Dipole Oscillator Strength                         0.00000
+
+     Occ.    5  b1   ---  Virt.    7  b2    0.99821 X
+  ----------------------------------------------------------------------------
+  Root   3 singlet a1             0.361680112 a.u.                9.8418 eV 
+  ----------------------------------------------------------------------------
+     Transition Moments    X  0.00000   Y  0.00000   Z -0.43210
+     Transition Moments   XX -0.01234  XY  0.00000  XZ  0.00000
+     Transition Moments   YY  0.04321  YZ  0.00000  ZZ  0.00987
+     Dipole Oscillator Strength                         0.04502
+
+     Occ.    4  a1   ---  Virt.    6  a1    0.98911 X
+     Occ.    3  b2   ---  Virt.    7  b2   -0.11040 X
+
+ Total times  cpu:        1.5s     wall:        1.7s

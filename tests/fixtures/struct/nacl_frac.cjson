@@ -1,0 +1,3 @@
+{"chemicalJson": 1, "name": "NaCl primitive",
+ "unitCell": {"a": 3.988, "b": 3.988, "c": 3.988, "alpha": 60, "beta": 60, "gamma": 60},
+ "atoms": {"elements": {"number": [11, 17]}, "coords": {"3dFractional": [0, 0, 0, 0.5, 0.5, 0.5]}}}

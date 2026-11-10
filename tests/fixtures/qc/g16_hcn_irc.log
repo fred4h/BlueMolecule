@@ -1,0 +1,111 @@
+ Entering Gaussian System, Link 0=g16
+ Input=job.gjf
+ Output=job.log
+ Initial command:
+ /opt/g16/l1.exe "/scratch/Gau-12345.inp" -scrdir="/scratch/"
+ Entering Link 1 = /opt/g16/l1.exe PID=     12345.
+  
+ Copyright (c) 1988-2019, Gaussian, Inc.  All Rights Reserved.
+  
+ This is part of the Gaussian(R) 16 program.  It is based on
+ the Gaussian(R) 09 system (copyright 2009, Gaussian, Inc.),
+ ... (legal notice abridged) ...
+  
+ Cite this work as:
+ Gaussian 16, Revision C.01,
+ M. J. Frisch, G. W. Trucks, H. B. Schlegel, G. E. Scuseria, et al.
+ Gaussian, Inc., Wallingford CT, 2016.
+ 
+ ******************************************
+ Gaussian 16:  ES64L-G16RevC.01  3-Jul-2019
+                 4-Nov-2026 
+ ******************************************
+ ----------------------------------
+ #p irc=(calcfc,maxpoints=2,stepsize=10) b3lyp/6-31g(d)
+ ----------------------------------
+ ---------------
+ HCN <-> HNC IRC
+ ---------------
+ Symbolic Z-matrix:
+ Charge =  0 Multiplicity = 1
+                         Input orientation:                         
+ ---------------------------------------------------------------------
+ Center     Atomic      Atomic             Coordinates (Angstroms)
+ Number     Number       Type             X           Y           Z
+ ---------------------------------------------------------------------
+      1          7           0         0.000000    0.000000    0.000000
+      2          6           0         0.000000    0.000000    1.180000
+      3          1           0         1.100000    0.000000    0.700000
+ ---------------------------------------------------------------------
+ SCF Done:  E(RB3LYP) =  -93.3210000000     A.U. after    9 cycles
+                         Input orientation:                         
+ ---------------------------------------------------------------------
+ Center     Atomic      Atomic             Coordinates (Angstroms)
+ Number     Number       Type             X           Y           Z
+ ---------------------------------------------------------------------
+      1          7           0         0.000000    0.000000    0.000000
+      2          6           0         0.000000    0.000000    1.175000
+      3          1           0         1.050000    0.000000    0.850000
+ ---------------------------------------------------------------------
+ SCF Done:  E(RB3LYP) =  -93.3298765430     A.U. after    9 cycles
+ IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC
+ Point Number:   1          Path Number:   1
+   CHANGE IN THE REACTION COORDINATE =    0.10000 (Amu)**1/2 Bohr
+   NET REACTION COORDINATE UP TO THIS POINT =    0.10000 (Amu)**1/2 Bohr
+ # OF POINTS ALONG THE PATH =   1
+ # OF STEPS =   2
+
+                         Input orientation:                         
+ ---------------------------------------------------------------------
+ Center     Atomic      Atomic             Coordinates (Angstroms)
+ Number     Number       Type             X           Y           Z
+ ---------------------------------------------------------------------
+      1          7           0         0.000000    0.000000    0.000000
+      2          6           0         0.000000    0.000000    1.170000
+      3          1           0         1.000000    0.000000    1.000000
+ ---------------------------------------------------------------------
+ SCF Done:  E(RB3LYP) =  -93.3387654320     A.U. after    9 cycles
+ IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC
+ Point Number:   2          Path Number:   1
+   CHANGE IN THE REACTION COORDINATE =    0.10000 (Amu)**1/2 Bohr
+   NET REACTION COORDINATE UP TO THIS POINT =    0.20000 (Amu)**1/2 Bohr
+ # OF POINTS ALONG THE PATH =   2
+ # OF STEPS =   2
+
+ Calculation of REVERSE path follows:
+                         Input orientation:                         
+ ---------------------------------------------------------------------
+ Center     Atomic      Atomic             Coordinates (Angstroms)
+ Number     Number       Type             X           Y           Z
+ ---------------------------------------------------------------------
+      1          7           0         0.000000    0.000000    0.000000
+      2          6           0         0.000000    0.000000    1.185000
+      3          1           0         1.000000    0.000000    0.550000
+ ---------------------------------------------------------------------
+ SCF Done:  E(RB3LYP) =  -93.3445227110     A.U. after    9 cycles
+ IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC
+ Point Number:   1          Path Number:   2
+   CHANGE IN THE REACTION COORDINATE =    0.10000 (Amu)**1/2 Bohr
+   NET REACTION COORDINATE UP TO THIS POINT =    0.10000 (Amu)**1/2 Bohr
+ # OF POINTS ALONG THE PATH =   1
+ # OF STEPS =   2
+
+                         Input orientation:                         
+ ---------------------------------------------------------------------
+ Center     Atomic      Atomic             Coordinates (Angstroms)
+ Number     Number       Type             X           Y           Z
+ ---------------------------------------------------------------------
+      1          7           0         0.000000    0.000000    0.000000
+      2          6           0         0.000000    0.000000    1.190000
+      3          1           0         0.900000    0.000000    0.400000
+ ---------------------------------------------------------------------
+ SCF Done:  E(RB3LYP) =  -93.3601401230     A.U. after    9 cycles
+ IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC-IRC
+ Point Number:   2          Path Number:   2
+   CHANGE IN THE REACTION COORDINATE =    0.10000 (Amu)**1/2 Bohr
+   NET REACTION COORDINATE UP TO THIS POINT =    0.20000 (Amu)**1/2 Bohr
+ # OF POINTS ALONG THE PATH =   2
+ # OF STEPS =   2
+
+ Reaction path calculation complete.
+ Normal termination of Gaussian 16 at Wed Nov  4 21:00:00 2026.

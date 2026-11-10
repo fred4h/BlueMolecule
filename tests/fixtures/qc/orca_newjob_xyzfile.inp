@@ -1,0 +1,9 @@
+! B3LYP def2-SVP Opt
+* xyz -1 2
+  O   0.000000   0.000000   0.000000
+  H   0.000000   0.000000   0.970000
+*
+
+$new_job
+! B3LYP def2-TZVP
+* xyzfile -1 2 orca_newjob_xyzfile.xyz

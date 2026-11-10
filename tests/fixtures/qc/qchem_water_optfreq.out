@@ -1,0 +1,260 @@
+                  Welcome to Q-Chem
+     A Quantum Leap Into The Future Of Chemistry
+
+
+ Q-Chem 6.0.2, Q-Chem, Inc., Pleasanton, CA (2022)
+
+ License issued to: Example University
+
+ E. Epifanovsky,  A. T. B. Gilbert,  Xintian Feng,  Joonho Lee,  Yuezhi Mao,  
+ N. Mardirossian,  P. Pokhilko,  A. F. White,  M. P. Coons,  A. L. Dempwolff,  
+
+ Q-Chem 6.0.2 for Intel X86 EM64T Linux
+
+ Q-Chem begins on Wed Nov  4 21:00:00 2026  
+
+ Host: node01
+0
+
+     Scratch files written to /scratch/qchem12345//
+ Processing $rem in /opt/qchem/config/preferences:
+ Core orbitals will be frozen
+
+ Checking the input file for inconsistencies... 	...done.
+
+--------------------------------------------------------------
+User input:
+--------------------------------------------------------------
+$molecule
+0 1
+O   0.0000000000   0.0000000000   0.1173000000
+H   0.0000000000   0.7572000000  -0.4692000000
+H   0.0000000000  -0.7572000000  -0.4692000000
+$end
+
+$rem
+   JOBTYPE         opt
+   METHOD          b3lyp
+   BASIS           6-31G*
+$end
+--------------------------------------------------------------
+ ----------------------------------------------------------------
+             Standard Nuclear Orientation (Angstroms)
+    I     Atom           X                Y                Z
+ ----------------------------------------------------------------
+    1      O       0.0000000000     0.0000000000     0.1173000000
+    2      H       0.0000000000     0.7572000000    -0.4692000000
+    3      H       0.0000000000    -0.7572000000    -0.4692000000
+ ----------------------------------------------------------------
+ Nuclear Repulsion Energy =           9.1681932328 hartrees
+ There are        5 alpha and        5 beta electrons
+ Requested basis set is 6-31G*
+ There are 10 shells and 19 basis functions
+ ---------------------------------------
+  Cycle       Energy         DIIS error
+ ---------------------------------------
+    1     -76.2898331043      4.71e-02  
+    9     -76.4089074962      1.23e-08  Convergence criterion met
+ ---------------------------------------
+ SCF time:   CPU 1.23s  wall 1.30s 
+ SCF   energy in the final basis set =      -76.4089074962
+ Total energy in the final basis set =      -76.4089074962
+ 
+** GEOMETRY OPTIMIZATION IN DELOCALIZED INTERNAL COORDINATES **
+   Searching for a Minimum
+
+   Optimization Cycle:   1
+
+                         Coordinates (Angstroms)
+     ATOM              X           Y           Z
+      1  O         0.0000000000   0.0000000000   0.1173000000
+      2  H         0.0000000000   0.7572000000  -0.4692000000
+      3  H         0.0000000000  -0.7572000000  -0.4692000000
+   Point Group: c2v                    Number of degrees of freedom:     2
+
+
+   Energy is    -76.408907496
+
+   Hessian Updated using BFGS Update
+
+   Step Taken.  Stepsize is  0.031413
+
+   Maximum     Tolerance    Cnvgd?
+   Gradient       0.012346      0.000300      NO
+   Displacement   0.023671      0.001200      NO
+   Energy change  *********      0.000001      NO
+
+
+   New Cartesian Coordinates Obtained by Inverse Iteration
+ ----------------------------------------------------------------
+             Standard Nuclear Orientation (Angstroms)
+    I     Atom           X                Y                Z
+ ----------------------------------------------------------------
+    1      O       0.0000000000     0.0000000000     0.1189000000
+    2      H       0.0000000000     0.7598000000    -0.4756000000
+    3      H       0.0000000000    -0.7598000000    -0.4756000000
+ ----------------------------------------------------------------
+ Total energy in the final basis set =      -76.4098631177
+
+   Optimization Cycle:   2
+
+   Maximum     Tolerance    Cnvgd?
+   Gradient       0.001634      0.000300      NO
+   Displacement   0.002367      0.001200      NO
+   Energy change -0.000955621      0.000001      NO
+
+ ----------------------------------------------------------------
+             Standard Nuclear Orientation (Angstroms)
+    I     Atom           X                Y                Z
+ ----------------------------------------------------------------
+    1      O       0.0000000000     0.0000000000     0.1190180000
+    2      H       0.0000000000     0.7592420000    -0.4759270000
+    3      H       0.0000000000    -0.7592420000    -0.4759270000
+ ----------------------------------------------------------------
+ Total energy in the final basis set =      -76.4098717230
+
+   Optimization Cycle:   3
+
+   Maximum     Tolerance    Cnvgd?
+   Gradient       0.000012      0.000300     YES
+   Displacement   0.000045      0.001200     YES
+   Energy change -0.000008605      0.000001      NO
+
+
+         Distance Matrix (Angstroms)
+             O (  1)   H (  2)
+   H (  2)  0.968563
+   H (  3)  0.968563  1.518484
+
+ ******************************
+ **  OPTIMIZATION CONVERGED  **
+ ******************************
+
+                           Coordinates (Angstroms)
+     ATOM              X           Y           Z
+      1  O         0.0000000000   0.0000000000   0.1190180000
+      2  H         0.0000000000   0.7592420000  -0.4759270000
+      3  H         0.0000000000  -0.7592420000  -0.4759270000
+
+ Total job time:  12.34s(wall), 11.22s(cpu) 
+ Wed Nov  4 21:00:12 2026
+
+        *************************************************************
+        *                                                           *
+        *  Thank you very much for using Q-Chem.  Have a nice day.  *
+        *                                                           *
+        *************************************************************
+
+
+
+------------------------------------------------------------
+User input:  
+------------------------------------------------------------
+$molecule
+read
+$end
+
+$rem
+   JOBTYPE         freq
+   METHOD          b3lyp
+   BASIS           6-31G*
+   SCF_GUESS       read
+$end
+--------------------------------------------------------------
+ ----------------------------------------------------------------
+             Standard Nuclear Orientation (Angstroms)
+    I     Atom           X                Y                Z
+ ----------------------------------------------------------------
+    1      O       0.0000000000     0.0000000000     0.1190180000
+    2      H       0.0000000000     0.7592420000    -0.4759270000
+    3      H       0.0000000000    -0.7592420000    -0.4759270000
+ ----------------------------------------------------------------
+ There are        5 alpha and        5 beta electrons
+ Total energy in the final basis set =      -76.4098717230
+ 
+ --------------------------------------------------------------
+ 
+                    Orbital Energies (a.u.)
+ --------------------------------------------------------------
+ 
+ Alpha MOs
+ -- Occupied --
+-19.1351  -0.9971  -0.5203  -0.3662  -0.2921
+ -- Virtual --
+  0.0654   0.1491
+ --------------------------------------------------------------
+ 
+          Ground-State Mulliken Net Atomic Charges
+
+     Atom                 Charge (a.u.)
+  ----------------------------------------
+      1 O                    -0.851498
+      2 H                     0.425749
+      3 H                     0.425749
+  ----------------------------------------
+  Sum of atomic charges =     0.000000
+
+ -----------------------------------------------------------------
+                    Cartesian Multipole Moments
+ -----------------------------------------------------------------
+    Charge (ESU x 10^10)
+                 0.0000
+    Dipole Moment (Debye)
+         X       0.0000      Y      -0.0000      Z      -2.0937
+       Tot       2.0937
+ -----------------------------------------------------------------
+
+ **********************************************************************
+ **                                                                  **
+ **                       VIBRATIONAL ANALYSIS                       **
+ **                       --------------------                       **
+ **                                                                  **
+ **        VIBRATIONAL FREQUENCIES (CM**-1) AND NORMAL MODES         **
+ **     FORCE CONSTANTS (mDYN/ANGSTROM) AND REDUCED MASSES (AMU)     **
+ **                  INFRARED INTENSITIES (KM/MOL)                   **
+ **                                                                  **
+ **********************************************************************
+
+
+ Mode:                 1                      2                      3
+ Frequency:      1626.80                3773.58                3884.37
+ Force Cnst:      1.6884                 8.7650                 9.6168
+ Red. Mass:       1.0828                 1.0447                 1.0817
+ IR Active:          YES                    YES                    YES
+ IR Intens:       69.334                  4.187                 36.912
+ Raman Active:       YES                    YES                    YES
+               X      Y      Z        X      Y      Z        X      Y      Z
+ O         0.000  0.000 -0.068    0.000  0.000  0.048    0.000 -0.068  0.000
+ H         0.000 -0.417  0.540    0.000  0.584 -0.380    0.000  0.538 -0.453
+ H         0.000  0.417  0.540    0.000 -0.584 -0.380    0.000  0.538  0.453
+ TransDip   0.000 -0.000 -0.267    0.000  0.000  0.066    0.000 -0.195  0.000
+
+ STANDARD THERMODYNAMIC QUANTITIES AT   298.15 K  AND     1.00 ATM
+
+   This Molecule has  0 Imaginary Frequencies
+   Zero point vibrational energy:       13.331 kcal/mol
+
+   Atom    1 Element O  Has Mass   15.99491
+   Atom    2 Element H  Has Mass    1.00783
+   Atom    3 Element H  Has Mass    1.00783
+   Molecular Mass:     18.010560 amu
+   Translational Enthalpy:        1.481 kcal/mol
+   Rotational Enthalpy:           0.889 kcal/mol
+   Vibrational Enthalpy:         13.333 kcal/mol
+   gas constant (RT):             0.592 kcal/mol
+   Translational Entropy:        34.608  cal/mol.K
+   Rotational Entropy:           10.479  cal/mol.K
+   Vibrational Entropy:           0.009  cal/mol.K
+
+   Total Enthalpy:               15.703 kcal/mol
+   Total Entropy:                45.096  cal/mol.K
+
+ Total job time:  20.11s(wall), 18.40s(cpu) 
+ Wed Nov  4 21:00:32 2026
+
+        *************************************************************
+        *                                                           *
+        *  Thank you very much for using Q-Chem.  Have a nice day.  *
+        *                                                           *
+        *************************************************************
+

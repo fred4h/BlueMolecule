@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Renderer harness</title>
+<style>
+  html, body { margin: 0; background: #101722; color: #dbe4f0; font: 13px ui-sans-serif, system-ui, sans-serif; }
+  #vp { position: relative; width: 800px; height: 600px; overflow: hidden; background: #101722; }
+  #gl, #overlay { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #gl { touch-action: none; }
+  #overlay { pointer-events: none; }
+  #bar { padding: 6px 8px; }
+</style>
+</head>
+<body>
+<!-- Stand-alone page for the renderer: node tests/test_renderer.js drives it; open it directly and pick a scene to look around. -->
+<div id="vp"><canvas id="gl"></canvas><canvas id="overlay"></canvas></div>
+<div id="bar">Scene: <select id="scene"></select> <select id="style"><option>ballstick</option><option>wireframe</option><option>sticks</option><option>spacefill</option></select></div>
+<script src="../src/elements.js"></script>
+<script src="../src/geom.js"></script>
+<script src="../src/renderer.js"></script>
+<script>
+'use strict';
+const R = new BM.Renderer(document.getElementById('gl'), document.getElementById('overlay'));
+window.R = R;
+const rad = Math.PI / 180;
+
+// ---- molecules: {Z, P (positions), bonds (flat pairs), orders (parallel to the pairs)} ----
+function benzene(aromatic) {
+  const Z = [], P = [], bonds = [], orders = [];
+  for (let k = 0; k < 6; k++) { const a = k * 60 * rad; Z.push(6); P.push([1.39 * Math.cos(a), 1.39 * Math.sin(a), 0]); }
+  for (let k = 0; k < 6; k++) { const a = k * 60 * rad; Z.push(1); P.push([2.47 * Math.cos(a), 2.47 * Math.sin(a), 0]); }
+  for (let k = 0; k < 6; k++) { bonds.push(k, (k + 1) % 6); orders.push(aromatic ? 1.5 : (k % 2 ? 1 : 2)); }
+  for (let k = 0; k < 6; k++) { bonds.push(k, k + 6); orders.push(1); }
+  return { Z, P, bonds, orders };
+}
+const co2 = () => ({ Z: [8, 6, 8], P: [[-1.16, 0, 0], [0, 0, 0], [1.16, 0, 0]], bonds: [0, 1, 1, 2], orders: [2, 2] });
+const acetylene = () => ({ Z: [1, 6, 6, 1], P: [[-1.66, 0, 0], [-0.60, 0, 0], [0.60, 0, 0], [1.66, 0, 0]], bonds: [1, 2, 0, 1, 2, 3], orders: [3, 1, 1] });
+function waterDimer() {
+  // donor O0-H1 points at acceptor O3 (O···O 2.91 Å, H···O 1.95 Å)
+  const c = Math.cos(52.26 * rad), s = Math.sin(52.26 * rad), b = [0.7809, 0, -0.6247];
+  const P = [[0, 0, 0], [0.9572, 0, 0], [0.9572 * Math.cos(104.52 * rad), 0.9572 * Math.sin(104.52 * rad), 0], [2.91, 0, 0]];
+  P.push([2.91 + 0.9572 * c * b[0], 0.9572 * s, 0.9572 * c * b[2]], [2.91 + 0.9572 * c * b[0], -0.9572 * s, 0.9572 * c * b[2]]);
+  return { Z: [8, 1, 1, 8, 1, 1], P, bonds: [0, 1, 0, 2, 3, 4, 3, 5], hbond: [1, 3] };
+}
+const formaldehyde = () => ({ Z: [6, 8, 1, 1], P: [[0, 0, 0], [1.21, 0, 0], [-0.55, 0.94, 0], [-0.55, -0.94, 0]], bonds: [0, 1, 0, 2, 0, 3], orders: [2, 1, 1] });
+
+// ---- helpers used by the test ----
+/** Rotate (quaternion `rot`) and shift positions, then show them. View quaternion `view` is applied first. */
+function load(m, o = {}) {
+  clearExtras();
+  const M = BM.quat.mat(o.rot || [0, 0, 0, 1]), sh = o.shift || [0, 0, 0];
+  const xyz = new Float64Array(m.P.length * 3);
+  m.P.forEach((p, i) => { for (let r = 0; r < 3; r++) xyz[3 * i + r] = M[3 * r] * p[0] + M[3 * r + 1] * p[1] + M[3 * r + 2] * p[2] + sh[r]; });
+  R.setOptions(Object.assign({ style: 'ballstick', showH: true }, o.opt || {}));
+  R.setOrientation(o.view || [0, 0, 0, 1]);
+  const bonds = Uint32Array.from(m.bonds);
+  R.setScene(m.Z, xyz, bonds, false, o.noOrders || !m.orders ? undefined : Float32Array.from(m.orders));
+  return { xyz, bonds };
+}
+function clearExtras() {
+  R.setDashedBonds([]); R.setCell(null); R.setExtraArrows([]); R.setAtomMarkers([]); R.setSelection([]); R.highlightBond(-1);
+  R.setRepresentation(null, true); R.setOverlays([]); R.setPickProxies(null); R.setRepMarkers([]); R.setLegend(null);
+  R.overlayHook = null; R.labelProvider = null; R.tool = null;
+}
+const conj = q => [-q[0], -q[1], -q[2], q[3]];
+const atomPos = i => [R.xyz[3 * i], R.xyz[3 * i + 1], R.xyz[3 * i + 2]];
+/** Read an instanced buffer back from the GPU: array of {a, b, r, c} cylinders (10 floats each). */
+function readCyl(buf, count) {
+  const gl = R.gl, f = new Float32Array(count * 10);
+  if (count) { gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.getBufferSubData(gl.ARRAY_BUFFER, 0, f); }
+  const out = [];
+  for (let k = 0; k < count; k++) { const s = f.subarray(10 * k); out.push({ a: [s[0], s[1], s[2]], b: [s[3], s[4], s[5]], r: s[6], c: [s[7], s[8], s[9]] }); }
+  return out;
+}
+const frame = () => new Promise(res => requestAnimationFrame(() => requestAnimationFrame(res)));
+// a general orientation for the benzene ring so that "in plane" and "perpendicular to the view" differ
+const RING_ROT = BM.quat.axis([0.3, 1, 0.45], 0.9);
+Object.assign(window, { benzene, co2, acetylene, waterDimer, formaldehyde, load, conj, atomPos, readCyl, frame, RING_ROT });
+
+// ---- interactive use ----
+const SCENES = {
+  'benzene (Kekulé)': () => load(benzene(false), { rot: RING_ROT, view: conj(RING_ROT) }),
+  'benzene (aromatic)': () => load(benzene(true), { rot: RING_ROT, view: conj(RING_ROT) }),
+  'CO2': () => load(co2(), { view: BM.quat.axis([1, 0.4, 0], -0.5) }),
+  'acetylene': () => load(acetylene(), { view: BM.quat.axis([1, 0.4, 0], -0.5) }),
+  'water dimer + H-bond': () => { const m = waterDimer(); load(m); R.setDashedBonds([m.hbond]); },
+  'cell + dipole + markers': () => {
+    load(formaldehyde(), { view: BM.quat.axis([1, 0.35, 0], -0.75) });
+    R.setCell([[5.2, 0, 0], [1.1, 4.8, 0], [0.7, 0.9, 4.6]], [-3.0, -2.9, -2.3]);
+    R.setExtraArrows([{ from: [1.4, 0, 1.2], to: [-1.6, 0, 1.2], color: [1.0, 0.55, 0.15], radius: 0.07 }]);
+    R.setAtomMarkers([2, 3]);
+  }
+};
+const sel = document.getElementById('scene'), sty = document.getElementById('style');
+for (const k of Object.keys(SCENES)) sel.add(new Option(k));
+const show = () => { SCENES[sel.value](); R.setOptions({ style: sty.value }); };
+sel.onchange = show; sty.onchange = show;
+Object.assign(window, { SCENES, clearExtras });
+if (!navigator.webdriver) show();
+window.harnessReady = true;
+</script>
+</body>
+</html>

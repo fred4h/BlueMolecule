@@ -1,0 +1,275 @@
+    -----------------------------------------------------------------------
+          Psi4: An Open-Source Ab Initio Electronic Structure Package
+                               Psi4 1.7 release
+
+                         Git: Rev {HEAD} 6ce35a5 
+
+
+    D. G. A. Smith, L. A. Burns, A. C. Simmonett, R. M. Parrish,
+    M. C. Schieber, R. Galvelis, P. Kraus, H. Kruse, R. Di Remigio,
+    -----------------------------------------------------------------------
+
+
+    Psi4 started on: Wednesday, 04 November 2026 09:00PM
+
+    Process ID: 12345
+    Host:       node01
+    Memory:     500.0 MiB
+    Threads:    4
+    
+  ==> Input File <==
+
+--------------------------------------------------------------------------
+molecule water {
+0 1
+O   0.0000000000   0.0000000000   0.1173000000
+H   0.0000000000   0.7572000000  -0.4692000000
+H   0.0000000000  -0.7572000000  -0.4692000000
+}
+
+set basis 6-31G*
+optimize('b3lyp')
+frequency('b3lyp')
+--------------------------------------------------------------------------
+
+         ---------------------------------------------------------
+                                   SCF
+               by Justin Turney, Rob Parrish, Andy Simmonett
+                          and Daniel G. A. Smith
+                              RKS Reference
+                        4 Threads,    500 MiB Core
+         ---------------------------------------------------------
+
+  ==> Geometry <==
+
+    Molecular point group: c2v
+    Full point group: C2v
+
+    Geometry (in Angstrom), charge = 0, multiplicity = 1:
+
+       Center              X                  Y                   Z               Mass       
+    ------------   -----------------  -----------------  -----------------  -----------------
+         O            0.000000000000     0.000000000000     0.117300000000    15.994914619570
+         H            0.000000000000     0.757200000000    -0.469200000000     1.007825032230
+         H            0.000000000000    -0.757200000000    -0.469200000000     1.007825032230
+
+  Running in c2v symmetry.
+
+  ==> Primary Basis <==
+
+  Basis Set: 6-31G*
+    Blend: 6-31G*
+    Number of shells: 10
+
+  ==> DFT Potential <==
+
+   => Composite Functional: B3LYP <= 
+
+  @DF-RKS Final Energy:   -76.40890749621001
+
+	==> Convergence Check <==
+
+	Measures of convergence in internal coordinates in au.
+	Criteria marked as inactive (o), active & met (*), and active & unmet ( ).
+	---------------------------------------------------------------------------------------------
+	   Step     Total Energy     Delta E     MAX Force     RMS Force      MAX Disp      RMS Disp   
+	---------------------------------------------------------------------------------------------
+	  Convergence Criteria    1.00e-06 *    3.00e-04 *             o    1.20e-03 *             o
+	---------------------------------------------------------------------------------------------
+	      1     -76.40890750   -7.64e+01      1.23e-02      6.79e-03 o    2.37e-02      1.53e-02 o  ~
+	---------------------------------------------------------------------------------------------
+
+         ---------------------------------------------------------
+                                   SCF
+               by Justin Turney, Rob Parrish, Andy Simmonett
+                          and Daniel G. A. Smith
+                              RKS Reference
+                        4 Threads,    500 MiB Core
+         ---------------------------------------------------------
+
+  ==> Geometry <==
+
+    Molecular point group: c2v
+    Full point group: C2v
+
+    Geometry (in Angstrom), charge = 0, multiplicity = 1:
+
+       Center              X                  Y                   Z               Mass       
+    ------------   -----------------  -----------------  -----------------  -----------------
+         O            0.000000000000     0.000000000000     0.118900000000    15.994914619570
+         H            0.000000000000     0.759800000000    -0.475600000000     1.007825032230
+         H            0.000000000000    -0.759800000000    -0.475600000000     1.007825032230
+
+  Running in c2v symmetry.
+
+  ==> Primary Basis <==
+
+  Basis Set: 6-31G*
+    Blend: 6-31G*
+    Number of shells: 10
+
+  ==> DFT Potential <==
+
+   => Composite Functional: B3LYP <= 
+
+  @DF-RKS Final Energy:   -76.40986311770000
+
+	==> Convergence Check <==
+
+	Measures of convergence in internal coordinates in au.
+	Criteria marked as inactive (o), active & met (*), and active & unmet ( ).
+	---------------------------------------------------------------------------------------------
+	   Step     Total Energy     Delta E     MAX Force     RMS Force      MAX Disp      RMS Disp   
+	---------------------------------------------------------------------------------------------
+	  Convergence Criteria    1.00e-06 *    3.00e-04 *             o    1.20e-03 *             o
+	---------------------------------------------------------------------------------------------
+	      2     -76.40986312   -9.56e-04      1.63e-03      9.51e-04 o    2.37e-03      1.53e-03 o  ~
+	---------------------------------------------------------------------------------------------
+
+         ---------------------------------------------------------
+                                   SCF
+               by Justin Turney, Rob Parrish, Andy Simmonett
+                          and Daniel G. A. Smith
+                              RKS Reference
+                        4 Threads,    500 MiB Core
+         ---------------------------------------------------------
+
+  ==> Geometry <==
+
+    Molecular point group: c2v
+    Full point group: C2v
+
+    Geometry (in Angstrom), charge = 0, multiplicity = 1:
+
+       Center              X                  Y                   Z               Mass       
+    ------------   -----------------  -----------------  -----------------  -----------------
+         O            0.000000000000     0.000000000000     0.119018000000    15.994914619570
+         H            0.000000000000     0.759242000000    -0.475927000000     1.007825032230
+         H            0.000000000000    -0.759242000000    -0.475927000000     1.007825032230
+
+  Running in c2v symmetry.
+
+  ==> Primary Basis <==
+
+  Basis Set: 6-31G*
+    Blend: 6-31G*
+    Number of shells: 10
+
+  ==> DFT Potential <==
+
+   => Composite Functional: B3LYP <= 
+
+  @DF-RKS Final Energy:   -76.40987172299999
+
+    Orbital Energies [Eh]
+    ---------------------
+
+    Doubly Occupied:                                                      
+
+       1A1   -19.135086     2A1    -0.997099     1B2    -0.520344  
+       3A1    -0.366234     1B1    -0.292114  
+
+    Virtual:                                                              
+
+       4A1     0.065423     2B2     0.149137  
+
+    Final Occupation by Irrep:
+             A1    A2    B1    B2 
+    DOCC [     3,    0,    1,    1 ]
+
+ Multipole Moments:
+
+ ------------------------------------------------------------------------------------
+     Multipole            Electronic (a.u.)      Nuclear  (a.u.)        Total (a.u.)
+ ------------------------------------------------------------------------------------
+
+ L = 1.  Multiply by 2.5417464519 to convert [e a0] to [Debye]
+ Dipole X            :          0.0000000            0.0000000            0.0000000
+ Dipole Y            :          0.0000000            0.0000000            0.0000000
+ Dipole Z            :         -0.1594632            0.9832395            0.8237763
+ Magnitude           :                                                    0.8237763
+
+ ------------------------------------------------------------------------------------
+
+  Mulliken Charges: (a.u.)
+   Center  Symbol    Alpha    Beta     Spin     Total
+       1     O     4.43079  4.43079  0.00000 -0.86158
+       2     H     0.28461  0.28461  0.00000  0.43079
+       3     H     0.28461  0.28461  0.00000  0.43079
+
+   Total alpha =  5.00000, Total beta =  5.00000, Total charge = -0.00000
+
+  Lowdin Charges: (a.u.)
+   Center  Symbol    Alpha    Beta     Spin     Total
+       1     O     4.31877  4.31877  0.00000 -0.63754
+       2     H     0.34061  0.34061  0.00000  0.31877
+       3     H     0.34061  0.34061  0.00000  0.31877
+
+	==> Convergence Check <==
+
+	Measures of convergence in internal coordinates in au.
+	Criteria marked as inactive (o), active & met (*), and active & unmet ( ).
+	---------------------------------------------------------------------------------------------
+	   Step     Total Energy     Delta E     MAX Force     RMS Force      MAX Disp      RMS Disp   
+	---------------------------------------------------------------------------------------------
+	  Convergence Criteria    1.00e-06 *    3.00e-04 *             o    1.20e-03 *             o
+	---------------------------------------------------------------------------------------------
+	      3     -76.40987172   -8.61e-06      1.20e-05 *    8.00e-06 o    4.50e-05 *    3.00e-05 o  ~
+	---------------------------------------------------------------------------------------------
+
+	**** Optimization is complete! (in 3 steps) ****
+
+	Final optimized geometry and variables:
+	Molecular point group: c2v
+	Full point group: C2v
+
+	Geometry (in Angstrom), charge = 0, multiplicity = 1:
+
+	   O            0.000000000000     0.000000000000     0.119018000000
+	   H            0.000000000000     0.759242000000    -0.475927000000
+	   H            0.000000000000    -0.759242000000    -0.475927000000
+
+	Cleaning optimization helper files.
+
+  ==> Harmonic Vibrational Analysis <==
+
+  non-mass-weighted Hessian:       Symmetric? True   Hermitian? True   Lin Dep Dim?  6 (0)
+  projection of translations (True) and rotations (True) removed 6 degrees of freedom (6)
+  total projector:                 Symmetric? True   Hermitian? True   Lin Dep Dim?  6 (0)
+  mass-weighted Hessian:           Symmetric? True   Hermitian? True   Lin Dep Dim?  6 (0)
+
+  Vibration                       7                   8                   9           
+  Freq [cm^-1]                1626.8000           3773.5800           3884.3700       
+  Irrep                           A1                  A1                  B2          
+  Reduced mass [u]              1.0828              1.0447              1.0817        
+  Force const [mDyne/A]         1.6884              8.7650              9.6168        
+  Turning point v=0 [a0]        0.2733              0.1849              0.1831        
+  RMS dev v=0 [a0 u^1/2]        0.2011              0.1335              0.1346        
+  IR activ [km/mol]            69.3340              4.1870             36.9120        
+  Char temp [K]              2340.6181           5429.3245           5588.7303        
+  ----------------------------------------------------------------------------------
+      1   O                0.00  0.00 -0.07      0.00  0.00  0.05      0.00 -0.07  0.00 
+      2   H                0.00 -0.42  0.54      0.00  0.58 -0.38      0.00  0.54 -0.45 
+      3   H                0.00  0.42  0.54      0.00 -0.58 -0.38      0.00  0.54  0.45 
+
+  ==> Thermochemistry Components <==
+
+  Entropy, S
+    Electronic S         0.000 [cal/(mol K)]      0.000 [J/(mol K)]   0.00000000 [mEh/K] (multiplicity = 1)
+  Total S               45.096 [cal/(mol K)]    188.682 [J/(mol K)]   0.07186509 [mEh/K]
+
+  Correction ZPE                    13.331 [kcal/mol]     55.778 [kJ/mol]    0.02124430 [Eh]
+  Total ZPE, Electronic energy at 0 [K]                  -76.38862742 [Eh]
+  Correction E                      15.111 [kcal/mol]     63.223 [kJ/mol]    0.02408091 [Eh]
+  Correction H                      15.703 [kcal/mol]     65.702 [kJ/mol]    0.02502432 [Eh]
+  Correction G                       2.258 [kcal/mol]      9.447 [kJ/mol]    0.00359776 [Eh]
+
+  Total ZPE, Electronic energy at 0 [K]                  -76.38862742 [Eh]
+  Total E, Electronic energy at  298.15 [K]              -76.38579081 [Eh]
+  Total H, Enthalpy at  298.15 [K]                       -76.38484740 [Eh]
+  Total G,  Free enthalpy at  298.15 [K]                 -76.40627396 [Eh]
+
+    Psi4 stopped on: Wednesday, 04 November 2026 09:01PM
+    Psi4 wall time for execution: 0:00:42.17
+
+*** Psi4 exiting successfully. Buy a developer a beer!

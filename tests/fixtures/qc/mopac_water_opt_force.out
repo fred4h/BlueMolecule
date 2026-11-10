@@ -1,0 +1,171 @@
+ *******************************************************************************
+ ** Cite this program as: MOPAC2016, Version: 22.0.6 Linux, James J. P.       **
+ ** Stewart, Stewart Computational Chemistry, web: HTTP://OpenMOPAC.net.      **
+ *******************************************************************************
+ **                                                                           **
+ **                                MOPAC2016                                  **
+ **                                                                           **
+ *******************************************************************************
+
+                             PM7 CALCULATION RESULTS
+
+
+ *******************************************************************************
+ *  CALCULATION DONE:                                    Wed Nov  4 21:00:00 2026
+ *  CHARGE ON SYSTEM =  0
+ *  FORCE      - FORCE CALCULATION SPECIFIED
+ *  OPT        - OPTIMIZE COORDINATES
+ *  PM7        - THE PM7 HAMILTONIAN TO BE USED
+ *  SINGLET    - SPIN STATE DEFINED AS A SINGLET
+ *  T=         - A TIME OF 172800.0 SECONDS REQUESTED
+ *******************************************************************************
+ PM7 CHARGE=0 SINGLET OPT FORCE
+ water
+ BlueMolecule: optimisation + frequencies
+
+    ATOM    CHEMICAL          X               Y               Z
+   NUMBER    SYMBOL      (ANGSTROMS)     (ANGSTROMS)     (ANGSTROMS)
+
+      1       O          0.00000000  *   0.00000000  *   0.11730000  *
+      2       H          0.00000000  *   0.75720000  *  -0.46920000  *
+      3       H          0.00000000  *  -0.75720000  *  -0.46920000  *
+
+
+                             CARTESIAN COORDINATES
+
+   1    O          0.000000000    0.000000000    0.117300000
+   2    H          0.000000000    0.757200000   -0.469200000
+   3    H          0.000000000   -0.757200000   -0.469200000
+
+
+           Empirical Formula: H2 O  =     3 atoms
+
+
+      MOLECULAR POINT GROUP   :   C2v 
+
+  RHF CALCULATION, NO. OF DOUBLY OCCUPIED LEVELS =  4
+
+
+ CYCLE:     1 TIME:   0.004 TIME LEFT:  2.00D  GRAD.:    26.917 HEAT:  -53.11564
+ CYCLE:     2 TIME:   0.004 TIME LEFT:  2.00D  GRAD.:     6.241 HEAT:  -53.40137
+ CYCLE:     3 TIME:   0.004 TIME LEFT:  2.00D  GRAD.:     0.358 HEAT:  -53.42174
+
+     GRADIENT =  0.35764 IS LESS THAN CUTOFF =  1.00000
+
+
+
+                             PM7 CALCULATION RESULTS
+
+
+ *******************************************************************************
+ *  CALCULATION DONE:                                    Wed Nov  4 21:00:00 2026
+ *  CHARGE ON SYSTEM =  0
+ *  FORCE      - FORCE CALCULATION SPECIFIED
+ *******************************************************************************
+ PM7 CHARGE=0 SINGLET OPT FORCE
+ water
+ BlueMolecule: optimisation + frequencies
+
+
+
+     GEOMETRY OPTIMISED USING EIGENVECTOR FOLLOWING (EF).     
+     SCF FIELD WAS ACHIEVED                                   
+
+
+                                PM7 CALCULATION
+                                                       MOPAC2016 (Version: 22.0.6L)
+                                                       Wed Nov  4 21:00:00 2026
+
+
+
+
+          FINAL HEAT OF FORMATION =        -53.42174 KCAL/MOL =    -223.51456 KJ/MOL
+
+
+          TOTAL ENERGY            =       -322.63021 EV
+          ELECTRONIC ENERGY       =       -470.11233 EV
+          CORE-CORE REPULSION     =        147.48212 EV
+
+          GRADIENT NORM           =          0.35764
+          DIPOLE                  =          2.12345 DEBYE   POINT GROUP:  C2v
+          NO. OF FILLED LEVELS    =          4
+          IONIZATION POTENTIAL    =         12.18217 EV
+          HOMO LUMO ENERGIES (EV) =        -12.182  3.913
+          MOLECULAR WEIGHT        =         18.0153
+
+
+          SCF CALCULATIONS        =             12
+          WALL-CLOCK TIME         =          0.030 SECONDS
+          COMPUTATION TIME        =          0.028 SECONDS
+
+
+    ATOM    CHEMICAL          X               Y               Z
+   NUMBER    SYMBOL      (ANGSTROMS)     (ANGSTROMS)     (ANGSTROMS)
+
+      1       O          0.00000000  +   0.00000000  +   0.11901813  +
+      2       H          0.00000000  +   0.75924211  +  -0.47592690  +
+      3       H          0.00000000  +  -0.75924211  +  -0.47592690  +
+
+                             CARTESIAN COORDINATES
+
+   1    O          0.000000000    0.000000000    0.119018130
+   2    H          0.000000000    0.759242110   -0.475926900
+   3    H          0.000000000   -0.759242110   -0.475926900
+
+
+               EIGENVALUES
+
+  -40.68134 -19.88214 -14.83255 -12.18217   3.91293   5.59245
+
+
+                    NET ATOMIC CHARGES AND DIPOLE CONTRIBUTIONS
+
+  ATOM NO.   TYPE          CHARGE      No. of ELECS.   s-Pop       p-Pop       
+    1          O          -0.637720        6.6377     1.86502     4.77270
+    2          H           0.318860        0.6811     0.68114
+    3          H           0.318860        0.6811     0.68114
+ DIPOLE           X         Y         Z       TOTAL
+ POINT-CHG.    0.000     0.000     1.745     1.745
+ HYBRID        0.000     0.000     0.378     0.378
+ SUM           0.000     0.000     2.123     2.123
+
+
+           DESCRIPTION OF VIBRATIONS
+
+  VIBRATION    1    1A1            ATOM PAIR      ENERGY CONTRIBUTION    RADIAL
+  FREQ.    1626.75                 O  1 -- H  2       50.0% ( 99.9%)     0.0%
+  T-DIPOLE  1.2345                 O  1 -- H  3       50.0% ( 99.9%)     0.0%
+  TRAVEL    0.1234
+  RED. MASS  1.0823
+
+  VIBRATION    2    2A1            ATOM PAIR      ENERGY CONTRIBUTION    RADIAL
+  FREQ.    3773.58                 O  1 -- H  2       50.0% (  0.1%)   100.0%
+  T-DIPOLE  0.3021                 O  1 -- H  3       50.0% (  0.1%)   100.0%
+  TRAVEL    0.0687
+  RED. MASS  1.0447
+
+  VIBRATION    3    1B2            ATOM PAIR      ENERGY CONTRIBUTION    RADIAL
+  FREQ.    3884.37                 O  1 -- H  2       50.0% (  0.0%)   100.0%
+  T-DIPOLE  0.9346                 O  1 -- H  3       50.0% (  0.0%)   100.0%
+  TRAVEL    0.0672
+  RED. MASS  1.0817
+
+
+          NORMAL COORDINATE ANALYSIS
+
+   Root No.    1           2           3
+
+           1626.75000  3773.58000  3884.37000
+
+     1    0.00000     0.00000     0.00000
+     2    0.00000     0.00000    -0.06810
+     3   -0.06800     0.04780     0.00000
+     4    0.00000     0.00000     0.00000
+     5   -0.41650     0.58350     0.53820
+     6    0.54010    -0.37950    -0.45310
+     7    0.00000     0.00000     0.00000
+     8    0.41650    -0.58350     0.53820
+     9    0.54010    -0.37950     0.45310
+
+
+ == MOPAC DONE ==

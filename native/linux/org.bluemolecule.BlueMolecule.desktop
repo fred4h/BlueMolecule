@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=BlueMolecule
+GenericName=Molecule Viewer
+Comment=View and build molecules: quantum-chemistry structures, vibrations, spectra and orbitals
+Exec=bluemolecule %F
+Icon=org.bluemolecule.BlueMolecule
+Terminal=false
+Categories=Education;Science;Chemistry;
+Keywords=chemistry;molecule;Gaussian;ORCA;XYZ;cube;orbital;
+MimeType=chemical/x-gaussian-cube;chemical/x-gaussian-checkpoint;chemical/x-molden;chemical/x-xyz;chemical/x-mdl-molfile;chemical/x-mdl-sdfile;chemical/x-mol2;chemical/x-pdb;chemical/x-cif;chemical/x-gromacs-gro;chemical/x-gaussian-input;chemical/x-cml;chemical/x-cjson;chemical/x-xsf;
+StartupWMClass=org.bluemolecule.BlueMolecule

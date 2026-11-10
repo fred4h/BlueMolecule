@@ -1,0 +1,13 @@
+# Build output: tools/build.py writes it; releases are published as GitHub release assets
+/dist/
+
+# Screenshots written by the browser tests
+/tests/shots/
+
+# Python, Node and editor clutter
+__pycache__/
+*.pyc
+node_modules/
+.DS_Store
+*.swp
+*~
