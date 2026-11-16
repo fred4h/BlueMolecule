@@ -1084,7 +1084,8 @@ void main(){
     }
 
     // ---------- input ----------
-    /** Active tool: null or {onDown(ev, hit) → boolean, onMove(ev, hit), onUp(ev, hit), onHover?(ev, hit), cursor?}. */
+    /** Active tool: null or {onDown(ev, hit) → boolean, onMove(ev, hit), onUp(ev, hit), onHover?(ev, hit),
+     *  onRightClick?(ev, hit) → boolean (a right press and release without moving; a right drag always pans), cursor?}. */
     get tool() { return this._tool; }
     set tool(t) { this._tool = t || null; this._updateCursor(null); }
     _updateCursor(hit) {
@@ -1156,6 +1157,14 @@ void main(){
         if (down.tool) { try { toolEvent('onUp', e); } finally { down = null; } return; }
         const wasMoved = moved, btn = down.button;
         down = null;
+        if (!wasMoved && btn === 2) {   // a right-click (no drag): the tool may act on it, e.g. delete the atom
+          const tool = this._tool;
+          if (tool && typeof tool.onRightClick === 'function') {
+            const [px, py] = local(e);
+            if (tool.onRightClick(e, this._hitAt(px, py))) this.requestRender();
+          }
+          return;
+        }
         if (wasMoved || btn !== 0) return;
         const rect = cv.getBoundingClientRect();
         const i = this.pick(e.clientX - rect.left, e.clientY - rect.top);

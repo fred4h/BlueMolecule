@@ -20,10 +20,14 @@ view, and the status bar shows its hints.
 |---|---|---|
 | **Navigate** | N | Rotate, pan and zoom; click atoms to select and measure (the default) |
 | **Select** | S | Drag a box to select (Shift adds, Ctrl/⌘ removes), click to toggle an atom, double-click to select a whole fragment. Options: select by element, select all, invert |
-| **Draw** | D | Click empty space to add an atom; drag from an atom to add a bonded atom; click an atom to change it to the current element; click a bond to cycle single → double → triple; Alt/Option-click to delete. Options: element (common elements plus the periodic table), bond order, automatic hydrogens (±H), automatic clean-up |
+| **Draw** | D | Click empty space to add an atom; drag from an atom to add a bonded atom; click an atom to change it to the current element; click a bond to cycle single → double → triple; right-click or Alt/Option-click an atom or bond to delete it. Options: element (common elements plus the periodic table), bond order, automatic hydrogens (±H), automatic clean-up |
 | **Template** | T | Insert from the library. **Groups**: attach a substituent to an atom. **Molecules**: insert a molecule. **Metal**: build a metal centre with a chosen coordination geometry. **Ligands**: replace ligands at the selected sites, including bidentate ligands |
 | **Bond-centric** | K | Drag a bond to rotate its smaller side around it; Shift-drag to stretch it |
 | **Manipulate** | M | Drag an atom to move its fragment, or the selection; Shift-drag to rotate it |
+
+In the Draw, Template, Bond-centric and Manipulate tools, **right-click** an atom (press and release without moving)
+to delete it; with **±H** on, its hydrogens go with it. Each deletion is one undo step. Right-dragging still pans the
+view, and Navigate and Select never delete on a right-click.
 
 **Ctrl/⌘ + A** selects all atoms, and **Delete** or **Backspace** deletes the selected ones.
 
@@ -125,7 +129,8 @@ symmetrized one.
 | **Charge** and **Multiplicity** | Taken from the file when known |
 | **Solvent** | Implicit solvation in each program's own syntax and solvent names (e.g. SMD in Gaussian, CPCM in ORCA) |
 | **Cores** and **Memory** | Written in each program's syntax (`%nprocshared`/`%mem`, `%pal`/`%maxcore`, …) |
-| **Title**, **Extra keywords** | Added to the route or keyword lines |
+| **Job name** | The file name (made safe: accents and spaces become plain letters and `_`) with the program's extension (`.gjf`, `.inp`, `.in`, `.nw`, `.mop`, …), the Gaussian checkpoint name and the title of the input. It starts as the name of the opened file. Turbomole always saves `coord` |
+| **Extra keywords** | Added to the route or keyword lines |
 
 The dialog shows an **editable preview** of the whole input file and saves what the preview contains. For a
 Gaussian or ORCA output, it can reuse the route or keyword line of the opened file. Your choices are remembered for

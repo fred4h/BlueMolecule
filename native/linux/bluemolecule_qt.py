@@ -37,7 +37,7 @@ import types
 from pathlib import Path
 
 APP_ID = 'org.bluemolecule.BlueMolecule'
-VERSION = '1.4.1'
+VERSION = '1.4.2'
 BINDINGS = ('PyQt6', 'PySide6', 'PyQt5')
 INLINE_LIMIT = 32 * 1024 * 1024     # files below this size go to the page in one piece
 READ_LIMIT = 6 * 1024 * 1024        # bytes per bmRead reply (8 MiB of base64)

@@ -344,6 +344,26 @@ test('charge, multiplicity and precision everywhere', () => {
 
 // ---------------------------------------------------------------------- summary
 for (const n of notes) console.log('  note: ' + n);
+// ---- file names from job names (issue #3: the Job name of the calculation-input dialog names the files)
+current = 'file names from job names';
+{
+  const fb = BM.writers.fileBase;
+  eq(fb('My TS search (opt) #2', 'job'), 'My_TS_search_opt_2', 'spaces and punctuation');
+  eq(fb('água fria', 'job'), 'agua_fria', 'accents dropped');
+  eq(fb('water.inp', 'job'), 'water', 'an input extension is removed');
+  eq(fb('TS v2.1', 'job'), 'TS_v2.1', 'a version number is kept');
+  eq(fb('   ', 'job'), 'job', 'empty name: the default');
+  eq(fb('a/b\\c:d*e?', 'job'), 'a_b_c_d_e', 'path and wildcard characters');
+  ok(fb('x'.repeat(200), 'job').length <= 60, 'long names are shortened');
+  for (const p of BM.inputPrograms) {
+    const r = p.write({ Z: [8, 1, 1], xyz: [0, 0, 0.12, 0, 0.76, -0.47, 0, -0.76, -0.47], charge: 0, multiplicity: 1, task: p.tasks[0],
+      method: p.defaultMethod || '', basis: p.defaultBasis || '', nprocs: 2, memoryMB: 2000, title: 'My TS search', baseName: fb('My TS search', 'job') });
+    const names = r.files ? r.files.map(f => f.name) : [];
+    ok(!names.length || names.some(n => /^My_TS_search/.test(n)) || p.id === 'turbomole', p.id + ': its files are named after the job: ' + names.join(', '));
+    ok(!r.command || /My_TS_search/.test(r.command) || p.id === 'turbomole', p.id + ': the run command uses the job name: ' + r.command);
+  }
+}
+
 console.log('\nBlueMolecule writer tests: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) {
   for (const f of failures) console.log('  FAIL ' + f);

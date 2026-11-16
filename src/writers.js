@@ -197,9 +197,14 @@
     if (!Number.isInteger(n)) throw new Error(what + ' must be an integer (got "' + v + '").');
     return n;
   }
+  /** A safe file name (without extension) from a job name: accents dropped, anything but letters, digits and
+   *  _ . - turned into _, a trailing extension removed ("water.inp" -> "water"); def when nothing is left. */
   function fileBase(s, def) {
-    const t = String(s || '').replace(/\.[A-Za-z0-9]{1,4}$/, '').replace(/[^A-Za-z0-9_.-]+/g, '_').replace(/^[._-]+|[._-]+$/g, '');
-    return (t || def).slice(0, 40);
+    let t = String(s || '').trim();
+    try { t = t.normalize('NFKD').replace(/[\u0300-\u036f]/g, ''); } catch (e) { /* old engines: keep as is */ }
+    t = t.replace(/\.(inp|gjf|com|gau|in|nw|mop|dat|xyz|out|log|txt)$/i, '')
+      .replace(/[^A-Za-z0-9_.-]+/g, '_').replace(/_{2,}/g, '_').replace(/^[._-]+|[._-]+$/g, '');
+    return (t || def || 'job').slice(0, 60).replace(/[._-]+$/, '');
   }
 
   /** Validated, normalised job options shared by all generators. */
@@ -658,7 +663,7 @@
   // Methods and bases left empty take each program's defaults.
   for (const p of PROGRAMS) { const w = p.write; p.write = o => w(withDefaults(o || {}, p)); }
 
-  BM.writers = { xyz, xyzMulti, gaussianInput, orcaInput, mol, pdb, psi4, qchem, nwchem, gamess, mopac, xtb, molpro, turbomole };
+  BM.writers = { xyz, xyzMulti, gaussianInput, orcaInput, mol, pdb, psi4, qchem, nwchem, gamess, mopac, xtb, molpro, turbomole, fileBase };
   BM.inputPrograms = PROGRAMS;
 
   // ------------------------------------------------------------------ "Save as" registry

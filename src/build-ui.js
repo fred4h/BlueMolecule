@@ -468,6 +468,7 @@
           else aff.push(j);
         }
       }
+      if (del.length >= f.Z.length && !doc().built) { toast('Cannot delete every atom of a file geometry (start a New molecule to build from scratch).', true); return; }
       edit(mol => {
         const r = BM.chem.deleteAtoms(mol, del);
         return adjusted(r.mol, r.map, aff.map(j => r.map[j]).filter(j => j >= 0), mol.Z.length);
@@ -575,6 +576,15 @@
     }
 
     // ---------------------------------------------------------------- tools
+    /** Right-click (press and release without moving) in the building tools: delete the atom under the pointer, and
+     *  in the Draw tool also a bond, as Alt/Option-click does. Navigate and Select leave right-clicks alone. */
+    function rightClickDelete(hit, bonds) {
+      const d = doc();
+      if (!d || d.pending) return false;
+      if (hit.kind === 'atom') { drawDeleteAtom(hit.index); return true; }
+      if (bonds && hit.kind === 'bond') { const ab = bondAtoms(hit.index); if (ab) { R().highlightBond(-1); drawBond(ab[0], ab[1], 0); return true; } }
+      return false;
+    }
     const T = { navigate: null };
     T.select = {
       cursor: hit => (hit.kind === 'atom' ? 'pointer' : 'crosshair'),
@@ -632,11 +642,13 @@
         if (g.start < 0) return;
         const t = hit.kind === 'atom' && hit.index !== g.start ? hit.index : -1;
         if (t >= 0) drawConnect(g.start, t, g.px, g.py); else drawGrow(g.start, g.px, g.py, -1);
-      }
+      },
+      onRightClick: (ev, hit) => rightClickDelete(hit, true)
     };
     T.template = {
       cursor: hit => { const m = B.tpl.mode; return m === 'groups' || m === 'ligands' ? (hit.kind === 'atom' ? 'pointer' : '') : (hit.kind === 'none' ? 'copy' : ''); },
-      onDown() { return false; }
+      onDown() { return false; },
+      onRightClick: (ev, hit) => rightClickDelete(hit, false)
     };
     T.bond = {
       cursor: hit => (drag && drag.kind === 'bond' ? 'grabbing' : hit.kind === 'bond' ? 'grab' : ''),
@@ -685,7 +697,8 @@
         const f = cur();
         app.endContinuousEdit(doc(), g.stretch ? 'Bond ' + label(f, g.q) + '–' + label(f, g.p) + ' stretched to ' + geom.dist(f.xyz, g.q, g.p).toFixed(3) + ' Å'
           : 'Rotated about ' + label(f, g.q) + '–' + label(f, g.p) + ' by ' + (g.turned * 180 / Math.PI).toFixed(1) + '°');
-      }
+      },
+      onRightClick: (ev, hit) => rightClickDelete(hit, false)
     };
     T.manipulate = {
       cursor: hit => (drag && drag.kind === 'move' ? 'grabbing' : hit.kind === 'atom' ? 'grab' : ''),
@@ -726,7 +739,8 @@
         if (!g.moved) { if (ev.type !== 'pointercancel') { const d = doc(); setSelection(d.selection.indexOf(g.i) >= 0 ? d.selection.filter(x => x !== g.i) : d.selection.concat([g.i])); } return; }
         app.endContinuousEdit(doc(), (g.rotate ? 'Rotated ' : 'Moved ') + g.set.length + ' atom' + (g.set.length > 1 ? 's' : ''));
         if (relax && relax.mode === 'auto') relaxRelease();
-      }
+      },
+      onRightClick: (ev, hit) => rightClickDelete(hit, false)
     };
     function dihedralRef(adj, q, p) {
       const f = cur(), pick = (a, skip) => { const l = adj[a].filter(x => x !== skip); return l.find(x => f.Z[x] > 1) ?? l[0]; };
@@ -971,14 +985,14 @@
     function hintText() {
       const d = doc();
       const tool = TOOLS.find(t => t.id === B.tool) || TOOLS[0];
-      const head = tool.name + ' — ';
+      const head = tool.name + ' — ', RC = ' · right-click an atom: delete it';
       switch (B.tool) {
         case 'select': return head + 'drag on empty space: box select (Shift adds, Ctrl/⌘ removes) · click an atom: toggle · double-click: whole fragment · Ctrl/⌘+A: all';
-        case 'draw': return head + 'click empty space: add ' + el.symbol(B.element) + ' · drag from an atom: new bonded atom · click an atom: make it ' + el.symbol(B.element) + ' · click a bond: cycle 1→2→3 · Alt/Option-click: delete';
+        case 'draw': return head + 'click empty space: add ' + el.symbol(B.element) + ' · drag from an atom: new bonded atom · click an atom: make it ' + el.symbol(B.element) + ' · click a bond: cycle 1→2→3 · right-click or Alt/Option-click: delete';
         case 'template': {
           const t = B.tpl;
-          if (t.mode === 'molecules') { const e = tplEntry('molecule', t.molecule); return head + 'click empty space to insert ' + (e ? e.name : t.molecule); }
-          if (t.mode === 'groups') { const e = tplEntry('group', t.group); return head + 'click an atom (an H or a heavy atom) to attach ' + (e ? e.name : t.group); }
+          if (t.mode === 'molecules') { const e = tplEntry('molecule', t.molecule); return head + 'click empty space to insert ' + (e ? e.name : t.molecule) + RC; }
+          if (t.mode === 'groups') { const e = tplEntry('group', t.group); return head + 'click an atom (an H or a heavy atom) to attach ' + (e ? e.name : t.group) + RC; }
           const id = t.mode === 'metal' ? t.metalLigand : t.ligand, lig = tplEntry('ligand', id);
           let s = head + (t.mode === 'metal' ? 'click empty space to build ' + el.symbol(t.metalZ) + ' (' + ((BM.ff.GEOMETRIES[t.geometry] || {}).name || t.geometry) + ')'
             : 'click a ligand atom to replace it' + (lig && lig.denticity === 2 ? ' — pick two cis sites, then Apply' : ' · Shift-click picks sites'));
@@ -988,10 +1002,10 @@
             const ox = oxText(sc.metals);
             s += sc.determinable ? ' · suggested total charge ' + chargeText(sc.total) + (ox ? ' (assuming ' + ox + ')' : '') : ' · total charge: set the metal oxidation state as its formal charge';
           }
-          return s;
+          return s + RC;
         }
-        case 'bond': return head + 'drag a bond: rotate the smaller side · Shift-drag: stretch it · ring bonds cannot be rotated';
-        case 'manipulate': return head + 'drag an atom: move its fragment, or the selection if the atom is selected · Shift-drag: rotate · each drag is one undo step';
+        case 'bond': return head + 'drag a bond: rotate the smaller side · Shift-drag: stretch it · ring bonds cannot be rotated' + RC;
+        case 'manipulate': return head + 'drag an atom: move its fragment, or the selection if the atom is selected · Shift-drag: rotate · each drag is one undo step' + RC;
         default: return head + 'drag: rotate · right-drag or Shift-drag: pan · wheel: zoom · click atoms: measure (2–4) · double-click: centre';
       }
     }

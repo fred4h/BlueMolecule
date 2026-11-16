@@ -2988,6 +2988,12 @@
 
   function validate(ds) {
     if (!ds.frames.length && !(ds.volumes && ds.volumes.length)) throw err('The file contains no atoms.');
+    // an energy that could not be read is "not known" (null), never NaN: every consumer tests for numbers
+    for (const f of ds.frames) {
+      if (typeof f.energy === 'number' && !Number.isFinite(f.energy)) f.energy = null;
+      if (f.energies) for (const k of Object.keys(f.energies)) if (typeof f.energies[k] === 'number' && !Number.isFinite(f.energies[k])) delete f.energies[k];
+    }
+    if (Array.isArray(ds.optSteps)) for (const st of ds.optSteps) if (typeof st.energy === 'number' && !Number.isFinite(st.energy)) st.energy = null;
     const trajOnly = !!(ds.meta && ds.meta.needsTopology);
     for (const f of ds.frames) {
       if (trajOnly && !f.Z) { if (f.xyz.length % 3) throw err('Internal error: coordinate array length is not a multiple of 3.'); continue; }
@@ -3013,6 +3019,34 @@
     return ds;
   }
 
+  // ------------------------------------------------------------------ jobs that are still running
+  /** Program outputs (as opposed to structure files): Gaussian and ORCA logs and the 'output' readers. */
+  function isOutputFormat(fmt) { return !!fmt && (fmt.kind === 'output' || fmt.id === 'gaussian-log' || fmt.id === 'orca-out'); }
+  /** Readers that report whether the job terminated; for them, no termination message means "not finished". */
+  const TRACKS_TERMINATION = new Set(['gaussian-log', 'orca-out', 'gamess-out', 'nwchem-out', 'qchem-out', 'psi4-out',
+    'xtb-out', 'mopac-out', 'cp2k-out']);
+  const PARTIAL_LINE_NOTE = 'The file ends in the middle of a line, as the output of a job that is still running does; ' +
+    'that incomplete line was not read.';
+  /** A running job's output usually ends part-way through a line, e.g. "SCF Done:  E(RB3LYP) =  -0.", and a number
+   *  on that line is incomplete (-0. would read as an energy of 0). The text up to the last line break, or null. */
+  function withoutPartialLine(text) {
+    const c = text.charCodeAt(text.length - 1);
+    if (c === 10 || c === 13) return null;
+    const k = Math.max(text.lastIndexOf('\n'), text.lastIndexOf('\r'));
+    return k > 0 ? text.slice(0, k + 1) : null;
+  }
+  /** Marks unfinished jobs (meta.running) and notes a dropped partial line. */
+  function finishOutput(ds, fmt, partial) {
+    if (!ds || !isOutputFormat(fmt)) return ds;
+    const m = ds.meta || (ds.meta = {});
+    if (partial) {
+      if (!Array.isArray(ds.warnings)) ds.warnings = [];
+      ds.warnings.push(PARTIAL_LINE_NOTE);
+    }
+    if (m.normalTermination !== true && m.normalTermination !== false && (partial || TRACKS_TERMINATION.has(fmt.id))) m.running = true;
+    return ds;
+  }
+
   function parseFile(fileName, text) {
     const shown = baseName(fileName) || 'file';
     if (text === null || text === undefined) throw err('"' + shown + '" could not be read (no content).');
@@ -3026,12 +3060,17 @@
     if (!id) throw err('The format of "' + shown + '" was not recognised. Supported: ' + supportedList() + '.');
     const fmt = FORMATS.find(f => f.id === id) || EXTRA.find(f => f.id === id);
     if (!fmt.parse) throw err('"' + shown + '" must be opened as a binary file.');
+    let partial = false;
+    if (isOutputFormat(fmt)) {
+      const cut = withoutPartialLine(text);
+      if (cut !== null) { text = cut; partial = true; }
+    }
     let ds;
     try { ds = fmt.parse(text, fileName); } catch (e) {
       throw err('Could not read "' + shown + '" as ' + fmt.name + ': ' + (e && e.message ? e.message : e));
     }
     if (ds && !ds.format) ds.format = fmt.id;
-    return validate(ds);
+    return validate(finishOutput(ds, fmt, partial));
   }
   /**
    * BM.parseLines(fileName, lines) -> Dataset: like parseFile for a file already split into lines
@@ -3056,12 +3095,15 @@
     if (!id) throw err('The format of "' + shown + '" was not recognised. Supported: ' + supportedList() + '.');
     const fmt = FORMATS.find(f => f.id === id) || EXTRA.find(f => f.id === id);
     if (!fmt.parse) throw err('"' + shown + '" must be opened as a binary file.');
+    // a complete file ends with a line break, so its last element is ''; anything else is a partial last line
+    let partial = false;
+    if (isOutputFormat(fmt) && lines.length > 1 && lines[lines.length - 1] !== '') { lines[lines.length - 1] = ''; partial = true; }
     let ds;
     try { ds = fmt.parse(lines, fileName); } catch (e) {
       throw err('Could not read "' + shown + '" as ' + fmt.name + ': ' + (e && e.message ? e.message : e));
     }
     if (ds && !ds.format) ds.format = fmt.id;
-    return validate(ds);
+    return validate(finishOutput(ds, fmt, partial));
   }
   /** Binary files (trajectories etc.). Falls back to text parsing when no binary reader claims the extension. */
   function parseFileBinary(fileName, bytes) {
