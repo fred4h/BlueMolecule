@@ -5,7 +5,7 @@ as honestly as possible, what has been checked, what has not, and what the progr
 
 ## What has been checked
 
-- **About 30,000 automated checks in 29 test suites** (22,000 of them cut example outputs as a running job would
+- **About 32,000 automated checks in 32 test suites** (22,000 of them cut example outputs as a running job would
   leave them), all passing for this release
   ([how to run them](developer-guide.md#tests)). They cover:
   - every reader and writer, including format detection and the units and conventions of each program;
@@ -14,8 +14,11 @@ as honestly as possible, what has been checked, what has not, and what the progr
   - the launcher, including its local-server security checks;
   - the packaging;
   - the interface itself, in a headless browser.
-- **Large files:** synthetic 600 MB Gaussian and ORCA logs, a 1.2 GB log and a 1.1 GB DCD trajectory, with
-  `tests/run_all.py --big`.
+- **Large files:** synthetic 600 MB Gaussian and ORCA logs, a 1.2 GB log, a 1.1 GB DCD trajectory, and synthetic
+  5 GB and 10 GB Gaussian ONIOM optimisation and frequency logs, with `tests/run_all.py --big`.
+- **Amber NetCDF:** besides files written by SciPy, real trajectories written by pmemd 16, sander 9 and cpptraj 6.4
+  (public test files of the MDAnalysis project, not included here) were read and compared with SciPy's reading:
+  the same coordinates, boxes and times.
 - **Script injection:** crafted files with HTML in titles, atom and residue names, labels and file names. None of it
   may become markup in the page (`tests/browser_xss_test.js`).
 - **Screenshots** of the interface, produced by the browser tests, were inspected during development.
@@ -29,6 +32,8 @@ as honestly as possible, what has been checked, what has not, and what the progr
   - Gaussian ONIOM microiterations;
   - CP2K QM/MM;
   - xtb ONIOM.
+- **Real huge outputs.** Condensed reading was tested on synthetic logs of up to 10 GB and on every example output.
+  A real multi-gigabyte QM/MM output has not been opened with it yet.
 - **The macOS app** has never been compiled or run on a Mac. It was written and checked on Linux.
 - **The Windows version** has never been run on Windows. Its launcher (C# 5) and installer (Windows PowerShell)
   were written and checked on Linux. The checks cover syntax limits, registry symmetry and the page they produce,
@@ -44,11 +49,11 @@ as honestly as possible, what has been checked, what has not, and what the progr
 |---|---|
 | Orbitals | Orbitals, densities and potentials are **not computed** from fchk or Molden basis sets. Isosurfaces need a cube or XSF grid from your program (`cubegen`, `orca_plot`) |
 | Surfaces | No molecular surfaces (solvent-accessible or solvent-excluded) and no electrostatic potential mapped on a surface |
-| QM/MM energies | The layer and component energies are read and stored, but only the total energy is plotted |
 | Secondary structure | A simplified DSSP: α-helices and β-ladders only (no 3₁₀ or π helices, no turns), computed once per structure rather than per trajectory frame. Records in PDB or mmCIF files are used when present |
 | Cartoons | Rebuilt during trajectory playback only for systems up to 20,000 atoms |
 | Glycans | Identification by shape works for six-membered (pyranose) rings; unknown five-membered (furanose) rings get white symbols |
-| Trajectories | Long binary trajectories are thinned automatically to fit memory; the stride and frame range cannot yet be chosen in the interface. Amber NetCDF (`.nc`) trajectories are not read |
+| Trajectories | Amber NetCDF 4 files (HDF5 inside) and text (ASCII) `mdcrd` trajectories are not read; convert them to NetCDF 3. The loading dialog appears from 1 GB; smaller long trajectories are thinned automatically when they would need more than about 512 MB |
+| Huge outputs | Condensed reading (only what the readers use) covers Gaussian and ORCA outputs and XYZ trajectories. Huge outputs of other programs are read whole, within the JavaScript engine's limit of about 4 GB |
 | Readers | No readers for Molpro or Dalton outputs (Molpro inputs can be written) |
 | Gaussian inputs | ONIOM layer columns in `.gjf` files are skipped; layers are read from outputs |
 | Clean-up | A generic force field for tidying sketches; not a published force field and not a physical method |
@@ -62,8 +67,7 @@ as honestly as possible, what has been checked, what has not, and what the progr
 Not promised, and in no particular order:
 - orbitals and densities computed from fchk and Molden files;
 - molecular surfaces and electrostatic potentials;
-- a stride and frame-range control for trajectories;
-- Amber NetCDF trajectories;
+- ASCII Amber trajectories (`mdcrd`);
 - Molpro and Dalton outputs;
 - conformer search and crystal tools.
 

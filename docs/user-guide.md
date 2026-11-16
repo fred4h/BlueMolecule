@@ -41,13 +41,17 @@ Q-Chem, Psi4, NWChem, GAMESS, MOPAC, CP2K and xtb are told apart by their header
 (`.gz`) are decompressed while they are read. If BlueMolecule cannot read a file and [Open Babel](installation.md#open-babel-optional)
 is installed, the file is converted with Open Babel. The Info tab then says so.
 
+For an output or trajectory of **1 GB or more**, a dialog first asks what to load: every Nth step or frame, a range
+or the last N, and which vibrations to keep for animation. **Load other parts…** in the Info tab changes the choice
+later ([details](large-files-and-trajectories.md#choosing-what-to-load)).
+
 Each file becomes a **document** with its own view, selection, display rows and edits. Anything the reader found
 odd is listed under **Reader notes** in the Info tab. Examples are a missing geometry, an unfinished job or skipped
 frames.
 
 **Molecular-dynamics files** often split atoms and coordinates across two files:
 - Open the **topology or structure first** (Amber prmtop, CHARMM/NAMD PSF, PDB or GRO), then the coordinates or
-  trajectory (inpcrd/rst7, DCD, TRR, XTC) with the same number of atoms.
+  trajectory (inpcrd/rst7, Amber NetCDF, DCD, TRR, XTC) with the same number of atoms.
 - A topology opened on its own shows a **Coordinates pending** card with an **Open coordinates…** button.
 - A trajectory opened without a matching topology is refused, with a message saying what to open first.
 
@@ -160,7 +164,7 @@ The **plot picker** at the left of the plot panel lists every plot available for
 
 | Group | Plots |
 |---|---|
-| Optimisation | Energy, ΔE vs final, each convergence criterion against its threshold, RMSD to the final geometry, largest atomic step, all criteria / threshold |
+| Optimisation | Energy, ΔE vs final, the QM/MM or ONIOM energy components, each convergence criterion against its threshold, RMSD to the final geometry, largest atomic step, all criteria / threshold |
 | Scan / IRC, or Geometries | Energy against the scan coordinate or the reaction coordinate, or an energy profile over the geometries |
 | Spectra | IR, Raman, UV-Vis, ECD, NMR |
 | Orbitals | MO energy-level diagram |
@@ -171,6 +175,19 @@ with the plot: broadening, units, ranges and so on (see [Analysing outputs](anal
 
 **Click the plot** to select a geometry, mode, state, orbital level, atom or NMR signal; the 3D view follows.
 **CSV**, **PNG** and **SVG** save the current plot: the curve and the sticks as CSV, or the picture.
+
+### Zooming into a plot
+
+- **Drag a box** on the plot to zoom into it. A flat box zooms the x axis only, and a tall, narrow one the y axis
+  only. Orbital level diagrams zoom in energy.
+- The **magnifier buttons** at the right of the plot panel zoom in and out around the middle of the view. The third
+  button, **Fit**, shows the whole plot again; it is lit while the plot is zoomed. A **double-click** on the plot
+  does the same.
+- A **click** without dragging still selects, also in a zoomed plot.
+- Each plot keeps its zoom while you select points, while a running job adds steps and when you change a setting
+  such as the line width. Another unit, reference, range or y quantity starts unzoomed.
+- **CSV, PNG and SVG follow the zoom.** The pictures show what is on screen. The CSV keeps only the rows inside the
+  zoomed range (the energies, for orbital levels), and a line under its title says so.
 
 ## Saving and exporting
 

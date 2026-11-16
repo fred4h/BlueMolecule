@@ -27,7 +27,7 @@ $UninstallKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\BlueM
 # File types that get an "Open with > BlueMolecule" entry (same list in uninstall.ps1)
 $Extensions = @('log', 'out', 'xyz', 'gjf', 'inp', 'fchk', 'fch', 'cube', 'cub', 'molden', 'mol', 'sdf', 'mol2', 'pdb', 'ent',
     'cif', 'mmcif', 'gro', 'cml', 'cjson', 'xsf', 'axsf', 'vasp', 'prmtop', 'parm7', 'inpcrd', 'rst7', 'psf', 'dcd', 'xtc',
-    'trr', 'lammpstrj', 'pwi', 'pwo', 'cell', 'nw', 'mop', 'arc', 'gz')
+    'trr', 'nc', 'ncdf', 'ncrst', 'mdcrd', 'lammpstrj', 'pwi', 'pwo', 'cell', 'nw', 'mop', 'arc', 'gz')
 
 function Say([string] $Text) { Write-Host $Text }
 

@@ -60,8 +60,11 @@ from the terminal with `bluemolecule file.log`. You can also choose BlueMolecule
 - **Missing data**, such as no vibrations, no excited states or wrong layers: look at **Reader notes** in the Info
   tab. Then please [report it](../CONTRIBUTING.md#reporting-a-file-that-is-read-wrongly) with a trimmed example
   file. This is the most valuable kind of bug report.
-- **"Not enough memory"**: see [Large files](large-files-and-trajectories.md). Close other documents, or use the
-  Qt window or a Chromium-based browser.
+- **"Not enough memory"**: see [Large files](large-files-and-trajectories.md#when-memory-runs-out-anyway). Open
+  the file again and load less of it (every Nth step, the last steps, vibrations without displacements), close
+  other documents, or use the Qt window or a Chromium-based browser.
+- **A NetCDF file is "a NetCDF 4 file"**: convert it to NetCDF 3 with `nccopy -k 64-bit-offset in.nc out.nc`
+  ([details](large-files-and-trajectories.md#molecular-dynamics-trajectories)).
 
 ## The QM/MM energy graph looks wrong
 

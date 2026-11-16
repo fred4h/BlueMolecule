@@ -34,7 +34,7 @@
   // ------------------------------------------------------------------ errors
   function abortError() { const e = new Error('Reading was cancelled.'); e.name = 'AbortError'; return e; }
   function isAbort(e) { return !!e && (e.name === 'AbortError' || e.code === 20); }
-  function oomError(msg) { const e = new Error(msg); e.name = 'OutOfMemoryError'; return e; }
+  function oomError(msg, limit) { const e = new Error(msg); e.name = 'OutOfMemoryError'; if (limit) e.limit = limit; return e; }
   /** True for the errors a JavaScript engine raises when memory or string/array limits are exhausted. */
   function isOutOfMemory(e) {
     if (!e) return false;
@@ -49,9 +49,19 @@
     const what = '"' + (name || 'the file') + '"' + (size ? ' (' + fmtMB(size) + ')' : '');
     if (isAbort(e)) return 'Opening ' + what + ' was cancelled.';
     if (isOutOfMemory(e)) {
-      return 'Not enough memory to open ' + what + '. ' + (e && e.name === 'OutOfMemoryError' ? e.message + ' ' : '') +
-        'Close other documents or tabs and try again, or open a smaller part of the file (for example the last ' +
-        'optimisation cycles, cut out with a text tool).';
+      const own = e && e.name === 'OutOfMemoryError' ? e.message + ' ' : '';
+      if (e && e.limit === 'engine') {
+        return 'Not enough memory to open ' + what + '. ' + own + 'The JavaScript engine that runs BlueMolecule holds about 4 GB at most, ' +
+          'even on a computer with more memory. Open the file again and load less of it (every Nth step, only the last steps, or the ' +
+          'vibrations without their displacements).';
+      }
+      if (e && e.limit === 'computer') {
+        return 'Not enough memory to open ' + what + '. ' + own + 'Close other programs or documents, or open the file again and load less ' +
+          'of it (every Nth step, only the last steps, or the vibrations without their displacements).';
+      }
+      return 'Not enough memory to open ' + what + '. ' + own +
+        'Close other documents or tabs and try again, or open the file again and load less of it (every Nth step or only the last ' +
+        'steps for outputs and trajectories).';
     }
     return (e && e.message) || String(e);
   }
@@ -165,7 +175,7 @@
   MemoryGuard.prototype.check = function (bytes, final) {
     const h0 = this.h0;
     if (this.limitOverride && this.total && estimateMemory(this.total) > this.limitOverride) {
-      throw oomError('The file needs about ' + fmtMB(estimateMemory(this.total)) + ' of memory and ' + fmtMB(this.limitOverride) + ' is available.');
+      throw oomError('As text, the file needs about ' + fmtMB(estimateMemory(this.total)) + ' of memory and ' + fmtMB(this.limitOverride) + ' is available.', 'engine');
     }
     if (!h0 || !h0.precise) return;
     const h = heapStats();
@@ -177,7 +187,7 @@
     const projected = h.used + perByte * rest + this.reserve;
     if (h.used > 0.9 * limit || (projected > 0.97 * limit && bytes > 16 * MB)) {
       throw oomError('After ' + fmtMB(bytes) + (this.total ? ' of ' + fmtMB(this.total) : '') + ' the memory in use is ' + fmtMB(h.used) +
-        ' of at most ' + fmtMB(limit) + '; the whole file would need about ' + fmtMB(projected) + '.');
+        ' of at most ' + fmtMB(limit) + '; the whole file would need about ' + fmtMB(projected) + '.', 'engine');
     }
   };
 
@@ -215,6 +225,8 @@
     if (endsCR) this.cr = true;
   };
   LineSplitter.prototype.finish = function () { this.out.push(this.carry); this.carry = ''; return this.out; };
+  /** The text after the last line break (the last line, '' when the text ends with one); the splitter is reset. */
+  LineSplitter.prototype.rest = function () { const c = this.carry; this.carry = ''; this.cr = false; return c; };
 
   // Node's TextDecoder returns two-byte strings (2 bytes per character); pure-ASCII pieces are decoded as Latin-1
   // there, which gives one-byte strings (browsers already produce those for Latin-1 text).
@@ -323,6 +335,69 @@
     return lines;
   }
 
+  /**
+   * Like readLines, for program outputs too large to keep as lines (issue #6): pick(head) gets the start of the text
+   * (up to 64 KB of the first piece) and returns a condenser (condense.js), which receives every line and keeps only
+   * what its reader needs, or null to collect all lines as readLines does. Resolves to the line array (condensed:
+   * with .bmSide). The guard follows what is kept: the condensed text (JavaScript heap, opts.memoryLimit or the
+   * measured heap) and the typed arrays (the computer's memory, opts.ramLimit); either running out stops reading
+   * with an Error named 'OutOfMemoryError' whose .limit says which ('engine' or 'computer').
+   */
+  async function readCondensed(source, pick, opts) {
+    opts = opts || {};
+    if (typeof source === 'string' || (source && source.kind === 'text')) {
+      const text = typeof source === 'string' ? source : String(source.data);
+      const c = pick(text.slice(0, 65536));
+      if (!c) return text.split(/\r\n|\r|\n/);
+      const L = text.split(/\r\n|\r|\n/);
+      for (let k = 0; k < L.length - 1; k++) c.push(L[k]);
+      return c.finish(L.length ? L[L.length - 1] : '');
+    }
+    const src0 = source && source.kind && 'data' in source && !isBlob(source) && !isChunks(source) ? source.data : source;
+    const size = sizeOf(src0) !== null ? sizeOf(src0) : (+opts.total || 0);
+    let cond = null, plain = null, sp = null, lastReport = 0, guard = null;
+    const h0 = heapStats();
+    const r = await eachPiece(source, opts, (text, bytes, total, final) => {
+      if (!sp) {
+        cond = pick(text.slice(0, 65536)) || null;
+        if (!cond) { plain = []; guard = new MemoryGuard(size, opts); }
+        sp = new LineSplitter(cond || plain);
+      }
+      sp.feed(text);
+      if (final) return;
+      if (cond) checkCondensed(cond, bytes, total, opts, h0);
+      else guard.check(bytes, false);
+      if (opts.onProgress && (bytes - lastReport >= 4 * MB || (total && bytes >= total))) {
+        lastReport = bytes;
+        opts.onProgress({ bytes, total, lines: cond ? cond.lineCount() : plain.length, kept: cond ? cond.bytes() + 2 * cond.textChars() : null });
+      }
+    });
+    if (!sp) { cond = pick('') || null; plain = cond ? null : []; sp = new LineSplitter(cond || plain); }
+    const lines = cond ? cond.finish(sp.rest()) : sp.finish();
+    if (opts.onProgress) opts.onProgress({ bytes: r.bytes, total: r.total === null ? r.bytes : r.total, lines: lines.length, done: true });
+    return lines;
+  }
+  /** Memory of a condensed read: the kept text (heap: ~1 byte per character plus a line header) and the typed arrays. */
+  function checkCondensed(c, bytes, total, opts, h0) {
+    const heapLim = opts.memoryLimit || (h0 ? 0.85 * h0.limit : 0);
+    const kept = c.textChars() + 40 * c.lineCount(), ext = c.bytes();
+    const ram = opts.ramLimit || 0;
+    const of = total ? ' after ' + fmtMB(bytes) + ' of ' + fmtMB(total) : '';
+    if (ram && ext > ram) {
+      const e = oomError('The parts kept' + of + ' already need ' + fmtMB(ext) + ' of the computer\'s memory, more than the ' + fmtMB(ram) + ' that can be used.');
+      e.limit = 'computer'; throw e;
+    }
+    if (heapLim && kept > 0.9 * heapLim) {
+      const e = oomError('The text kept' + of + ' already needs ' + fmtMB(kept) + ' of the ' + fmtMB(heapLim) + ' that the JavaScript engine can hold, whatever the computer\'s memory.');
+      e.limit = 'engine'; throw e;
+    }
+    const h = h0 && h0.precise ? heapStats() : null;
+    if (h && h.used > 0.92 * (opts.memoryLimit || h.limit)) {
+      const e = oomError('The JavaScript engine is using ' + fmtMB(h.used) + ' of at most ' + fmtMB(opts.memoryLimit || h.limit) + of + ', whatever the computer\'s memory.');
+      e.limit = 'engine'; throw e;
+    }
+  }
+
   async function readBytes(source, opts) {
     opts = opts || {};
     const src = source && source.kind && 'data' in source && !isBlob(source) && !isChunks(source) ? source.data : source;
@@ -369,7 +444,7 @@
   }
 
   BM.bigfile = {
-    CHUNK, BIG, readLines, readBytes, readHead, byteReader, toStream, gunzip, toSource, sizeOf,
+    CHUNK, BIG, readLines, readCondensed, readBytes, readHead, byteReader, toStream, gunzip, toSource, sizeOf,
     isAbort, isOutOfMemory, describeError, estimateMemory, heapStats, LineSplitter,
     preciseMemory: false   // set by a host that runs Chromium with --enable-precise-memory-info
   };

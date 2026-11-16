@@ -74,6 +74,7 @@ new steps.
 |---|---|
 | Energy | The total energy of each optimisation step |
 | ΔE vs final | The energy relative to the last step, in the chosen unit |
+| Energy components | QM/MM and ONIOM runs only: the total and each component (high and low level on the model and real systems, or QM, MM and QM–MM interaction), each relative to its own final value, with a legend. The CSV gives the energies in hartree |
 | One plot per criterion | Max force, RMS force, max displacement, RMS displacement, energy change or gradient norm, with the threshold as a dashed line (log scale) |
 | RMSD to final | The RMSD of each geometry from the final one, after optimal superposition (Kabsch) |
 | Largest atomic step | The largest displacement of any atom from the previous geometry |

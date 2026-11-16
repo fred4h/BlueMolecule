@@ -1546,6 +1546,9 @@ ijaqVH/i//4/AwjfmJccfToAAAAASUVORK5CYII=">
   <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.8 12s3.4-6 9.2-6 9.2 6 9.2 6-3.4 6-9.2 6-9.2-6-9.2-6z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="12" r="2.7" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol>
   <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M4 4.5 20 19.5M9.6 6.4A9.6 9.6 0 0 1 12 6c5.8 0 9.2 6 9.2 6a15.6 15.6 0 0 1-2.6 3.3M14.6 17.6A9.4 9.4 0 0 1 12 18c-5.8 0-9.2-6-9.2-6a15.3 15.3 0 0 1 3.4-3.9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-dup" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M15.5 5.5V5a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 5v8A1.5 1.5 0 0 0 6 14.5h.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+  <symbol id="i-zoom-in" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m15.2 15.2 4.8 4.8M10.5 7.8v5.4M7.8 10.5h5.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-zoom-out" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m15.2 15.2 4.8 4.8M7.8 10.5h5.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-zoom-fit" viewBox="0 0 24 24"><path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="m8.5 14 2.5-3 2 1.8 2.5-3.3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-plot" viewBox="0 0 24 24"><path d="M4 4.5v15h16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="m7.5 15 3.5-4.5 3 2.5 5-6.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-logo" viewBox="0 0 64 64"><g stroke="#7cb2ff" stroke-width="4.5" stroke-linecap="round"><line x1="20" y1="40" x2="40" y2="21"/><line x1="40" y1="21" x2="47" y2="45"/></g><circle cx="20" cy="40" r="10" fill="#4f8cff"/><circle cx="40" cy="21" r="7.5" fill="#b4d2ff"/><circle cx="47" cy="45" r="6.5" fill="#2f6be0"/></symbol>
 </svg>
@@ -1660,9 +1663,14 @@ ijaqVH/i//4/AwjfmJccfToAAAAASUVORK5CYII=">
           <label class="plot-pick" id="plot-pick-wrap"><svg class="ic sm"><use href="#i-plot"/></svg><select id="plot-pick" aria-label="Plot"></select><span class="count mono" id="plot-count"></span></label>
           <div class="plot-controls" id="plot-controls"></div>
           <div class="plot-actions">
-            <button class="mini" data-act="plot-csv" title="Save curve and sticks as CSV">CSV</button>
-            <button class="mini" data-act="plot-png" title="Save plot as PNG">PNG</button>
-            <button class="mini" data-act="plot-svg" title="Save plot as SVG">SVG</button>
+            <span class="plot-zoom" role="group" aria-label="Zoom">
+              <button class="mini icon" data-act="plot-zoom-in" id="btn-plot-zoom-in" title="Zoom in — or drag a box on the plot to zoom into it" aria-label="Zoom in"><svg class="ic sm"><use href="#i-zoom-in"/></svg></button>
+              <button class="mini icon" data-act="plot-zoom-out" id="btn-plot-zoom-out" title="Zoom out" aria-label="Zoom out" disabled><svg class="ic sm"><use href="#i-zoom-out"/></svg></button>
+              <button class="mini icon" data-act="plot-zoom-fit" id="btn-plot-fit" title="Show the whole plot (or double-click the plot)" aria-label="Fit" disabled><svg class="ic sm"><use href="#i-zoom-fit"/></svg></button>
+            </span>
+            <button class="mini" data-act="plot-csv" title="Save the data as CSV (only what is shown when zoomed in)">CSV</button>
+            <button class="mini" data-act="plot-png" title="Save the plot as PNG (as shown)">PNG</button>
+            <button class="mini" data-act="plot-svg" title="Save the plot as SVG (as shown)">SVG</button>
             <button class="mini icon" id="btn-plot-collapse" title="Collapse / expand"><svg class="ic sm"><use href="#i-collapse"/></svg></button>
           </div>
         </div>
@@ -1683,6 +1691,7 @@ ijaqVH/i//4/AwjfmJccfToAAAAASUVORK5CYII=">
 <script src="elements.js"></script><!--BM:JS:elements-->
 <script src="bigfile.js"></script><!--BM:JS:bigfile-->
 <script src="parsers.js"></script><!--BM:JS:parsers-->
+<script src="condense.js"></script><!--BM:JS:condense-->
 <script src="readers-struct.js"></script><!--BM:JS:readers-struct-->
 <script src="writers.js"></script><!--BM:JS:writers-->
 <script src="readers-qc.js"></script><!--BM:JS:readers-qc-->

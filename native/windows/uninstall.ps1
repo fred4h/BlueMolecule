@@ -17,7 +17,7 @@ $UninstallKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\BlueM
 # the same list as in install.ps1
 $Extensions = @('log', 'out', 'xyz', 'gjf', 'inp', 'fchk', 'fch', 'cube', 'cub', 'molden', 'mol', 'sdf', 'mol2', 'pdb', 'ent',
     'cif', 'mmcif', 'gro', 'cml', 'cjson', 'xsf', 'axsf', 'vasp', 'prmtop', 'parm7', 'inpcrd', 'rst7', 'psf', 'dcd', 'xtc',
-    'trr', 'lammpstrj', 'pwi', 'pwo', 'cell', 'nw', 'mop', 'arc', 'gz')
+    'trr', 'nc', 'ncdf', 'ncrst', 'mdcrd', 'lammpstrj', 'pwi', 'pwo', 'cell', 'nw', 'mop', 'arc', 'gz')
 
 Write-Host 'Removing BlueMolecule...'
 Remove-Item -LiteralPath $Shortcut -Force -ErrorAction SilentlyContinue

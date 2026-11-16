@@ -23,12 +23,14 @@
 
 - **Opens quantum-chemistry outputs.** It shows every geometry of an optimisation, scan or IRC, plus energies and thermochemistry. It also reads orbital energies, charges, dipoles, vibrations, excited states and NMR shieldings. The Info tab lists everything found in the file, and you can pick which job, plot or property to look at.
 - **Optimisation graphs.** Energy, ΔE, each convergence criterion against its threshold (log scale), the RMSD to the final geometry and the largest atomic step, all plotted per optimisation step.
-- **Spectra.** IR and Raman (Lorentzian or Gaussian broadening, scale factor, ε or relative intensity), UV-Vis and ECD from excited states, and NMR sticks with a reference shielding. Each plot exports as CSV, PNG or SVG.
+- **Spectra.** IR and Raman (Lorentzian or Gaussian broadening, scale factor, ε or relative intensity), UV-Vis and ECD from excited states, and NMR sticks with a reference shielding.
+- **Zoomable plots.** Drag a box to zoom into any plot, or use the magnifier buttons; a click still selects. Each plot exports as CSV, PNG or SVG, as zoomed.
 - **Vibrations.** Animated modes with displacement arrows, imaginary frequencies highlighted, displacement along a mode, and multi-frame XYZ animations.
 - **QM/MM and ONIOM.**
   - Supports Gaussian ONIOM (2 or 3 layers), ORCA QM/MM and QM/XTB, CP2K QM/MM and xtb ONIOM.
   - Layers, link atoms and frozen atoms are read from the file.
   - Each optimisation step is one point at the total energy, so the energy graph no longer jumps back and forth between sub-calculations.
+  - The component energies (each layer and level, or QM, MM and QM–MM) are plotted next to the total.
   - A layer view shows each layer in its own style, with a legend naming the method.
 - **Macromolecules.**
   - Proteins: cartoon coloured by secondary structure.
@@ -41,7 +43,8 @@
   - SMILES input and a library of molecules, groups, ligands and coordination geometries.
   - Hydrogen and bond-order handling, a clean-up force field, point-group detection and symmetrization, and a coordinate editor.
 - **Exports.** Writes 24 structure, crystal and MD formats and calculation inputs for 10 programs. Other formats go through Open Babel when it is installed. Images can be saved at higher resolution.
-- **Large files.** Outputs of hundreds of megabytes or more are read in chunks. Long DCD, TRR or XTC trajectories are thinned to fit in memory.
+- **Large files.** Outputs of hundreds of megabytes are read in chunks, and Gaussian and ORCA outputs of several gigabytes (QM/MM jobs on whole proteins) are condensed while they are read. For files of 1 GB and more, a dialog lets you choose what to load: every Nth step or frame, a range, or the last N, and which vibrations to animate.
+- **MD trajectories.** Amber (prmtop with text or NetCDF coordinates and trajectories), CHARMM/NAMD (PSF, DCD), GROMACS (GRO, TRR, XTC) and LAMMPS, read in slices when they are long.
 - **Its own window.** On Linux it opens a Qt WebEngine window, or a browser app window if Qt is missing, with its own name and icon. On macOS it is a small native app, and on Windows an Edge app window started by its own launcher. Both are experimental. The single HTML file also works in any modern browser.
 - **Private by design.** Nothing is uploaded. The only network traffic is between the window and its own launcher on `127.0.0.1`.
 
@@ -71,17 +74,17 @@ Download the latest release from the **[Releases page](https://github.com/fred4h
 **Linux** (the main platform; needs `python3`):
 
 ```bash
-tar xzf BlueMolecule-1.4.2-linux.tar.gz
-cd BlueMolecule-1.4.2-linux
+tar xzf BlueMolecule-1.5.0-linux.tar.gz
+cd BlueMolecule-1.5.0-linux
 ./install.sh                 # installs for your user in ~/.local; offers to install Qt WebEngine for Python
 bluemolecule calc.log        # or start it from the applications menu, or use "Open With" on a file
 ```
 
-**Windows 10 and 11** (experimental, not yet tested on a real PC): extract `BlueMolecule-1.4.2-windows.zip`, then
+**Windows 10 and 11** (experimental, not yet tested on a real PC): extract `BlueMolecule-1.5.0-windows.zip`, then
 double-click **Install BlueMolecule.cmd**. It needs no administrator rights and nothing installed first. It adds
 BlueMolecule to the Start menu and to **Open with** for chemistry files.
 
-**macOS** (experimental, not yet tested on a real Mac): unzip `BlueMolecule-1.4.2-macOS.zip`, then double-click
+**macOS** (experimental, not yet tested on a real Mac): unzip `BlueMolecule-1.5.0-macOS.zip`, then double-click
 **Install BlueMolecule.command**. It needs Apple's free Command Line Tools.
 
 **Any computer:** open `BlueMolecule.html` in Chrome, Edge, Firefox or Safari. It works offline, but Open Babel is
@@ -102,7 +105,7 @@ Building from source needs only Python 3: `python3 tools/build.py`.
 | [Selection language](docs/selection-language.md) | Complete reference with examples |
 | [Building and editing](docs/building-and-editing.md) | Build tools, library, hydrogens, clean-up, symmetry, calculation inputs |
 | [File formats](docs/file-formats.md) | Every format that can be opened or saved |
-| [Large files and trajectories](docs/large-files-and-trajectories.md) | Very large outputs, topology plus trajectory, memory |
+| [Large files and trajectories](docs/large-files-and-trajectories.md) | Very large outputs, choosing what to load, topology plus trajectory, Amber NetCDF, memory |
 | [Troubleshooting](docs/troubleshooting.md) | Window opens in a browser, files that will not open, Wayland, diagnostics |
 | [Status and limitations](docs/limitations.md) | What has and has not been verified |
 | [How it was made](docs/vibe-coding.md) | The vibe-coding process and what it implies |
@@ -110,8 +113,8 @@ Building from source needs only Python 3: `python3 tools/build.py`.
 
 ## Status
 
-BlueMolecule 1.4.2 is the current release (1.4.1 was the first public one). The automated test suite has about
-30,000 checks in 29 suites, 22,000 of them from cutting example outputs as a running job would leave them:
+BlueMolecule 1.5.0 is the current release (1.4.1 was the first public one). The automated test suite has about
+32,000 checks in 32 suites, 22,000 of them from cutting example outputs as a running job would leave them:
 - format readers and writers against example files;
 - chemistry routines;
 - the selection language;

@@ -87,6 +87,39 @@
   function err(msg) { return new Error(msg); }
   function last(a) { return a.length ? a[a.length - 1] : null; }
 
+  // ------------------------------------------------------------------ condensed huge outputs (condense.js)
+  // A condensed line array (BM.condense) has a .bmSide store; a line starting with U+0001 stands for a compacted
+  // table: PH + 'G' + k -> bmSide.geoms[k] (geometry rows), PH + 'M' + k -> bmSide.modes[k] (normal-mode rows).
+  const isPH = s => s !== undefined && s.charCodeAt(0) === 1;
+  const phIndex = s => +s.slice(2);
+  const DEC10 = [1, 10, 100, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12, 1e13, 1e14, 1e15];
+  const ZERO_PACK = Object.freeze({ vals: new Int8Array(0), d: 0 });   // a mode printed without rows: zeros
+  /**
+   * Mode vectors kept as integers with d decimals (huge outputs: 1 byte per value for Gaussian's 2-decimal modes)
+   * and decoded on access: modes[k] is a Float64Array of the printed values, or null when the mode's
+   * displacements were not loaded. packs[k] = {vals: Int8Array | Int16Array | Int32Array | Float64Array, d} | null.
+   */
+  function packedModes(packs, N) {
+    const out = new Array(packs.length), cache = new Map();
+    const decode = k => {
+      const p = packs[k];
+      if (!p) return null;
+      let v = cache.get(k);
+      if (v) return v;
+      v = new Float64Array(3 * N);
+      const src = p.vals, n = Math.min(src.length, v.length);
+      if (p.d < 0) for (let i = 0; i < n; i++) v[i] = src[i];
+      else { const s = DEC10[p.d]; for (let i = 0; i < n; i++) v[i] = src[i] / s; }
+      if (cache.size >= 8) cache.delete(cache.keys().next().value);
+      cache.set(k, v);
+      return v;
+    };
+    for (let k = 0; k < packs.length; k++) Object.defineProperty(out, k, { enumerable: true, configurable: true, get: () => decode(k) });
+    Object.defineProperty(out, 'packed', { value: true });
+    Object.defineProperty(out, 'has', { value: k => !!packs[k] });   // loaded, without decoding it
+    return out;
+  }
+
   function newDataset(format, fileName) {
     return {
       format, program: null, title: baseName(fileName) || '',
@@ -101,8 +134,10 @@
       jobs: null, nmr: null, optSteps: null, ircPath: null
     };
   }
+  /** xyz null: a step whose geometry was not loaded (huge outputs, BM.condense); it becomes an entry of
+   *  ds.optSteps with its energies, and no frame (splitPhantoms). */
   function newFrame(Z, xyz) {
-    return { Z: Array.from(Z), xyz: xyz instanceof Float64Array ? xyz : Float64Array.from(xyz),
+    return { Z: Array.from(Z), xyz: xyz === null ? null : xyz instanceof Float64Array ? xyz : Float64Array.from(xyz),
       energy: null, energies: null, label: null, converged: false, opt: null,
       atomNames: null, resNames: null, resIds: null };
   }
@@ -112,7 +147,7 @@
   }
   function sameGeom(f, Z, xyz, tol) {
     tol = tol || 2e-5;
-    if (!f || f.Z.length !== Z.length || f.xyz.length !== xyz.length) return false;
+    if (!f || !f.xyz || !xyz || f.Z.length !== Z.length || f.xyz.length !== xyz.length) return false;
     for (let i = 0; i < Z.length; i++) if (f.Z[i] !== Z[i]) return false;
     for (let i = 0; i < xyz.length; i++) if (!(Math.abs(f.xyz[i] - xyz[i]) <= tol)) return false;
     return true;
@@ -157,7 +192,9 @@
         if (prev && sameGeom(prev, Z, xyz)) {
           fr.pop(); this.pending = { frame: prev, rank, locked: false, fresh: false }; this.dup = true; return;
         }
-        cur.Z = Array.from(Z); cur.xyz = Float64Array.from(xyz); p.rank = rank; return;
+        // (a geometry that was not loaded never replaces one that was)
+        if (xyz || !cur.xyz) { cur.Z = Array.from(Z); cur.xyz = xyz ? Float64Array.from(xyz) : null; }
+        p.rank = rank; return;
       }
       if (sameGeom(cur, Z, xyz)) { p.rank = rank; return; }
     }
@@ -231,7 +268,7 @@
   /** Value of 'R(1,2)' (Angstrom), 'A(1,2,3)' or 'D(1,2,3,4)' (degrees) for a frame; atoms 1-based. */
   function geomValue(coord, xyz) {
     const m = /^([RAD])\(([\d,]+)\)$/.exec(coord || '');
-    if (!m) return NaN;
+    if (!m || !xyz) return NaN;
     const ix = m[2].split(',').map(s => int(s) - 1);
     if (ix.some(k => k < 0 || 3 * k + 2 >= xyz.length)) return NaN;
     const p = k => [xyz[3 * k], xyz[3 * k + 1], xyz[3 * k + 2]];
@@ -360,6 +397,13 @@
     let block = null, expectSym = false, depolSeen = false;
     let j = i0 + 1;
     for (; j < L.length; j++) {
+      if (block && isPH(L[j]) && L.bmSide) {   // the atom rows of this block, condensed (vecs[k] null: not loaded)
+        const run = L.bmSide.modes[phIndex(L[j])];
+        if (!rec.packed) rec.packed = [];
+        block.forEach((m, k) => { rec.packed[m] = run.vecs[k] || null; });
+        rec.nAtoms = Math.max(rec.nAtoms, run.nAtoms);
+        continue;
+      }
       const t = L[j].trim();
       if (!t) { if (rec.freqs.length) break; continue; }
       if (!block && /^(activities|incident light|and normal coordinates|depolarization|reduced masses)/i.test(t)) continue;
@@ -428,19 +472,29 @@
       for (let i = 0; i < n; i++) out[i] = a[i] === undefined ? NaN : a[i];
       return out;
     };
-    const modes = [];
-    for (let m = 0; m < n; m++) {
-      const v = new Float64Array(3 * N);
-      const src = rec.modes[m] || [];
-      for (let k = 0; k < 3 * N; k++) { const x = src[k]; v[k] = x === undefined || Number.isNaN(x) ? 0 : x; }
-      modes.push(v);
+    let modes = [];
+    // (packed[m] null: not loaded; undefined: no rows were printed, which the full reading turns into zeros)
+    if (rec.packed) modes = packedModes(Array.from({ length: n }, (_, m) => (rec.packed[m] === undefined ? ZERO_PACK : rec.packed[m])), N);
+    else {
+      for (let m = 0; m < n; m++) {
+        const v = new Float64Array(3 * N);
+        const src = rec.modes[m] || [];
+        for (let k = 0; k < 3 * N; k++) { const x = src[k]; v[k] = x === undefined || Number.isNaN(x) ? 0 : x; }
+        modes.push(v);
+      }
     }
-    return { frameIndex: Math.max(0, frameIndex), freqs: fill(rec.freqs), ir: fill(rec.ir), raman: fill(rec.raman),
+    const out = { frameIndex: Math.max(0, frameIndex), freqs: fill(rec.freqs), ir: fill(rec.ir), raman: fill(rec.raman),
       depol: fill(rec.depol), redMass: fill(rec.redMass), forceConst: fill(rec.forceConst),
       sym: rec.sym.length ? fill(rec.sym).map(s => (typeof s === 'string' ? s : '')) : null, modes };
+    if (rec.packed) out.modesLoaded = modes.reduce((s, m, k) => s + (rec.packed[k] === null ? 0 : 1), 0);
+    return out;
   }
 
   function readGaussOrientation(L, i) {
+    if (isPH(L[i + 1]) && L.bmSide) {   // condensed table (xyz null: a step whose geometry was not loaded)
+      const g = L.bmSide.geoms[phIndex(L[i + 1])];
+      return { Z: g.Z, xyz: g.xyz, tv: g.tv, end: i + 1, complete: g.complete };
+    }
     let j = i + 1, dashes = 0;
     while (j < L.length && dashes < 2) { if (/^\s*-{10,}\s*$/.test(L[j])) dashes++; j++; }
     const Z = [], xyz = [], tv = [];
@@ -604,7 +658,10 @@
       if (oniomOpt && stepOpen && cur && oniomFrames.has(cur)) {
         // another real-system print within the same step (micro-iterations, a second orientation): it updates the
         // step's coordinates until the step's ONIOM energy is known (Standard orientation preferred), then is ignored
-        if (!oniomEDone && sameZ(cur.Z, g.Z) && rank >= (oniomFrames.get(cur) || 0)) { cur.xyz = Float64Array.from(g.xyz); oniomFrames.set(cur, rank); }
+        if (!oniomEDone && sameZ(cur.Z, g.Z) && rank >= (oniomFrames.get(cur) || 0)) {
+          if (g.xyz) cur.xyz = Float64Array.from(g.xyz);   // (a geometry that was not loaded changes nothing)
+          oniomFrames.set(cur, rank);
+        }
         return;
       }
       const n0 = ds.frames.length;
@@ -1483,7 +1540,7 @@
       if (r) { if (!qm) qm = r.qm; links = r.links; }
     }
     if (!links.length && q.summary.links.length) links = q.summary.links.filter(l => l.atom < N).map(l => ({ atom: l.atom, bondedTo: l.bondedTo, element: 'H', type: null }));
-    if (!links.length && qm && !subsystemOnly) {
+    if (!links.length && qm && !subsystemOnly && X) {
       // covalent bonds that cross the QM boundary carry the link atoms
       const inQM = new Set(qm);
       for (const a of qm) for (let b = 0; b < N; b++) {
@@ -1527,7 +1584,7 @@
     // QM/MM, QM/QM2 (multiscale): every geometry print is tagged with its step ("epoch"); after the loop each step
     // becomes one frame with the full-system geometry and all of the step's energies (QM-region prints are no steps).
     let qmmm = null, qmmmChecked = false, epoch = 0;
-    const epochOf = new Map();
+    const epochOf = new Map(), zMemo = new WeakMap();
     const checkQmmm = () => {
       if (qmmmChecked) return;
       qmmmChecked = true;
@@ -1591,9 +1648,25 @@
       if (t === 'CARTESIAN COORDINATES (ANGSTROEM)') {
         let j = i + 1;
         if (j < n && /^-+$/.test(L[j].trim())) j++;
-        const Z = [], xyz = [];
+        const Z = [];
+        let xyz = [];
         checkQmmm();
         for (; j < n; j++) {
+          if (isPH(L[j]) && L.bmSide) {   // condensed rows: labels (interned) and coordinates (null: not loaded)
+            const g = L.bmSide.geoms[phIndex(L[j])];
+            let zz = zMemo.get(g.codes);
+            if (!zz) {
+              const zOf = g.labels.map(t0 => {
+                const lab = t0.replace(/[:>].*$/, ''), z = qmmm && /^H(LA|L|\*)$/i.test(lab) ? 1 : BM.el.toZ(lab);
+                return z < 0 || t0.indexOf(':') > 0 ? 0 : z;
+              });
+              zz = Array.from(g.codes, c => zOf[c]);
+              zMemo.set(g.codes, zz);
+            }
+            for (let a = 0; a < zz.length; a++) Z.push(zz[a]);
+            xyz = g.xyz;
+            continue;
+          }
           let tk = tok(L[j]);
           // ghost atoms "H:" / "H :", embedding "Zr>", point charges "Q  -0.834  x y z"
           if (tk.length > 1 && (tk[1] === ':' || tk[1] === '>')) tk = [tk[0] + tk[1]].concat(tk.slice(2));
@@ -1719,6 +1792,12 @@
         const cols = vib.modes;
         let head = null;
         for (; j < n; j++) {
+          if (head && isPH(L[j]) && L.bmSide) {   // the rows of this block, condensed (vecs[q] null: not loaded)
+            const run = L.bmSide.modes[phIndex(L[j])];
+            if (!vib.packed) vib.packed = [];
+            head.forEach((k, q) => { vib.packed[k] = run.vecs[q] || null; });
+            continue;
+          }
           const s = L[j].trim();
           if (!s) { if (head && cols.length) { const nx = (L[j + 1] || '').trim(); if (!nx || !/^\d/.test(nx)) break; } continue; }
           const tk = s.split(/\s+/);
@@ -1915,7 +1994,7 @@
         keep.energies = Object.keys(en).length ? en : null; keep.opt = opt; keep.converged = conv; keep.label = keep.label || label;
         if (sc) keep.scan = sc;
         pick(keep);
-        if (!qmmmSub && !qmmmOnlySub) { const sub = gr.list.find(f => f.Z.length < target); if (sub) qmmmSub = { full: keep, sub }; }
+        if (!qmmmSub && !qmmmOnlySub && keep.xyz) { const sub = gr.list.find(f => f.Z.length < target && f.xyz); if (sub) qmmmSub = { full: keep, sub }; }
         const prev = last(out);
         if (prev && sameGeom(prev, keep.Z, keep.xyz)) {
           prev.energies = Object.assign(prev.energies || {}, keep.energies || {});
@@ -1982,7 +2061,7 @@
       const keep = [];
       vib.freqs.forEach((f, k) => { if (f !== undefined && Math.abs(f) > 1e-3) keep.push(k); });
       const pick = a => (a ? keep.map(k => (a[k] === undefined ? NaN : a[k])) : null);
-      const modes = keep.map(k => {
+      const modes = vib.packed ? packedModes(keep.map(k => (vib.packed[k] === undefined ? ZERO_PACK : vib.packed[k])), N) : keep.map(k => {
         const v = new Float64Array(3 * N);
         const col = vib.modes[k];
         if (col) for (let r = 0; r < 3 * N; r++) v[r] = col[r] === undefined ? 0 : col[r];
@@ -1991,6 +2070,7 @@
       if (!vib.modes.length) ds.warnings.push('Frequencies were found but no NORMAL MODES block; modes cannot be animated.');
       ds.vibrations = { frameIndex: fi, freqs: pick(vib.freqs), ir: pick(vib.ir), raman: pick(vib.raman),
         depol: pick(vib.depol), redMass: null, forceConst: null, sym: null, modes };
+      if (vib.packed) ds.vibrations.modesLoaded = keep.filter(k => vib.packed[k] !== null).length;
     }
     ds.excitedStates = orcaStates(absRows, tdBlocks, meta.multiplicity);
     if (ds.excitedStates && (cdLen || cdVel)) {
@@ -2026,7 +2106,7 @@
     });
     ds.jobs = jl;
     if (qmmm) {
-      ds.layers = orcaLayers(qmmm, qmmmSub ? qmmmSub.full : ds.frames[0], qmmmSub ? qmmmSub.sub : null, meta, qmmmOnlySub);
+      ds.layers = orcaLayers(qmmm, qmmmSub ? qmmmSub.full : ds.frames.find(f => f.xyz) || ds.frames[0], qmmmSub ? qmmmSub.sub : null, meta, qmmmOnlySub);
       meta.qmmm = true;
       if (qmmmOnlySub) ds.warnings.push('This output prints only the QM region (with link atoms); ORCA writes the full-system geometries to its trajectory and PDB files.');
     }
@@ -2251,6 +2331,7 @@
     const ds = newDataset('xyz', fileName);
     const L = splitLines(text);
     const n = L.length;
+    const zMemo = new WeakMap();
     let i = 0;
     while (i < n && !L[i].trim()) i++;
     const t0 = tok(L[i] || '');
@@ -2265,19 +2346,33 @@
         }
         const na = int(h[0]);
         const comment = i + 1 < n ? L[i + 1] : '';
-        const Z = [], xyz = [];
-        let ok = true;
-        for (let k = 0; k < na; k++) {
-          const t = tok(L[i + 2 + k] || '');
-          if (t.length < 4 || !isNumTok(t[1]) || !isNumTok(t[2]) || !isNumTok(t[3])) { ok = false; break; }
-          Z.push(xyzAtom(t, ds, 'on line ' + (i + 3 + k)));
-          xyz.push(num(t[1]), num(t[2]), num(t[3]));
+        let f;
+        if (na > 0 && isPH(L[i + 2]) && L.bmSide) {   // condensed frame (condense.js): labels and coordinates
+          const g = L.bmSide.geoms[phIndex(L[i + 2])];
+          let zz = zMemo.get(g.codes);
+          if (!zz) {
+            const zOf = g.labels.map(lb => xyzAtom([lb], ds, 'in frame ' + (ds.frames.length + 1)));
+            zz = Array.from(g.codes, c => zOf[c]);
+            zMemo.set(g.codes, zz);
+          }
+          f = newFrame([], g.xyz);
+          f.Z = zz;   // frames with the same atoms share one element list
+          i -= na - 1;   // the placeholder stands for the na atom lines
+        } else {
+          const Z = [], xyz = [];
+          let ok = true;
+          for (let k = 0; k < na; k++) {
+            const t = tok(L[i + 2 + k] || '');
+            if (t.length < 4 || !isNumTok(t[1]) || !isNumTok(t[2]) || !isNumTok(t[3])) { ok = false; break; }
+            Z.push(xyzAtom(t, ds, 'on line ' + (i + 3 + k)));
+            xyz.push(num(t[1]), num(t[2]), num(t[3]));
+          }
+          if (!ok) {
+            if (ds.frames.length) { ds.warnings.push('Frame ' + (ds.frames.length + 1) + ' is incomplete and was skipped.'); break; }
+            throw err('Expected ' + na + ' atom lines ("Element x y z") after line ' + (i + 2) + '.');
+          }
+          f = newFrame(Z, xyz);
         }
-        if (!ok) {
-          if (ds.frames.length) { ds.warnings.push('Frame ' + (ds.frames.length + 1) + ' is incomplete and was skipped.'); break; }
-          throw err('Expected ' + na + ' atom lines ("Element x y z") after line ' + (i + 2) + '.');
-        }
-        const f = newFrame(Z, xyz);
         f.energy = xyzCommentEnergy(comment);
         f.label = comment.trim() || null;
         ds.frames.push(f);
@@ -2981,6 +3076,17 @@
     const ext = extOf(fileName);
     return EXTRA.some(f => f.binary && f.extensions.indexOf(ext) >= 0);
   }
+  /** A file name whose contents may be binary although its extension is a text one (Amber .rst7: ASCII or NetCDF). */
+  function maybeBinary(fileName) {
+    const ext = extOf(fileName);
+    return EXTRA.some(f => f.binary && f.magic && (f.magicExtensions || []).indexOf(ext) >= 0);
+  }
+  /** The first bytes of such a file belong to a binary format (its signature): the binary reader takes it. */
+  function sniffBinary(fileName, u8) {
+    if (!u8 || !u8.length) return false;
+    const ext = extOf(fileName);
+    return EXTRA.some(f => f.binary && f.magic && (f.magicExtensions || []).indexOf(ext) >= 0 && f.magic(u8));
+  }
   function supportedList() {
     return 'Gaussian output/input/fchk, ORCA output/input, XYZ, cube, Molden, MOL/SDF, PDB, GRO' +
       (EXTRA.length ? ', ' + EXTRA.map(f => f.name).join(', ') : '');
@@ -3016,6 +3122,39 @@
       const v = ds.vibrations;
       if (!ds.frames[v.frameIndex]) v.frameIndex = ds.frames.length - 1;
     }
+    return ds;
+  }
+
+  /**
+   * Steps whose geometry was not loaded (frames with xyz null: huge outputs read with a step selection, see
+   * condense.js) leave ds.frames. ds.steps then lists every step in order, {energy, energies, opt, label,
+   * converged, scan, irc, job, frame: index in ds.frames or null}, so the energy and convergence plots keep all
+   * of them; job ranges and the vibrations' frame are renumbered.
+   */
+  function splitPhantoms(ds) {
+    const fr = ds.frames;
+    if (!fr.some(f => !f.xyz)) return ds;
+    const jobOf = new Int32Array(fr.length).fill(-1);
+    (ds.jobs || []).forEach((jb, k) => { for (let i = Math.max(0, jb.frameStart); i <= jb.frameEnd && i < fr.length; i++) if (jobOf[i] < 0) jobOf[i] = k; });
+    const map = new Int32Array(fr.length), keep = [], steps = [];
+    for (let i = 0; i < fr.length; i++) {
+      const f = fr[i];
+      map[i] = f.xyz ? keep.length : -1;
+      steps.push({ energy: f.energy, energies: f.energies, opt: f.opt, label: f.label, converged: f.converged,
+        scan: f.scan || null, irc: f.irc || null, job: jobOf[i], frame: f.xyz ? keep.length : null });
+      if (f.xyz) keep.push(f);
+    }
+    if (!keep.length) throw err('None of the geometries of this file was loaded.');
+    const before = i => { for (let k = Math.min(i, fr.length - 1); k >= 0; k--) if (map[k] >= 0) return map[k]; return -1; };
+    const after = i => { for (let k = Math.max(0, i); k < fr.length; k++) if (map[k] >= 0) return map[k]; return -1; };
+    const near = i => { const b = before(i); return b >= 0 ? b : Math.max(0, after(i)); };
+    for (const jb of ds.jobs || []) {
+      const s = after(jb.frameStart), e = before(jb.frameEnd);
+      if (s >= 0 && e >= s) { jb.frameStart = s; jb.frameEnd = e; } else jb.frameStart = jb.frameEnd = near(jb.frameEnd);
+    }
+    if (ds.vibrations) ds.vibrations.frameIndex = near(ds.vibrations.frameIndex);
+    ds.frames = keep;
+    ds.steps = steps;
     return ds;
   }
 
@@ -3081,6 +3220,7 @@
   function parseLines(fileName, lines) {
     if (!Array.isArray(lines)) return parseFile(fileName, lines);
     const shown = baseName(fileName) || 'file';
+    const side = lines.bmSide || null;   // a condensed huge output (condense.js): its placeholders are U+0001 lines
     if (lines.length && lines[0].charCodeAt(0) === 0xFEFF) lines[0] = lines[0].slice(1);
     const head = headOf(lines, 65536);
     if (!head.trim()) {
@@ -3088,21 +3228,31 @@
       while (k < lines.length && !lines[k].trim()) k++;
       if (k === lines.length) throw err('"' + shown + '" is empty.');
     }
-    if (/[\u0000-\u0008]/.test(head.slice(0, 4096))) {
+    if (!side && /[\u0000-\u0008]/.test(head.slice(0, 4096))) {
       throw err('"' + shown + '" looks like a binary file that BlueMolecule cannot read. Supported: ' + supportedList() + '.');
     }
-    const id = detectFormat(fileName, head);
+    const id = side && side.format ? side.format : detectFormat(fileName, head);
     if (!id) throw err('The format of "' + shown + '" was not recognised. Supported: ' + supportedList() + '.');
     const fmt = FORMATS.find(f => f.id === id) || EXTRA.find(f => f.id === id);
     if (!fmt.parse) throw err('"' + shown + '" must be opened as a binary file.');
     // a complete file ends with a line break, so its last element is ''; anything else is a partial last line
-    let partial = false;
-    if (isOutputFormat(fmt) && lines.length > 1 && lines[lines.length - 1] !== '') { lines[lines.length - 1] = ''; partial = true; }
+    // (a condenser has already set it aside: lines.bmPartial)
+    let partial = !!lines.bmPartial;
+    if (!side && isOutputFormat(fmt) && lines.length > 1 && lines[lines.length - 1] !== '') { lines[lines.length - 1] = ''; partial = true; }
     let ds;
     try { ds = fmt.parse(lines, fileName); } catch (e) {
       throw err('Could not read "' + shown + '" as ' + fmt.name + ': ' + (e && e.message ? e.message : e));
     }
     if (ds && !ds.format) ds.format = fmt.id;
+    if (side) {
+      splitPhantoms(ds);
+      const ld = side.loaded;
+      if (ld) {   // what was loaded, counted on the dataset (the Info tab; "Reload with other choices")
+        const v = ds.vibrations;
+        ds.meta.loaded = { steps: Object.assign({}, ld.steps, { total: ds.steps ? ds.steps.length : ld.steps.frames ? ld.steps.total : ds.frames.length, loaded: ds.frames.length }),
+          modes: v ? Object.assign({}, ld.modes, { total: v.freqs.length, loaded: v.modesLoaded === undefined ? v.freqs.length : v.modesLoaded }) : null, bytes: ld.bytes };
+      }
+    }
     return validate(finishOutput(ds, fmt, partial));
   }
   /** Binary files (trajectories etc.). Falls back to text parsing when no binary reader claims the extension. */
@@ -3110,7 +3260,8 @@
     const shown = baseName(fileName) || 'file';
     const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
     const ext = extOf(fileName);
-    const cands = EXTRA.filter(f => f.parseBinary && f.extensions.indexOf(ext) >= 0);
+    let cands = EXTRA.filter(f => f.parseBinary && f.extensions.indexOf(ext) >= 0);
+    if (!cands.length) cands = EXTRA.filter(f => f.parseBinary && f.magic && f.magic(u8));   // e.g. a NetCDF restart named .rst7
     if (!cands.length) return parseFile(fileName, new TextDecoder('utf-8').decode(u8));
     let lastErr = null;
     for (const fmt of cands) {
@@ -3122,7 +3273,7 @@
 
   /** Readers that read a Blob / chunk source themselves (big binary trajectories: every Nth frame). */
   function sourceReaderFor(fileName) { const ext = extOf(fileName); return EXTRA.find(f => f.parseSource && f.extensions.indexOf(ext) >= 0) || null; }
-  /** BM.parseSource(fileName, source, opts) -> Promise<Dataset> for formats with such a reader (DCD, TRR, XTC). */
+  /** BM.parseSource(fileName, source, opts) -> Promise<Dataset> for formats with such a reader (DCD, TRR, XTC, NetCDF). */
   async function parseSource(fileName, source, opts) {
     const fmt = sourceReaderFor(fileName);
     if (!fmt) throw err('"' + (baseName(fileName) || 'file') + '" has no reader for big files.');
@@ -3138,8 +3289,15 @@
     return ds;
   }
   BM.detectFormat = detectFormat;
+  // shared with condense.js (the condensers must classify lines exactly as the readers do)
+  Object.defineProperty(BM, '_parse', { value: Object.freeze({ tok, isIntTok, isNumTok, num, int, floatsIn, modRedCoord, DEC10 }), configurable: true });
   BM.parseSource = parseSource;
   BM.hasSourceReader = fileName => !!sourceReaderFor(fileName);
+  /** BM.probeSource(fileName, source) -> Promise<{frames, atoms, perFrame, exact}>: a big trajectory's header only. */
+  BM.probeSource = async (fileName, source) => {
+    const fmt = sourceReaderFor(fileName);
+    return fmt ? fmt.parseSource(source, fileName, { probe: true }) : null;
+  };
   BM.parseFile = parseFile;
   BM.parseLines = parseLines;
   BM.qmmmMatch = qmmmMatch;
@@ -3154,6 +3312,8 @@
   BM.registerFormat = registerFormat;
   BM.parseFileBinary = parseFileBinary;
   BM.isBinaryFormat = isBinaryFormat;
+  BM.maybeBinary = maybeBinary;
+  BM.sniffBinary = sniffBinary;
   BM.formatRegistry = EXTRA;
   BM.emptyDataset = (format, fileName) => newDataset(format, fileName);
   BM.units = { BOHR, AU2DEBYE, HARTREE2EV, EV2NM };

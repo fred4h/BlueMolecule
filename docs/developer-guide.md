@@ -30,9 +30,10 @@ without a browser. `tools/build.py` inlines the scripts and the stylesheet into 
 |---|---|
 | `elements.js` | Element data: symbols, masses, covalent and van der Waals radii, colours |
 | `bigfile.js` | Reading files of any size as line arrays: chunked decoding, gzip streams, memory guard (`BM.bigfile`) |
+| `condense.js` | Condensed reading of huge Gaussian and ORCA outputs and XYZ trajectories: only the lines the readers use, geometries and normal modes as number arrays, the loading choices (`BM.condense`) |
 | `parsers.js` | Format detection, the reader registry and the core readers: Gaussian, ORCA, XYZ, cube, Molden, fchk, MOL/SDF, PDB, GRO; ONIOM and QM/MM layers |
 | `readers-qc.js` | GAMESS, NWChem, Q-Chem, Psi4, xtb, MOPAC, CP2K and Turbomole readers |
-| `readers-struct.js` | Crystal, materials and MD readers: CIF, mmCIF, Mol2, CML, CJSON, VASP, Quantum ESPRESSO, CASTEP, XSF, Amber, CHARMM, LAMMPS, TRR, XTC, DCD |
+| `readers-struct.js` | Crystal, materials and MD readers: CIF, mmCIF, Mol2, CML, CJSON, VASP, Quantum ESPRESSO, CASTEP, XSF, Amber (text and NetCDF), CHARMM, LAMMPS, TRR, XTC, DCD |
 | `writers.js` | The save-format registry, the basic writers and the calculation-input writers for 10 programs |
 | `writers-struct.js` | Structure, crystal and periodic-code writers for Save as |
 | `geom.js` | Bonds, distances, angles, dihedrals, formula, editing helpers |
@@ -109,8 +110,17 @@ Rules:
 - **Add a fixture and tests.** Put a small example under `tests/fixtures/` (a trimmed real file is best, if you may
   share it) and add checks to the matching `tests/test_*.js`.
 
-Binary formats use `parseBinary(bytes, fileName)` and `binary: true` instead of `parse`. See the DCD, TRR and XTC
-readers in `readers-struct.js`, which also support slice-wise reading with a frame stride.
+Binary formats use `parseBinary(bytes, fileName)` and `binary: true` instead of `parse`. See the DCD, TRR, XTC and
+NetCDF readers in `readers-struct.js`, which also read big files in slices (`parseSource(source, fileName, opts)`:
+a frame stride, a range or the last N frames; `{probe: true}` reads only the header for the loading dialog). A
+binary format that hides behind a text extension (an Amber NetCDF restart named `.rst7`) declares `magic(bytes)` and
+`magicExtensions`; the app then looks at the first bytes of such files.
+
+**Condensed reading.** For huge outputs, `condense.js` filters the lines before the reader sees them. Each
+condenser keeps exactly the lines its reader uses and replaces geometry and normal-mode blocks by placeholder lines
+(starting with U+0001) whose numbers travel in typed arrays on `lines.bmSide`. When you change what the Gaussian,
+ORCA or XYZ reader reads, change the condenser too: `tests/test_condense.js` compares condensed and full reads of
+every example output and of cut versions of them.
 
 ## Adding a save format
 
@@ -186,7 +196,7 @@ The version number lives in `tools/build.py`, `src/app.js`, `launcher/bluemolecu
 ```bash
 python3 tests/run_all.py             # unit tests: Node.js and Python (about a minute)
 python3 tests/run_all.py --browser   # also build, then the browser tests (a few minutes)
-python3 tests/run_all.py --big       # also the 600 MB / 1.2 GB files (slow; ~4 GB of RAM and disk)
+python3 tests/run_all.py --big       # also the 600 MB to 10 GB files (slow; ~4 GB of RAM and disk)
 ```
 
 Requirements:
@@ -202,17 +212,23 @@ Each suite can also be run alone, e.g. `node tests/test_parsers.js`.
 | `test_writers.js`, `test_writers_struct.js`, `test_audit.js` | Writers, round trips, regression tests from the code audit |
 | `test_chem.js`, `test_ff.js`, `test_templates.js`, `test_symmetry.js`, `test_analysis.js` | SMILES, bond orders, hydrogens, force field, building library, point groups, convergence analysis |
 | `test_running_jobs.js` | Outputs of jobs that are still running: every example output cut at thousands of places (line ends, inside energy numbers, at random), read as text and as lines; no energy or plotted point that the complete file does not contain |
+| `test_condense.js` | Condensed reading (huge outputs): the same dataset as a full read for every example output and its cut versions, and each loading choice (every Nth, last N, range, vibrations) |
+| `test_netcdf.js` | Amber NetCDF trajectories and restarts written by SciPy (and CDF-5 by `tests/make_netcdf.py`): coordinates, boxes, times, slices, damaged and streaming files, NetCDF 4 refusal |
 | `test_reps.js`, `test_cartoon.js` | Selection language, residue and sugar classification, presets, cartoon geometry (synthetic structures from `tests/synth.js`) |
 | `test_native_bridge.js`, `test_launcher.py`, `test_native_packaging.py` | Host bridge, launcher (server, security, window selection with simulated browsers and a simulated Qt), packages and installers |
 | `test_windows_package.py`, `browser_windows_launch_test.js` | The Windows package without Windows: C# 5 and PowerShell 5.1 syntax limits, delimiter balance, registry symmetry of install and uninstall, the icon, and the launch page opened from `file://` in Chromium |
 | `test_renderer.js`, `browser_*.js`, `test_bigfiles.js` | The renderer and the interface in headless Chromium (they save screenshots to `tests/shots/`), injection safety, large files |
 | `browser_ui_test.js` | Interface details: drop-down menus by mouse, drag and keyboard, the calculation-input file names, arrow keys in the lists, right-click deletion, running jobs |
+| `browser_15_test.js` | Version 1.5: plot zoom (box, buttons, double-click, selection, every plot type, exports), the energy-components plot, the loading dialog and Load other parts for outputs, XYZ, DCD and NetCDF, NetCDF after a prmtop |
 
 **Fixtures.**
 - Most example files were generated by `tools/make_fixtures.py`, which needs numpy, to imitate each program's
   output.
 - The orbital fixtures come from `tools/mini_scf.py`, a small Hartree–Fock code written for the tests.
-- `tools/make_big_fixture.py` writes the large logs used by `--big`.
+- `tools/make_big_fixture.py` writes the large logs used by `--big`; `tests/bigsynth.js` streams synthetic QM/MM
+  logs of any size (5 and 10 GB in `--big`) without writing them to disk.
+- `tests/make_netcdf.py` writes the NetCDF files in `tests/fixtures/netcdf/` with SciPy (needs NumPy and SciPy; the
+  files are committed).
 
 Real outputs are very welcome as additional fixtures ([CONTRIBUTING.md](../CONTRIBUTING.md)), trimmed and free of
 anything confidential.
