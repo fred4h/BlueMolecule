@@ -87,6 +87,7 @@ files ([limitations](limitations.md)).
 |---|---|---|
 | Amber topology | `.prmtop` `.parm7` | Topology: atoms, residues, charges, box |
 | Amber coordinates / restart | `.inpcrd` `.rst7` `.restrt` | Coordinates for a topology |
+| Amber NetCDF trajectory / restart | `.nc` `.ncdf` `.ncrst`, and `.mdcrd` `.rst7` `.restrt` files that hold NetCDF | Binary trajectory or restart (NetCDF 3), with the box and time |
 | CHARMM / NAMD PSF | `.psf` | Topology: atoms, segments, residues, charges |
 | CHARMM / NAMD DCD | `.dcd` | Binary trajectory |
 | GROMACS TRR | `.trr` | Binary trajectory |

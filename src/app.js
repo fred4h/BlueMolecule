@@ -7,7 +7,7 @@
   const HARTREE = { kcal: 627.509474, kj: 2625.49964, ev: 27.211386 };
   const UNIT_LABEL = { kcal: 'kcal/mol', kj: 'kJ/mol', ev: 'eV' };
   const BG = { navy: [0.063, 0.090, 0.133], black: [0, 0, 0], white: [1, 1, 1], gray: [0.91, 0.925, 0.945] };
-  const VERSION = '1.4.2';
+  const VERSION = '1.5.0';
   const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const isNum = v => typeof v === 'number' && isFinite(v);
   const fx = (v, d) => (isNum(v) ? v.toFixed(d) : '—');
@@ -241,12 +241,13 @@
 
   // ---------------- file opening ----------------
   const FORMAT_SUMMARY = 'QC outputs and inputs (Gaussian, ORCA, GAMESS, NWChem, Q-Chem, Psi4, xtb, MOPAC, CP2K, Turbomole), fchk, Molden, cube; ' +
-    'XYZ, MOL/SDF, PDB, mmCIF, CIF, Mol2, CML, CJSON, VASP, Quantum ESPRESSO, CASTEP, XSF, GRO, LAMMPS; prmtop/PSF with inpcrd, DCD, TRR, XTC; .gz';
+    'XYZ, MOL/SDF, PDB, mmCIF, CIF, Mol2, CML, CJSON, VASP, Quantum ESPRESSO, CASTEP, XSF, GRO, LAMMPS; prmtop/PSF with inpcrd, Amber NetCDF, DCD, TRR, XTC; .gz';
   const conciseError = msg => String(msg).replace(/Supported: [\s\S]*$/, 'Supported: ' + FORMAT_SUMMARY + '.');
   // Files of BIG bytes or more (and .gz files and streamed launcher files) are read with BM.bigfile.readLines and
   // parsed from lines (BM.parseLines): V8 cannot hold a string above ~512 MiB. Smaller files take the fast path.
   const BIGF = BM.bigfile || null;
-  const BIG = BIGF ? BIGF.BIG : 64 * 1048576;
+  const BIG0 = BIGF ? BIGF.BIG : 64 * 1048576;
+  const bigSize = () => (window.__bmBigSize > 0 ? window.__bmBigSize : BIG0);   // (tests lower it to read small files the big way)
   const MBs = b => (b >= 1e9 ? (b / 1073741824).toFixed(2) + ' GB' : (b / 1048576).toFixed(b < 10 * 1048576 ? 1 : 0) + ' MB');
   const nextPaint = () => new Promise(r => (typeof requestAnimationFrame === 'function' ? requestAnimationFrame(() => setTimeout(r, 0)) : setTimeout(r, 0)));
   let progEl = null;
@@ -307,49 +308,214 @@
   function heapLimit() {
     try { const m = performance.memory; return m && m.jsHeapSizeLimit > 0 ? m.jsHeapSizeLimit : 0; } catch (e) { return 0; }
   }
-  /** Large text file: streamed into lines (progress, Cancel) and parsed from them; the lines are dropped at once. */
-  async function readLinesAndParse(src, name, gz, prog) {
+  /** Memory the computer can give to the number arrays of a big file (bytes): what the Linux app reports as free, else
+   *  half of the browser's hint (navigator.deviceMemory: rounded, at most 8 GB), else unknown (no limit). */
+  function ramLimit() {
+    const q = window.BM_QT;
+    if (q && q.memAvailable > 0) return 0.8 * q.memAvailable;
+    const dm = typeof navigator !== 'undefined' ? navigator.deviceMemory : 0;
+    return dm > 0 ? 0.5 * dm * 1073741824 : undefined;
+  }
+  /** Large text file: streamed line by line. Huge program outputs and XYZ trajectories go through a condenser that keeps
+   *  only what their reader needs (condense.js, issue #6), with the choices of the loading dialog (load); other formats
+   *  are collected into lines. */
+  async function readLinesAndParse(src, name, gz, prog, load) {
     const lim = heapLimit();
-    const opts = { signal: prog.signal, total: src.size, memoryLimit: lim ? 0.85 * lim : undefined };
+    const opts = { signal: prog.signal, total: src.size, memoryLimit: lim ? 0.85 * lim : undefined, ramLimit: ramLimit() };
     let input = src.data;
     if (gz) {
       if (typeof DecompressionStream === 'undefined') throw new Error('This browser cannot decompress .gz files; please unzip it first.');
       opts.memoryLimit = undefined;            // the uncompressed size is not known in advance
       input = BIGF.gunzip(src.data, n => prog.onProgress({ bytes: n, total: src.size }));   // progress on the compressed bytes
     } else opts.onProgress = prog.onProgress;
-    let lines = await BIGF.readLines(input, opts);
+    const pick = head => {
+      const id = BM.detectFormat(name, head);
+      return BM.condense && BM.condense.formats.indexOf(id) >= 0 ? BM.condense.create(id, { load }) : null;
+    };
+    let lines = BIGF.readCondensed ? await BIGF.readCondensed(input, pick, opts) : await BIGF.readLines(input, opts);
     input = null;
-    await prog.parsing(`Parsing ${src.name} — ${lines.length.toLocaleString()} lines…`);
+    const nLines = lines.length, condensed = !!lines.bmSide;
+    await prog.parsing(`Parsing ${src.name} — ${nLines.toLocaleString()} ${condensed ? 'condensed ' : ''}lines…`);
     const t0 = performance.now();
     const ds = BM.parseLines(name, lines);
-    console.info(`[BlueMolecule] parsed ${name} from ${lines.length} lines in ${(performance.now() - t0).toFixed(0)} ms`);
+    console.info(`[BlueMolecule] parsed ${name} from ${nLines} ${condensed ? 'condensed ' : ''}lines in ${(performance.now() - t0).toFixed(0)} ms`);
     lines.length = 0; lines = null;
     return ds;
   }
-  async function openFile(file, nameHint) {
-    let src;
-    try { src = asSource(file, nameHint); } catch (e) { toast(e.message || String(e), true); return null; }
-    const gz = /\.gz$/i.test(src.name), name = src.name.replace(/\.gz$/i, '');
-    const size = Number.isFinite(src.size) ? src.size : null;
-    status('Reading ' + src.name + '…');
-    let prog = null;
+
+  // ---------------- loading part of a large file (issue #7) ----------------
+  /** From this size the loading dialog asks what to load (tests lower it with window.__bmAskSize). */
+  const askSize = () => (window.__bmAskSize > 0 ? window.__bmAskSize : 1024 * 1048576);
+  const ordinal = n => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th'));
+  /** What the start and the end of a big output say (a few MB each): atoms, jobs, the number of steps, frequencies. */
+  async function probeText(src, name) {
+    const R = BIGF && BIGF.byteReader(src.data);
+    if (!R || !R.size) return null;
+    const dec = u8 => new TextDecoder('utf-8').decode(u8), MB4 = 4 * 1048576;
+    const head = dec(await R.read(0, Math.min(R.size, MB4)));
+    const tail = R.size > 2 * MB4 ? dec(await R.read(R.size - MB4, MB4)) : '';
+    const format = BM.detectFormat(name, head.slice(0, 65536));
+    if (!BM.condense || BM.condense.formats.indexOf(format) < 0) return null;
+    const info = { format, size: R.size, atoms: null, jobs: [], steps: null, freq: false, qmmm: false, frames: null, bytesPerValue: format === 'gaussian-log' ? 1 : 4 };
+    const lastOf = (re, text) => { let m, last = null; re.lastIndex = 0; while ((m = re.exec(text))) last = m; return last; };
+    /** rows of the first table after a header line (Gaussian: after the second dashes line; ORCA: after the dashes) */
+    const tableRows = (text, header, skipDashes, rowRe) => {
+      const k = text.indexOf(header);
+      if (k < 0) return null;
+      const L = text.slice(k, k + 8 * 1048576).split(/\r?\n/);
+      let j = 1, d = 0;
+      while (j < L.length && d < skipDashes) { if (/^\s*-{10,}\s*$/.test(L[j])) d++; j++; }
+      let n = 0;
+      for (; j < L.length && rowRe.test(L[j]); j++) n++;
+      return j < L.length ? n : null;   // (a table cut by the end of the sample says nothing)
+    };
+    if (format === 'gaussian-log') {
+      const route = (/^\s*#.*$/m.exec(head) || [''])[0];
+      for (const [re, j] of [[/\bopt\b/i, 'opt'], [/\bfreq\b/i, 'freq'], [/\bscan\b|modredundant/i, 'scan'], [/\birc\b/i, 'irc']]) if (re.test(route)) info.jobs.push(j);
+      info.freq = info.jobs.indexOf('freq') >= 0 || /Harmonic frequencies/.test(tail);
+      info.qmmm = /oniom\s*\(/i.test(route);
+      const na = /NAtoms=\s*(\d+)/.exec(head);
+      info.atoms = na ? +na[1] : tableRows(head, ' orientation:', 2, /^\s*\d+\s+-?\d+\s+/);
+      const st = lastOf(/Step number\s+(\d+)\s+out of a maximum of/g, tail) || lastOf(/Step number\s+(\d+)\s+out of a maximum of/g, head);
+      if (st) info.steps = +st[1];
+    } else if (format === 'orca-out') {
+      const kw = [];
+      for (const m of head.matchAll(/\|\s*\d+>\s*!(.*)/g)) kw.push(m[1]);
+      const k = kw.join(' ');
+      for (const [re, j] of [[/\b(opt|copt|zopt|optts|tightopt|verytightopt|looseopt)\b/i, 'opt'], [/\b(freq|numfreq|anfreq)\b/i, 'freq'], [/\birc\b/i, 'irc']]) if (re.test(k)) info.jobs.push(j);
+      info.freq = info.jobs.indexOf('freq') >= 0 || /NORMAL MODES/.test(tail);
+      info.qmmm = /\b(qmmm|qm\/xtb|qm\/qm2|qm\/mm)\b/i.test(k) || /%qmmm/i.test(head);
+      info.atoms = tableRows(head, 'CARTESIAN COORDINATES (ANGSTROEM)', 1, /^\s*[A-Za-z][\w:>*]*\s+-?\d/);
+      const cy = lastOf(/GEOMETRY OPTIMIZATION CYCLE\s+(\d+)/g, tail) || lastOf(/GEOMETRY OPTIMIZATION CYCLE\s+(\d+)/g, head);
+      if (cy) info.steps = +cy[1];
+    } else {   // XYZ trajectory: frames from the size of the first one
+      const L = head.split(/\r?\n/);
+      let i = 0;
+      while (i < L.length && !L[i].trim()) i++;
+      const n = parseInt(L[i], 10);
+      if (n > 0 && L.length > i + n + 2) {
+        info.atoms = n;
+        const bytes = new TextEncoder().encode(L.slice(i, i + n + 2).join('\n') + '\n').length;
+        info.frames = Math.max(1, Math.round(R.size / bytes));
+      }
+    }
+    return info;
+  }
+  const MBs1 = b => (b >= 1073741824 ? (b / 1073741824).toFixed(1) + ' GB' : Math.max(1, Math.round(b / 1048576)) + ' MB');
+  /**
+   * The loading dialog: what to load of a big output (info.kind 'text': geometries and vibrations) or trajectory
+   * (info.kind 'traj': frames). Resolves to the choice (text: {steps, modes} for condense.js; traj: {stride, first,
+   * last, tail} for BM.parseSource) or null when cancelled. prev: the choice made before (Load other parts).
+   */
+  function askLoad(fileName, info, prev) {
+    return new Promise(resolve => {
+      const dlg = $('#dlg');
+      let done = false;
+      const finish = v => { if (done) return; done = true; dlg.removeEventListener('close', onClose); resolve(v); };
+      const onClose = () => finish(null);
+      const traj = info.kind === 'traj', xyz = info.format === 'xyz', frames = traj || xyz;
+      const N = info.atoms || 0, perStep = 24 * N * (frames ? 1 : 2);
+      const total = frames ? info.frames : info.steps;
+      const unit = frames ? 'frame' : 'step';
+      const budget = Math.min(2 * 1073741824, (ramLimit() || 4 * 1073741824) * 0.5);
+      const ps = prev && prev.steps ? prev.steps : null, pm = prev && prev.modes ? prev.modes : null;
+      // defaults: everything that fits
+      let defMode = 'all', every = 10;
+      if (total && perStep && total * perStep > budget) { defMode = 'every'; every = Math.max(2, Math.ceil(total * perStep / budget)); }
+      const sMode = ps ? ps.mode : defMode;
+      const nModes = info.freq && N ? 3 * N - 6 : 0, modeBytes = nModes * 3 * N * (info.bytesPerValue || 4);
+      let mMode = pm ? pm.mode : 'all', firstK = pm && pm.n ? pm.n : 100;
+      if (!pm && modeBytes > budget) { mMode = 'first'; firstK = Math.max(20, Math.floor(budget / (3 * N * (info.bytesPerValue || 4)))); }
+      const facts = [MBs1(info.size), traj ? (info.format || 'trajectory') : formatName({ format: info.format }) + (info.qmmm ? ' (QM/MM)' : ''),
+        N ? N.toLocaleString() + ' atoms' : '', info.jobs && info.jobs.length ? info.jobs.join(', ') : '',
+        total ? (info.exact === false || xyz ? 'about ' : '') + total.toLocaleString() + ' ' + unit + 's' : ''].filter(Boolean).join(' · ');
+      const num = (k, v, min) => `<input type="number" data-ld="${k}" value="${v}" min="${min || 1}" step="1" style="width:84px">`;
+      const radio = (group, value, checked, html) => `<label class="ld-opt"><input type="radio" name="${group}" value="${value}" ${checked ? 'checked' : ''}> <span>${html}</span></label>`;
+      const lastN = ps && ps.mode === 'last' ? ps.n : 20, from = ps && ps.mode === 'range' ? ps.from : 1, to = ps && ps.mode === 'range' && ps.to ? ps.to : (total || 100);
+      const body = `<p class="note" style="margin-top:0"><b>${esc(fileName)}</b>: ${esc(facts)}.</p>
+        <div class="ld-h">${frames ? 'Frames' : 'Geometries'}</div>
+        ${radio('ld-steps', 'all', sMode === 'all', 'all ' + unit + 's' + (total && perStep ? ` <span class="dim">(about ${MBs1(total * perStep)})</span>` : ''))}
+        ${radio('ld-steps', 'every', sMode === 'every', 'every ' + num('every', ps && ps.mode === 'every' ? ps.n : every, 2) + ` ${unit}`)}
+        ${radio('ld-steps', 'last', sMode === 'last', 'only the last ' + num('last', lastN) + ` ${unit}s`)}
+        ${radio('ld-steps', 'range', sMode === 'range', `${unit}s ` + num('from', from) + ' to ' + num('to', to))}
+        ${frames ? '' : '<p class="note">The energies and convergence data of every step are read in any case, and the first and last geometry of each job are always loaded.</p>'}
+        ${nModes ? `<div class="ld-h">Vibrations <span class="dim">(${nModes.toLocaleString()})</span></div>
+          ${radio('ld-modes', 'all', mMode === 'all', 'all, with their displacements' + (modeBytes ? ` <span class="dim">(about ${MBs1(modeBytes)})</span>` : ''))}
+          ${radio('ld-modes', 'first', mMode === 'first', 'displacements of the first ' + num('first', firstK) + ' only')}
+          ${radio('ld-modes', 'none', mMode === 'none', 'frequencies and intensities only (no animation)')}` : ''}
+        <p class="note" data-ld="est"></p>`;
+      const read = form => {
+        const q = sel => form.querySelector(sel);
+        const val = k => Math.max(1, Math.floor(+q(`[data-ld="${k}"]`).value || 1));
+        const sm = (q('input[name="ld-steps"]:checked') || { value: 'all' }).value;
+        const steps = sm === 'every' ? { mode: 'every', n: Math.max(2, val('every')) } : sm === 'last' ? { mode: 'last', n: val('last') }
+          : sm === 'range' ? { mode: 'range', from: Math.min(val('from'), val('to')), to: Math.max(val('from'), val('to')) } : { mode: 'all' };
+        if (traj) {   // BM.parseSource options (0-based frames)
+          if (steps.mode === 'every') return { stride: steps.n, first: 0, last: null, tail: null, choice: steps };
+          if (steps.mode === 'last') return { stride: 1, tail: steps.n, choice: steps };
+          if (steps.mode === 'range') return { stride: 1, first: steps.from - 1, last: steps.to - 1, tail: null, choice: steps };
+          return { stride: 1, first: 0, last: null, tail: null, choice: steps };
+        }
+        const mm = q('input[name="ld-modes"]:checked');
+        const modes = !mm || mm.value === 'all' ? { mode: 'all' } : mm.value === 'none' ? { mode: 'none' } : { mode: 'first', n: val('first') };
+        return { steps, modes };
+      };
+      const estimate = form => {
+        const c = read(form), st = traj ? c.choice : c.steps;
+        let n = total || 0;
+        if (n) n = st.mode === 'every' ? Math.ceil(n / st.n) : st.mode === 'last' ? Math.min(n, st.n) : st.mode === 'range' ? Math.max(0, Math.min(n, st.to) - st.from + 1) : n;
+        let b = n * perStep;
+        if (!traj && c.modes && nModes) b += c.modes.mode === 'all' ? modeBytes : c.modes.mode === 'first' ? Math.min(nModes, c.modes.n) * 3 * N * (info.bytesPerValue || 4) : 0;
+        const e = form.querySelector('[data-ld="est"]');
+        if (e) e.textContent = b ? 'Memory for what is kept: about ' + MBs1(b) + (total ? '' : ' plus the geometries') + '.' : '';
+      };
+      dialog('Load part of a large file', body, [
+        { label: 'Cancel', onClick: () => { finish(null); } },
+        { label: 'Load', primary: true, onClick: form => { finish(read(form)); } }
+      ], form => {
+        const bodyEl = form.querySelector('.dlg-body');
+        bodyEl.addEventListener('input', e => {   // typing a number chooses its option
+          const lab = e.target.closest('.ld-opt');
+          if (lab && e.target.type === 'number') { const r = lab.querySelector('input[type=radio]'); if (r) r.checked = true; }
+          estimate(form);
+        });
+        bodyEl.addEventListener('change', () => estimate(form));
+        estimate(form);
+        const pb = form.querySelector('.dlg-foot .btn.primary'); if (pb) pb.focus();
+      });
+      dlg.addEventListener('close', onClose);
+    });
+  }
+  /** The first bytes of a file whose extension may hide a binary format (an Amber NetCDF restart named .rst7). */
+  async function looksBinary(src, name) {
+    if (!BM.maybeBinary || !BM.maybeBinary(name)) return false;
     try {
-      const t0 = performance.now();
-      let data, note = '';
-      if (BM.isBinaryFormat(name)) {
-        if (!gz && size !== null && size >= BIG && BM.hasSourceReader && BM.hasSourceReader(name) && (src.kind === 'blob' || src.kind === 'chunks')) {
-          prog = beginProgress(src.name, size);   // DCD / TRR / XTC: frames read from slices, every Nth of a huge file
-          data = await BM.parseSource(name, src.data, { onProgress: prog.onProgress, signal: prog.signal });
+      let head = null;
+      if (src.kind === 'bytes') head = src.data.subarray(0, 16);
+      else if ((src.kind === 'blob' || src.kind === 'chunks') && BIGF) { const R = BIGF.byteReader(src.data); head = R && R.size ? await R.read(0, Math.min(16, R.size)) : null; }
+      return !!head && BM.sniffBinary(name, head);
+    } catch (e) { return false; }
+  }
+  /** Reads a file into a dataset: the fast path for small files, slices and lines for big ones (with load choices). */
+  async function readSource(src, name, gz, size, choice, onProg) {
+    let data, note = '', prog = null;
+    try {
+      if (BM.isBinaryFormat(name) || (!gz && await looksBinary(src, name))) {
+        if (!gz && size !== null && size >= bigSize() && BM.hasSourceReader && BM.hasSourceReader(name) && (src.kind === 'blob' || src.kind === 'chunks')) {
+          prog = onProg(src.name, size);   // DCD / TRR / XTC / NetCDF: frames read from slices
+          data = await BM.parseSource(name, src.data, Object.assign({ onProgress: prog.onProgress, signal: prog.signal }, choice || {}));
+          data.meta.sourceSize = size;
+          if (choice && choice.choice) data.meta.choice = choice.choice;
         } else {
-          if (src.kind === 'stream' || (size !== null && size >= BIG)) prog = beginProgress(src.name, size);
+          if (src.kind === 'stream' || (size !== null && size >= bigSize())) prog = onProg(src.name, size);
           data = BM.parseFileBinary(name, await readBytes(src, gz, prog));
         }
-      } else if (BIGF && (gz || src.kind === 'stream' || size === null || size >= BIG)) {
-        prog = beginProgress(src.name, size, size !== null && size < BIG ? 300 : 0);
-        try { data = await readLinesAndParse(src, name, gz, prog); }
+      } else if (BIGF && (gz || src.kind === 'stream' || size === null || size >= bigSize())) {
+        prog = onProg(src.name, size, size !== null && size < bigSize() ? 300 : 0);
+        try { data = await readLinesAndParse(src, name, gz, prog, choice); }
         catch (e) {
           // unrecognised small files: Open Babel needs the bytes (re-read; streams cannot be re-read)
-          if (!/not recognised|binary file/i.test(e.message || '') || src.kind === 'stream' || (size !== null && size >= BIG)) throw e;
+          if (!/not recognised|binary file/i.test(e.message || '') || src.kind === 'stream' || (size !== null && size >= bigSize())) throw e;
           const conv = await viaOpenBabel(name, await readBytes(src, gz), e);
           if (!conv) throw e;
           data = conv; note = ' (converted with Open Babel)';
@@ -361,8 +527,8 @@
         if (text === null) {
           if (!BIGF) throw new Error('This file is too large to open as text.');
           bytes = null;
-          prog = beginProgress(src.name, size);
-          data = await readLinesAndParse(src, name, false, prog);
+          prog = onProg(src.name, size);
+          data = await readLinesAndParse(src, name, false, prog, choice);
         } else {
           try { data = BM.parseFile(name, text); }
           catch (e) {
@@ -374,11 +540,50 @@
         }
         text = null; bytes = null;
       }
-      if (prog) { prog.done(); prog = null; }
+    } finally {
+      if (prog) prog.done();
+    }
+    return { data, note };
+  }
+  /** Asks what to load when a big output or trajectory is large enough; null: cancelled; {}: no question asked. */
+  async function chooseLoad(src, name, gz, size, prev) {
+    const seekable = !gz && size !== null && (src.kind === 'blob' || src.kind === 'chunks');
+    if (!seekable || (!prev && size < askSize())) return {};
+    if (BM.isBinaryFormat(name)) {
+      if (!(size >= bigSize() && BM.hasSourceReader && BM.hasSourceReader(name) && BM.probeSource)) return {};
+      let pr = null;
+      try { pr = await BM.probeSource(name, src.data); } catch (e) { pr = null; }
+      if (!pr) return {};
+      const fmt = (BM.formats.find(f => f.extensions.indexOf(name.split('.').pop().toLowerCase()) >= 0) || {}).name;
+      const choice = await askLoad(src.name, Object.assign({ kind: 'traj', size, format: fmt }, pr), prev);
+      return choice ? { traj: choice } : null;
+    }
+    if (size < bigSize()) return {};
+    let info = null;
+    try { info = await probeText(src, name); } catch (e) { info = null; }
+    if (!info) return {};
+    const choice = await askLoad(src.name, Object.assign({ kind: 'text' }, info), prev);
+    return choice ? { text: choice } : null;
+  }
+  async function openFile(file, nameHint) {
+    let src;
+    try { src = asSource(file, nameHint); } catch (e) { toast(e.message || String(e), true); return null; }
+    const gz = /\.gz$/i.test(src.name), name = src.name.replace(/\.gz$/i, '');
+    const size = Number.isFinite(src.size) ? src.size : null;
+    status('Reading ' + src.name + '…');
+    try {
+      const ask = await chooseLoad(src, name, gz, size, null);
+      if (!ask) { toast('Opening ' + src.name + ' was cancelled.'); return null; }
+      const choice = ask.traj || ask.text || null;
+      const t0 = performance.now();
+      const { data, note } = await readSource(src, name, gz, size, choice, beginProgress);
       console.info(`[BlueMolecule] parsed ${name} (${data.format}) in ${(performance.now() - t0).toFixed(0)} ms`);
       const d = openData(name, data, note);
-      if (d && data.meta && data.meta.totalFrames > data.frames.length) {
-        toast(`${name}: ${data.frames.length} of ${data.meta.totalFrames} frames loaded (every ${data.meta.stride}${data.meta.stride === 2 ? 'nd' : data.meta.stride === 3 ? 'rd' : 'th'})`);
+      if (d && d.data === data && data.meta && data.meta.loaded && !gz && (src.kind === 'blob' || src.kind === 'chunks')) {
+        d.loadSource = { src, name: src.name, size, choice: ask.text || { steps: { mode: 'all' }, modes: { mode: 'all' } } };
+      }
+      if (d && data.meta && data.meta.totalFrames > data.frames.length && !ask.traj) {
+        toast(`${name}: ${data.frames.length} of ${data.meta.totalFrames} frames loaded (every ${ordinal(data.meta.stride)})`);
       }
       return d;
     } catch (e) {
@@ -386,8 +591,52 @@
       console.error(e);
       toast(conciseError(BIGF ? BIGF.describeError(e, src.name, size) : (e.message || String(e))), true);
       return null;
-    } finally {
-      if (prog) prog.done();
+    }
+  }
+  /** A document's data replaced by a new reading of the same file (Load other parts). */
+  function replaceData(d, data) {
+    stopAnim(true);
+    d.data = data;
+    d.frameIndex = Math.max(0, data.frames.length - 1);
+    if (data.vibrations && data.vibrations.frameIndex < data.frames.length) d.frameIndex = data.vibrations.frameIndex;
+    d.selection = []; d.vibIndex = -1; d.stateIndex = -1; d.job = -1; d.convergedOnly = false;
+    d.bonds.clear(); d._conv = null; d._prof = null; d._vibVec = null; d._animXyz = null; d.undo = []; d.redo = [];
+    d.chargeScheme = firstChargeScheme(data);
+    if (state.active === d) { refreshScene(true); renderDocs(); renderTabs(); renderPanel(); renderPlot(); renderPlaybar(); updateStatus(); }
+  }
+  /** Info tab "Load other parts…": the loading dialog again, then the same file read with the new choice. */
+  async function reloadPart(d) {
+    if (!d) return;
+    const L = d.loadSource, T = d.trajLoad;
+    try {
+      if (L) {
+        const name = L.name.replace(/\.gz$/i, '');
+        const ask = await chooseLoad(L.src, name, false, L.size, L.choice);
+        if (!ask || !ask.text) return;
+        const { data } = await readSource(L.src, name, false, L.size, ask.text, beginProgress);
+        L.choice = ask.text;
+        replaceData(d, data);
+        toast(`${L.name}: ${data.frames.length} geometr${data.frames.length === 1 ? 'y' : 'ies'} loaded`);
+      } else if (T && T.reload) {
+        const choice = await askLoad(T.name, { kind: 'traj', size: T.size, format: T.format, frames: T.total, atoms: T.atoms, perFrame: 24 * T.atoms, exact: T.exact }, { steps: T.choice });
+        if (!choice) return;
+        const prog = beginProgress(T.name, T.size);
+        let td;
+        try { td = await T.reload(Object.assign({ onProgress: prog.onProgress, signal: prog.signal }, choice)); } finally { prog.done(); }
+        const t = d.data.frames[0];
+        const frames = td.frames.map((f, k) => ({ Z: t.Z, xyz: f.xyz, energy: isNum(f.energy) ? f.energy : null, energies: null, label: f.label || `${T.name} ${k + 1}`,
+          converged: false, opt: null, atomNames: t.atomNames, resNames: t.resNames, resIds: t.resIds, chains: t.chains || null, cell: f.cell || null, time: f.time }));
+        d.data.frames.splice(T.start, T.count, ...frames);
+        Object.assign(T, { count: frames.length, total: td.meta.totalFrames, stride: td.meta.stride, first: td.meta.first, last: td.meta.last, choice: choice.choice, reload: td.meta.reload || T.reload });
+        stopAnim(true);
+        d.frameIndex = T.start; d.bonds.clear(); d._conv = null; d._prof = null; d.job = -1;
+        if (state.active === d) { refreshScene(true); renderTabs(); renderPanel(); renderPlot(); renderPlaybar(); updateStatus(); }
+        toast(`${T.name}: ${frames.length} of ${T.total} frames loaded`);
+      }
+    } catch (e) {
+      if (BIGF && BIGF.isAbort(e)) { toast('Loading was cancelled.'); return; }
+      console.error(e);
+      toast(conciseError(BIGF ? BIGF.describeError(e, (L || T).name, (L || T).size) : (e.message || String(e))), true);
     }
   }
   /** Formats BlueMolecule does not read: convert with Open Babel (to SDF, else CML) when the host provides it. */
@@ -411,8 +660,8 @@
     }
     throw new Error('Open Babel could not convert "' + name + '"' + (last ? ': ' + last.message : '.'));
   }
-  /** Several files at once: topologies and structures before coordinate-only files (DCD, TRR, XTC, inpcrd…). */
-  const coordOnly = f => /\.(dcd|trr|xtc|inpcrd|rst7|restrt|mdcrd|crd)(\.gz)?$/i.test(f.name) ? 1 : 0;
+  /** Several files at once: topologies and structures before coordinate-only files (DCD, TRR, XTC, NetCDF, inpcrd…). */
+  const coordOnly = f => /\.(dcd|trr|xtc|nc|ncdf|netcdf|ncrst|inpcrd|rst7|restrt|rst|mdcrd|crd)(\.gz)?$/i.test(f.name) ? 1 : 0;
   async function openFiles(list) {
     for (const f of Array.from(list).sort((a, b) => coordOnly(a) - coordOnly(b))) await openFile(f);
   }
@@ -478,6 +727,11 @@
     const wasPending = d.pending;
     if (wasPending) { ds.frames = frames; d.pending = false; ds.meta.topologyOnly = false; d.frameIndex = 0; }
     else { ds.frames = ds.frames.concat(frames); d.frameIndex = ds.frames.length - frames.length; }
+    const m = data.meta || {};
+    if (typeof m.reload === 'function' && m.totalFrames) {   // a big trajectory read in slices: "Load other parts" can read it again
+      d.trajLoad = { name, reload: m.reload, total: m.totalFrames, stride: m.stride, first: m.first, last: m.last, start: d.frameIndex, count: frames.length,
+        atoms: m.natoms || t.Z.length, size: m.sourceSize || null, format: formatName(data), exact: true, choice: m.choice || null };
+    }
     if (data.cell && !ds.cell) ds.cell = data.cell;
     if (data.cellOrigin && !ds.cellOrigin) ds.cellOrigin = data.cellOrigin;
     if (ds.bonds && ds.bonds.length) d.topoAll = true;
@@ -528,7 +782,7 @@
     R.setOptions(renderOptions());
     $('#viewport').style.background = 'rgb(' + (BG[state.view.bg] || BG.navy).map(c => Math.round(c * 255)).join(',') + ')';
     $('#pending').classList.toggle('hidden', !(d && d.pending));
-    if (d && d.pending) $('#pending-msg').textContent = `${d.name}: ${d.data.frames[0].Z.length} atoms. Open a coordinate or trajectory file with the same atom count (inpcrd, DCD, TRR, XTC, PDB, GRO…).`;
+    if (d && d.pending) $('#pending-msg').textContent = `${d.name}: ${d.data.frames[0].Z.length} atoms. Open a coordinate or trajectory file with the same atom count (inpcrd, NetCDF, DCD, TRR, XTC, PDB, GRO…).`;
     if (!d || d.pending) { R.setRepresentation(null, true); R.setScene([], new Float64Array(0), new Uint32Array(0)); pushReps(null); R.setSurfaces([]); R.setArrows(null); refreshExtras(); updateMeasure(); return; }
     const f = curFrame(d);
     if (!keepView) R.setOrientation(principalQuat(f.Z, f.xyz));
@@ -1156,14 +1410,24 @@
     }
     if (state.anim.kind) state.anim.raf = requestAnimationFrame(tick);
   }
+  /** The displacement vector of vibration i, or null when it was not loaded (part of a huge output, issue #7). */
+  const modeOf = (d, i) => { const v = d.data.vibrations; return v && i >= 0 && v.modes ? v.modes[i] || null : null; };
+  const vibVec = (d, i, amp) => { const m = modeOf(d, i); return m ? geom.normalizedMode(m, amp) : null; };
+  const NOT_LOADED = 'The displacements of this vibration were not loaded (Info tab: Load other parts of the file).';
   function selectVib(d, i, play) {
     const v = d.data.vibrations;
     if (!v || i < 0 || i >= v.freqs.length) return;
     stopAnim(false);
     if (d.frameIndex !== v.frameIndex) { d.frameIndex = v.frameIndex; }
     d.vibIndex = i;
-    d._vibVec = geom.normalizedMode(v.modes[i], state.vib.amplitude);
+    d._vibVec = vibVec(d, i, state.vib.amplitude);
     d._animXyz = Float64Array.from(d.data.frames[v.frameIndex].xyz);
+    if (!d._vibVec) {
+      status(NOT_LOADED);
+      refreshScene(true); highlightRow('#vib-table', i); renderPlaybar();
+      if (d.plotType === 'ir' || d.plotType === 'raman') renderPlotDraw();
+      return;
+    }
     state.anim.phase = 0;
     refreshScene(true);
     highlightRow('#vib-table', i);
@@ -1318,18 +1582,22 @@
     }
     const conv = data.frames.some(x => x.converged) ? '<span class="pill ok">converged</span>' : (data.frames.length > 1 && (m.jobTypes || []).some(j => /opt/i.test(j)) ? '<span class="pill warn">not converged</span>' : null);
     let html = contentsHtml(d);
-    if (d.pending) html += `<div class="sec"><div class="route pending-note">Coordinates pending: open a coordinate or trajectory file with ${f.Z.length} atoms (inpcrd, DCD, TRR, XTC, PDB, GRO…).</div></div>`;
+    if (d.pending) html += `<div class="sec"><div class="route pending-note">Coordinates pending: open a coordinate or trajectory file with ${f.Z.length} atoms (inpcrd, NetCDF, DCD, TRR, XTC, PDB, GRO…).</div></div>`;
     html += sec('File', kv([
       ['Name', esc(d.name)], ['Format', esc(formatName(data))], ['Program', esc(data.program)], ['Title', esc(data.title)],
       ['Status', term], ['Jobs', esc((m.jobTypes || []).join(', '))]]));
+    html += loadedHtml(d);
     const route = m.route || m.keywords;
     if (route) html += `<div class="sec"><h3>${m.route ? 'Route' : 'Keywords'}</h3><div class="route">${esc(route)}</div></div>`;
     html += `<div class="sec"><h3>Molecule</h3>${kv([
       ['Formula', esc(geom.formula(f.Z))], ['Atoms', String(nAtoms) + (nAtoms !== f.Z.length ? ` (+${f.Z.length - nAtoms} dummy)` : '')],
       ['Mol. weight', geom.molWeight(f.Z).toFixed(3) + ' g/mol'], ['Method', esc(m.method)], ['Basis', esc(m.basis)], ['Solvent', esc(m.solvent)],
       ['Charge', isNum(m.charge) ? String(m.charge) : null], ['Multiplicity', isNum(m.multiplicity) ? String(m.multiplicity) : null]])}</div>`;
+    // QM/MM and ONIOM: the components of this geometry's total energy (issue #10)
+    const parts = m.qmmm && f.energies && isNum(f.energy) ? BM.analysis.energyComponents(data, [f], 1) : [];
     html += sec('Energy', kv([
       ['This geometry', isNum(f.energy) ? `<span class="mono">${f.energy.toFixed(8)}</span> Eh` : null],
+      ...parts.map(cp => ['<span class="dim">' + esc(cp.label) + '</span>', `<span class="mono">${cp.values[0].toFixed(8)}</span> Eh`]),
       ['Final', lastE ? `<span class="mono">${lastE.energy.toFixed(8)}</span> Eh` : null],
       ['Geometries', data.frames.length > 1 ? `${data.frames.length} ${conv || ''}` : null],
       ['Vibrations', vibTxt], ['Excited states', data.excitedStates && data.excitedStates.length ? String(data.excitedStates.length) : null]]));
@@ -1365,6 +1633,23 @@
     if (data.cell) html += cellHtml(data.cell);
     if (data.warnings && data.warnings.length) html += `<div class="sec" id="sec-warn"><h3>Reader notes</h3><ul class="warnings">${data.warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul></div>`;
     return html;
+  }
+
+  /** What was loaded of a big file (issue #7), with "Load other parts…" when the file can be read again. */
+  function loadedHtml(d) {
+    const L = d.data.meta && d.data.meta.loaded, T = d.trajLoad, rows = [];
+    const how = s => (s.mode === 'every' ? 'every ' + ordinal(s.n) : s.mode === 'last' ? 'the last ' + s.n : s.mode === 'range' ? s.from + '–' + (s.to || '…') : '');
+    if (L && L.steps) {
+      const s = L.steps;
+      rows.push([s.frames ? 'Frames' : 'Geometries', `${s.loaded.toLocaleString()} of ${s.total.toLocaleString()}` + (how(s) ? ' (' + how(s) + ')' : '') +
+        (!s.frames && s.loaded < s.total ? '; the plots show the energies of every step' : '')]);
+    }
+    if (L && L.modes) rows.push(['Displacements', L.modes.loaded >= L.modes.total ? `all ${L.modes.total.toLocaleString()} vibrations` : `${L.modes.loaded.toLocaleString()} of ${L.modes.total.toLocaleString()} vibrations`]);
+    if (L && L.bytes) rows.push(['Memory', 'about ' + MBs1(L.bytes) + ' in number arrays']);
+    if (T) rows.push(['Frames of ' + esc(T.name), `${T.count.toLocaleString()} of ${T.total.toLocaleString()}` + (T.stride > 1 ? ` (every ${ordinal(T.stride)})` : T.count < T.total ? ` (${T.first + 1}–${T.last + 1})` : '')]);
+    if (!rows.length) return '';
+    const can = !!(d.loadSource || (T && T.reload));
+    return `<div class="sec" id="sec-loaded"><h3>Loaded part of the file</h3>${kv(rows)}${can ? '<div class="btnrow" style="margin-top:6px"><button class="btn small" data-act="reload-part" title="Choose again what to load and read the file again">Load other parts…</button></div>' : ''}</div>`;
   }
 
   /** Everything the file holds, with counts; each entry jumps to its tab or plot. */
@@ -1495,7 +1780,11 @@
   function panelVib(d) {
     const v = d.data.vibrations;
     const hasIR = !!v.ir, hasR = !!v.raman, hasSym = v.sym && v.sym.some(Boolean);
-    const rows = v.freqs.map((f, i) => `<tr class="row" data-i="${i}"><td>${i + 1}</td><td class="${f < 0 ? 'imag' : ''}">${f < 0 ? Math.abs(f).toFixed(2) + 'i' : f.toFixed(2)}</td>${hasSym ? `<td class="dim">${esc(v.sym[i] || '')}</td>` : ''}${hasIR ? `<td>${fx(v.ir[i], 2)}</td>` : ''}${hasR ? `<td>${fx(v.raman[i], 2)}</td>` : ''}</tr>`).join('');
+    // huge outputs (QM/MM frequencies): a window of rows around the selected mode
+    const nV = v.freqs.length, W = 2000, lo = nV <= W ? 0 : Math.max(0, Math.min(nV - W, (d.vibIndex < 0 ? 0 : d.vibIndex) - W / 2)), hi = Math.min(nV, lo + W);
+    const partial = v.modesLoaded !== undefined && v.modesLoaded < nV;
+    const hasMode = i => (v.modes && v.modes.has ? v.modes.has(i) : !!v.modes[i]);
+    const rows = v.freqs.slice(lo, hi).map((f, i0) => { const i = lo + i0; return `<tr class="row${partial && !hasMode(i) ? ' nodisp' : ''}" data-i="${i}"${partial && !hasMode(i) ? ' title="Displacements not loaded"' : ''}><td>${i + 1}</td><td class="${f < 0 ? 'imag' : ''}">${f < 0 ? Math.abs(f).toFixed(2) + 'i' : f.toFixed(2)}</td>${hasSym ? `<td class="dim">${esc(v.sym[i] || '')}</td>` : ''}${hasIR ? `<td>${fx(v.ir[i], 2)}</td>` : ''}${hasR ? `<td>${fx(v.raman[i], 2)}</td>` : ''}</tr>`; }).join('');
     return `<div class="sec">
       <div class="controls">
         <label class="field"><span>Amplitude</span><input type="range" data-vib="amplitude" min="0.05" max="1.2" step="0.05" value="${state.vib.amplitude}"><output>${state.vib.amplitude.toFixed(2)} Å</output></label>
@@ -1730,7 +2019,8 @@
     const d = state.active, v = d && d.data.vibrations;
     if (!v || d.vibIndex < 0) return;
     const amt = parseFloat($('#disp-amt') ? $('#disp-amt').value : '0.15') || 0.15;
-    const mode = d.vibIndex, u = geom.normalizedMode(v.modes[mode], amt * sign);
+    const mode = d.vibIndex, u = vibVec(d, mode, amt * sign);
+    if (!u) return toast(NOT_LOADED, true);
     const eq = d.data.frames[v.frameIndex];
     stopAnim(true);
     const nf = { Z: eq.Z.slice(), xyz: Float64Array.from(eq.xyz, (x, i) => x + u[i]), energy: null, energies: null, label: `ν${mode + 1} ${sign > 0 ? '+' : '−'}${amt}`, converged: false, opt: null, atomNames: null, resNames: null, resIds: null, edited: true };
@@ -1767,6 +2057,7 @@
     const opt = c.isOpt && c.steps.length >= 2;
     if (opt) {
       const items = c.series.map(x => ['opt:' + x.key, x.label + (x.unit ? ' (' + x.unit + ')' : '')]);
+      if (c.components.length) items.splice(Math.min(2, items.length), 0, ['opt:parts', 'Energy components (ΔE vs final)']);
       if (c.ratios.length) items.push(['opt:all', 'All criteria / threshold']);
       g.push(['Optimisation', items]);
     }
@@ -1857,6 +2148,18 @@
     return null;
   }
   const csvNum = v => (isNum(v) ? String(v) : '');
+  /** CSV rows follow the zoom of the plot (issue #9): inZ(z) tests x (or y, for the orbital levels) against what is shown. */
+  function inZ(z, axis) {
+    if (!z) return () => true;
+    const a = axis === 'y' ? z.y0 : z.x0, b = axis === 'y' ? z.y1 : z.x1, tol = (b - a) * 1e-9;
+    return v => isNum(v) && v >= a - tol && v <= b + tol;
+  }
+  /** Adds a line under the title of a zoomed CSV saying which rows it holds. */
+  function zoomCSV(text, z, what, axis) {
+    if (!z) return text;
+    const a = axis === 'y' ? z.y0 : z.x0, b = axis === 'y' ? z.y1 : z.x1, i = text.indexOf('\n') + 1;
+    return text.slice(0, i) + `# zoomed in: only ${what} from ${+a.toPrecision(7)} to ${+b.toPrecision(7)}\n` + text.slice(i);
+  }
   const fmtCrit = (key, v) => (!isNum(v) ? '—' : key === 'energy' ? v.toFixed(6) + ' Eh' : key === 'dE' ? v.toFixed(3) + ' kcal/mol' : key === 'rmsd' || key === 'maxStep' ? v.toFixed(4) + ' Å' : v.toExponential(3));
   /** {spec, csv()} for the document's current plot. */
   function buildPlot(d) {
@@ -1867,7 +2170,7 @@
       const xs = pts.map(p => p.x);
       return {
         spec: { xRange: [Math.min(...xs) - 0.5, Math.max(...xs) + 0.5], integerX: true, xLabel: 'Geometry', yLabel: `ΔE (${u})`, points: pts, selected: d.frameIndex, xFormat: x => 'Geometry ' + Math.round(x) },
-        csv: () => `# BlueMolecule energy profile: ${d.name}\ngeometry,energy_hartree,delta_${d.spec.energy.unit}\n` + vis.filter(i => isNum(fr[i].energy)).map(i => `${i + 1},${fr[i].energy.toFixed(10)},${energyIn(d, fr[i].energy, ref).toFixed(6)}`).join('\n') + '\n'
+        csv: z => { const ok = inZ(z); return zoomCSV(`# BlueMolecule energy profile: ${d.name}\ngeometry,energy_hartree,delta_${d.spec.energy.unit}\n` + vis.filter(i => isNum(fr[i].energy) && ok(i + 1)).map(i => `${i + 1},${fr[i].energy.toFixed(10)},${energyIn(d, fr[i].energy, ref).toFixed(6)}`).join('\n') + '\n', z, 'geometries'); }
       };
     }
     if (t.startsWith('opt:')) return optPlot(d, t.slice(4));
@@ -1891,13 +2194,16 @@
         selected, peakFormat: uvLike ? (x => (s.unit === 'eV' ? x.toFixed(2) : Math.round(x).toString())) : null,
         xFormat: uvLike ? (x => (s.unit === 'eV' ? x.toFixed(3) + ' eV' : x.toFixed(1) + ' nm')) : (x => x.toFixed(1) + ' cm⁻¹')
       },
-      csv: () => {
+      csv: z => {
+        const ok = inZ(z);
         const head = t === 'uv' ? `# BlueMolecule UV-Vis spectrum: ${d.name}; Gaussian sigma = ${s.sigma} eV\n${s.unit === 'eV' ? 'energy_eV' : 'wavelength_nm'},epsilon_L_per_mol_cm`
           : t === 'ecd' ? `# BlueMolecule ECD spectrum: ${d.name}; Gaussian sigma = ${s.sigma} eV\n${s.unit === 'eV' ? 'energy_eV' : 'wavelength_nm'},delta_epsilon_L_per_mol_cm`
             : `# BlueMolecule ${t === 'ir' ? 'IR' : 'Raman'} spectrum: ${d.name}; ${s.shape} FWHM = ${s.fwhm} cm-1; scale = ${s.scale}\nwavenumber_cm-1,${t === 'ir' ? (s.yMode === 'epsilon' ? 'epsilon_L_per_mol_cm' : 'relative_absorbance') : 'relative_' + s.yMode}`;
-        return head + '\n' + Array.from(r.curve.x, (x, i) => `${x.toFixed(4)},${r.curve.y[i].toExponential(6)}`).join('\n') +
+        const rows = [];
+        for (let i = 0; i < r.curve.x.length; i++) if (ok(r.curve.x[i])) rows.push(`${r.curve.x[i].toFixed(4)},${r.curve.y[i].toExponential(6)}`);
+        return zoomCSV(head + '\n' + rows.join('\n') +
           '\n\n# sticks\n' + (t === 'uv' ? 'state,x,oscillator_strength\n' : t === 'ecd' ? 'state,x,rotatory_strength_1e-40_cgs\n' : `mode,wavenumber_cm-1,${t === 'ir' ? 'intensity_km_per_mol' : 'raman_' + s.yMode}\n`) +
-          r.sticks.map(p => `${uvLike ? p.id : p.id + 1},${p.x.toFixed(4)},${p.y.toExponential(6)}`).join('\n') + '\n';
+          r.sticks.filter(p => ok(p.x)).map(p => `${uvLike ? p.id : p.id + 1},${p.x.toFixed(4)},${p.y.toExponential(6)}`).join('\n') + '\n', z, uvLike ? (s.unit === 'eV' ? 'energies (eV)' : 'wavelengths (nm)') : 'wavenumbers (cm-1)');
       }
     };
   }
@@ -1910,15 +2216,29 @@
       const lines = c.ratios.map(r => ({ name: r.label, pts: steps.map((s, k) => (isNum(r.values[k]) && r.values[k] > 0 ? { x: s.n, y: r.values[k], id: s.frame, mark: k === c.converged, label: `${s.label} · ${r.label} = ${r.values[k].toPrecision(3)} × threshold` } : null)).filter(Boolean) }));
       return {
         spec: Object.assign(base, { yLabel: 'Criterion / threshold', logY: true, lines, hlines: [{ y: 1, label: 'converged below 1' }] }),
-        csv: () => head + [unitWord, 'frame'].concat(c.ratios.map(r => r.key + '_over_threshold')).join(',') + '\n' + steps.map((s, k) => [s.n, s.frame === null ? '' : s.frame + 1].concat(c.ratios.map(r => csvNum(r.values[k]))).join(',')).join('\n') + '\n'
+        csv: z => { const ok = inZ(z); return zoomCSV(head + [unitWord, 'frame'].concat(c.ratios.map(r => r.key + '_over_threshold')).join(',') + '\n' + steps.map((s, k) => (ok(s.n) ? [s.n, s.frame === null ? '' : s.frame + 1].concat(c.ratios.map(r => csvNum(r.values[k]))).join(',') : null)).filter(x => x !== null).join('\n') + '\n', z, unitWord + 's'); }
+      };
+    }
+    if (key === 'parts') {   // the total and the QM/MM or ONIOM components, each relative to its own last value
+      const tot = c.series.find(x => x.key === 'energy');
+      const all = [{ key: 'total', label: 'Total', values: tot ? tot.values : [] }].concat(c.components);
+      const lines = all.map(cp => {
+        const last = [...cp.values].reverse().find(isNum);
+        return { name: cp.label, pts: steps.map((s, k) => (isNum(cp.values[k]) ? { x: s.n, y: (cp.values[k] - last) * HARTREE.kcal, id: s.frame, mark: k === c.converged,
+          label: `${s.label} · ${cp.label}: ${cp.values[k].toFixed(8)} Eh (${((cp.values[k] - last) * HARTREE.kcal).toFixed(3)} kcal/mol vs final)` } : null)).filter(Boolean) };
+      });
+      return {
+        spec: Object.assign(base, { yLabel: 'ΔE vs final (kcal/mol)', lines }),
+        csv: z => { const ok = inZ(z); return zoomCSV(head + [unitWord, 'frame'].concat(all.map(cp => cp.key.replace(/[^A-Za-z0-9]+/g, '_') + '_hartree')).join(',') + '\n' +
+          steps.map((s, k) => (ok(s.n) ? [s.n, s.frame === null ? '' : s.frame + 1].concat(all.map(cp => csvNum(cp.values[k]))).join(',') : null)).filter(x => x !== null).join('\n') + '\n', z, unitWord + 's'); }
       };
     }
     const ser = c.series.find(x => x.key === key);
     const log = ser.log && d.spec.opt.log;
-    const pts = steps.map((s, k) => ({ x: s.n, y: ser.values[k], id: s.frame, mark: k === c.converged, label: `${s.label} · ${ser.label} = ${fmtCrit(key, ser.values[k])}${ser.threshold ? ' (threshold ' + ser.threshold.toExponential(1) + ')' : ''}` })).filter(p => isNum(p.y) && (!log || p.y > 0));
+    const pts = steps.map((s, k) => ({ x: s.n, y: ser.values[k], id: s.frame, mark: k === c.converged, label: `${s.label}${s.frame === null ? ' (geometry not loaded)' : ''} · ${ser.label} = ${fmtCrit(key, ser.values[k])}${ser.threshold ? ' (threshold ' + ser.threshold.toExponential(1) + ')' : ''}` })).filter(p => isNum(p.y) && (!log || p.y > 0));
     return {
       spec: Object.assign(base, { yLabel: ser.label + (ser.unit ? ' (' + ser.unit + ')' : ''), logY: log, points: pts, hlines: ser.threshold ? [{ y: ser.threshold, label: 'threshold ' + ser.threshold.toExponential(1) }] : [] }),
-      csv: () => head + `${unitWord},frame,${key}${ser.unit ? '_' + ser.unit.replace(/[^A-Za-z]+/g, '_') : ''}${ser.threshold ? ',threshold' : ''}\n` + steps.map((s, k) => [s.n, s.frame === null ? '' : s.frame + 1, csvNum(ser.values[k])].concat(ser.threshold ? [ser.threshold] : []).join(',')).join('\n') + '\n'
+      csv: z => { const ok = inZ(z); return zoomCSV(head + `${unitWord},frame,${key}${ser.unit ? '_' + ser.unit.replace(/[^A-Za-z]+/g, '_') : ''}${ser.threshold ? ',threshold' : ''}\n` + steps.map((s, k) => (ok(s.n) ? [s.n, s.frame === null ? '' : s.frame + 1, csvNum(ser.values[k])].concat(ser.threshold ? [ser.threshold] : []).join(',') : null)).filter(x => x !== null).join('\n') + '\n', z, unitWord + 's'); }
     };
   }
   function profilePlot(d, kind) {
@@ -1929,7 +2249,7 @@
     const integer = /point|step/i.test(p.xLabel);
     return {
       spec: { xRange: integer ? [lo - 0.5, hi + 0.5] : [lo - pad, hi + pad], integerX: integer, xLabel: p.xLabel, yLabel: `ΔE (${UNIT_LABEL[u]})`, points: pts, selected: d.frameIndex, xFormat: x => p.xLabel.replace(/ \(.*\)$/, '') + ' ' + (integer ? Math.round(x) : x.toFixed(3)) },
-      csv: () => `# BlueMolecule ${kind === 'scan' ? 'scan' : 'IRC'} profile: ${d.name}\n${p.xLabel.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '')},frame,energy_hartree,delta_${u}\n` + p.points.map(q => `${q.x},${q.frame === null ? '' : q.frame + 1},${q.energy.toFixed(10)},${((q.energy - ref) * HARTREE[u]).toFixed(6)}`).join('\n') + '\n'
+      csv: z => { const ok = inZ(z); return zoomCSV(`# BlueMolecule ${kind === 'scan' ? 'scan' : 'IRC'} profile: ${d.name}\n${p.xLabel.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '')},frame,energy_hartree,delta_${u}\n` + p.points.filter(q => ok(q.x)).map(q => `${q.x},${q.frame === null ? '' : q.frame + 1},${q.energy.toFixed(10)},${((q.energy - ref) * HARTREE[u]).toFixed(6)}`).join('\n') + '\n', z, 'points with ' + p.xLabel); }
     };
   }
   function nmrPlot(d) {
@@ -1943,7 +2263,7 @@
     const sel = d.selection.length ? d.selection[d.selection.length - 1] : null, selStick = sticks.find(p => p.atoms.indexOf(sel) >= 0);
     return {
       spec: { xRange: [lo - pad, hi + pad], reverseX: shift, xLabel: shift ? `δ(${lab}) (ppm, σref = ${s.ref})` : `Isotropic shielding σ(${lab}) (ppm)`, yLabel: 'Nuclei', sticks, showSticks: true, peakLabels: s.peaks, peakThreshold: 0, maxPeakLabels: 24, peakFormat: x => x.toFixed(2), selected: selStick ? selStick.id : null, xFormat: x => x.toFixed(2) + ' ppm' },
-      csv: () => `# BlueMolecule NMR sticks: ${d.name}; nucleus ${lab}${shift ? '; reference shielding ' + s.ref + ' ppm' : ''}\natoms,shielding_ppm,${shift ? 'shift_ppm,' : ''}count\n` + st.map(p => `"${names(p.atoms)}",${p.sigma.toFixed(4)},${shift ? p.x.toFixed(4) + ',' : ''}${p.count}`).join('\n') + '\n'
+      csv: z => { const ok = inZ(z); return zoomCSV(`# BlueMolecule NMR sticks: ${d.name}; nucleus ${lab}${shift ? '; reference shielding ' + s.ref + ' ppm' : ''}\natoms,shielding_ppm,${shift ? 'shift_ppm,' : ''}count\n` + st.filter(p => ok(p.x)).map(p => `"${names(p.atoms)}",${p.sigma.toFixed(4)},${shift ? p.x.toFixed(4) + ',' : ''}${p.count}`).join('\n') + '\n', z, shift ? 'shifts (ppm)' : 'shieldings (ppm)'); }
     };
   }
   function moLabel(d, id) {
@@ -1972,7 +2292,7 @@
     const gaps = cols.map((c, ci) => (c.homo >= 0 && c.lumo >= 0 ? { col: ci, from: c.levels[c.homo].e * EV, to: c.levels[c.lumo].e * EV, text: ((c.levels[c.lumo].e - c.levels[c.homo].e) * EV).toFixed(2) + ' eV' } : null)).filter(Boolean);
     return {
       spec: { type: 'levels', columns, gaps, yRange: [lo, hi], yLabel: 'Orbital energy (eV)', selected: d.moSel },
-      csv: () => `# BlueMolecule orbital energies: ${d.name}\nspin,index,energy_hartree,energy_eV,occupied\n` + cols.map(c => c.levels.map(l => `${c.spin},${l.index},${l.e},${(l.e * EV).toFixed(6)},${l.occ ? 1 : 0}`).join('\n')).join('\n') + '\n'
+      csv: z => { const ok = inZ(z, 'y'); return zoomCSV(`# BlueMolecule orbital energies: ${d.name}\nspin,index,energy_hartree,energy_eV,occupied\n` + cols.map(c => c.levels.filter(l => ok(l.e * EV)).map(l => `${c.spin},${l.index},${l.e},${(l.e * EV).toFixed(6)},${l.occ ? 1 : 0}`).join('\n')).filter(Boolean).join('\n') + '\n', z, 'orbital energies (eV)', 'y'); }
     };
   }
   function chargePlot(d) {
@@ -1982,8 +2302,18 @@
     const bars = q.map((v, i) => ({ x: i + 1, y: v, id: i, label: `${lab(i)} · ${d.chargeScheme} q = ${fx(v, 4)}`, color: v >= 0 ? '#e8684a' : '#4f8cff' }));
     return {
       spec: { xRange: [0.4, q.length + 0.6], bars, barWidth: 0.72, xTickLabels: q.map((_, i) => ({ x: i + 1, label: lab(i) })), xLabel: 'Atom', yLabel: `${d.chargeScheme} charge (e)`, selected: d.selection.length ? d.selection[d.selection.length - 1] : null },
-      csv: () => `# BlueMolecule atomic charges: ${d.name}; scheme ${d.chargeScheme}\natom,element,charge\n` + q.map((v, i) => `${i + 1},${Z[i] > 0 ? el.symbol(Z[i]) : 'X'},${v}`).join('\n') + '\n'
+      csv: z => { const ok = inZ(z); return zoomCSV(`# BlueMolecule atomic charges: ${d.name}; scheme ${d.chargeScheme}\natom,element,charge\n` + q.map((v, i) => (ok(i + 1) ? `${i + 1},${Z[i] > 0 ? el.symbol(Z[i]) : 'X'},${v}` : null)).filter(x => x !== null).join('\n') + '\n', z, 'atoms'); }
     };
+  }
+  /** The plot settings that change what an axis means (a unit, a reference, log or linear) or set its range: a zoom
+   *  starts again when one of them changes, and is kept through the others (a line width, a scale factor, labels). */
+  const ZOOM_SETTINGS = { ir: ['yMode', 'xmin', 'xmax'], raman: ['yMode', 'xmin', 'xmax'], uv: ['unit', 'xmin', 'xmax'], ecd: ['unit', 'xmin', 'xmax'],
+    energy: ['unit', 'ref'], opt: ['log'], nmr: ['z', 'ref'], mo: ['window'] };
+  /** Names a plot for its zoom (issue #9): the zoom is kept while the same plot is redrawn (a selection, a running
+   *  job's new steps, another line width) and starts again for another file, plot, job or axis setting. */
+  function zoomKey(d) {
+    const t = d.plotType, k = specKey(t), s = d.spec[k];
+    return [d.id, t, d.job].concat((ZOOM_SETTINGS[k] || []).map(n => (s ? String(s[n]) : ''))).join('|');
   }
   function renderPlotDraw() {
     const d = state.active;
@@ -1991,13 +2321,20 @@
     let r;
     try { r = buildPlot(d); } catch (e) { console.error(e); r = { spec: { empty: 'This plot could not be drawn: ' + e.message }, csv: null }; }
     d._plotCsv = r.csv || null;
+    r.spec.zoomKey = zoomKey(d);
     plot.set(r.spec);
   }
   function plotCSV() {
     const d = state.active; if (!d || !d.plotType) return;
     let r;
     try { r = buildPlot(d); } catch (e) { toast(e.message, true); return; }
-    if (r.csv) saveFile(`${baseName(d)}_${d.plotType.replace(':', '_')}.csv`, r.csv(), 'text/csv');
+    if (r.csv) saveFile(`${baseName(d)}_${d.plotType.replace(':', '_')}.csv`, r.csv(plot.zoomed()), 'text/csv');
+  }
+  /** The zoom buttons show whether the plot is zoomed: the exports then hold only what is shown. */
+  function onPlotZoom(zoomed) {
+    const fit = $('#btn-plot-fit'), out = $('#btn-plot-zoom-out');
+    if (fit) { fit.classList.toggle('on', zoomed); fit.disabled = !zoomed; }
+    if (out) out.disabled = !zoomed;
   }
 
   // ---------------- dialogs ----------------
@@ -2189,7 +2526,8 @@
   function exportVibration() {
     const d = state.active, v = d && d.data.vibrations;
     if (!v || d.vibIndex < 0) return toast('Select a vibration first (Vibrations tab).', true);
-    const eq = d.data.frames[v.frameIndex], u = geom.normalizedMode(v.modes[d.vibIndex], state.vib.amplitude), N = 20, frames = [];
+    const eq = d.data.frames[v.frameIndex], u = vibVec(d, d.vibIndex, state.vib.amplitude), N = 20, frames = [];
+    if (!u) return toast(NOT_LOADED, true);
     const f = v.freqs[d.vibIndex];
     for (let k = 0; k < N; k++) {
       const s = Math.sin(2 * Math.PI * k / N);
@@ -2345,14 +2683,16 @@
       ${h('Contents and plots')}
       <div class="keys">
         ${k('Info → Contents', 'Everything in the file with counts; click an entry to open its tab or plot. Several jobs: pick one to restrict steps and plots')}
-        ${k('Plot picker', 'Optimisation: energy, ΔE vs final, each criterion with its threshold (log scale), RMSD to the final geometry, largest atomic step, all criteria / threshold')}
+        ${k('Plot picker', 'Optimisation: energy, ΔE vs final, QM/MM or ONIOM energy components, each criterion with its threshold (log scale), RMSD to the final geometry, largest atomic step, all criteria / threshold')}
         ${k('', 'Scan / IRC energy profiles · IR, Raman, UV-Vis, ECD (Δε from rotatory strengths), NMR (shieldings, or shifts δ = σref − σ) · MO level diagram · atomic charges')}
         ${k('Click the plot', 'Select a geometry, mode, state, level, atom or NMR signal; CSV, PNG and SVG export the current plot')}
+        ${k('Drag on the plot', 'Zoom into the box (a flat box: x only); the magnifiers zoom in, out and fit; double-click shows the whole plot. Exports follow the zoom')}
       </div>
       ${h('Files')}
       <div class="keys">
         ${k('Open', FORMAT_SUMMARY)}
-        ${k('MD files', 'Open a topology (prmtop, PSF) or structure first, then coordinates or trajectories (inpcrd, DCD, TRR, XTC) with the same atom count')}
+        ${k('MD files', 'Open a topology (prmtop, PSF) or structure first, then coordinates or trajectories (inpcrd, Amber NetCDF, DCD, TRR, XTC) with the same atom count')}
+        ${k('Files of 1 GB+', 'A dialog asks what to load: every Nth step or frame, a range or the last N, and which vibrations; Info → Load other parts… reads it again')}
         ${k('Other formats', 'Converted with Open Babel when the BlueMolecule app or launcher finds obabel')}
         ${k('Export', 'Save as… (structure, crystal, MD and QC formats, plus Open Babel), calculation inputs for ten programs, images, vibration animations')}
       </div>
@@ -2467,9 +2807,13 @@
         case 'view-z': R.viewAlong('z'); break;
         case 'view-center-sel': { const d = state.active; if (d && d.selection.length) R.centerOn(d.selection[d.selection.length - 1]); break; }
         case 'plot-csv': plotCSV(); break;
+        case 'plot-zoom-in': plot.zoomIn(); break;
+        case 'plot-zoom-out': plot.zoomOut(); break;
+        case 'plot-zoom-fit': plot.fit(); break;
         case 'plot-png': if (state.active && state.active.plotType) { const nm = `${baseName(state.active)}_${state.active.plotType.replace(':', '_')}.png`; plot.toPNG(2).then(b => saveFile(nm, b, 'image/png')); } break;
         case 'plot-svg': if (state.active && state.active.plotType) saveFile(`${baseName(state.active)}_${state.active.plotType.replace(':', '_')}.svg`, plot.toSVG(960, 440), 'image/svg+xml'); break;
         case 'displace-plus': displace(1); break;
+        case 'reload-part': reloadPart(state.active); break;
         case 'displace-minus': displace(-1); break;
         case 'edit-set': editSet(); break;
         case 'edit-element': editElement(); break;
@@ -2524,7 +2868,7 @@
         else {
           state.vib[k] = parseFloat(t.value);
           if (t.nextElementSibling) t.nextElementSibling.textContent = k === 'amplitude' ? state.vib.amplitude.toFixed(2) + ' Å' : state.vib.speed.toFixed(1) + '×';
-          if (k === 'amplitude' && d.vibIndex >= 0) { d._vibVec = geom.normalizedMode(d.data.vibrations.modes[d.vibIndex], state.vib.amplitude); refreshArrows(); }
+          if (k === 'amplitude' && d.vibIndex >= 0) { d._vibVec = vibVec(d, d.vibIndex, state.vib.amplitude); refreshArrows(); }
           renderPlaybar();
         }
         savePrefs();
@@ -2590,7 +2934,7 @@
       const t = e.target, k = t.dataset.pb, d = state.active; if (!d) return;
       if (k === 'frame') { const vis = visibleFrames(d); setFrame(d, vis[+t.value]); }
       else if (k === 'fps') state.fps = +t.value;
-      else if (k === 'amp') { state.vib.amplitude = +t.value; if (d.vibIndex >= 0) { d._vibVec = geom.normalizedMode(d.data.vibrations.modes[d.vibIndex], state.vib.amplitude); refreshArrows(); } savePrefs(); }
+      else if (k === 'amp') { state.vib.amplitude = +t.value; if (d.vibIndex >= 0) { d._vibVec = vibVec(d, d.vibIndex, state.vib.amplitude); refreshArrows(); } savePrefs(); }
       else if (k === 'speed') { state.vib.speed = +t.value; savePrefs(); }
     });
     panel.addEventListener('keydown', e => { if (displayKey(e)) return; ui.panelKey(e); });
@@ -2695,6 +3039,7 @@
     try { R = new BM.Renderer($('#gl'), $('#overlay')); }
     catch (e) { $('#empty .empty-card p').textContent = e.message; console.error(e); return; }
     plot = new BM.Plot($('#plot'));
+    plot.onZoom = onPlotZoom;
     ui = BM.buildUI.create({
       state, R: () => R, esc, fx, toast, status, setHint, curFrame, topoFor, bondsFor, ordersFor, topoFrame, measurement,
       doEdit, beginContinuousEdit, endContinuousEdit, afterPositions, frameMol, commitMol, addBuiltDoc,
@@ -2709,7 +3054,7 @@
     ui.setTool('navigate', true);
     $('#formats').innerHTML = '<b>QC</b> Gaussian, ORCA, GAMESS, NWChem, Q-Chem, Psi4, xtb, MOPAC, CP2K, Turbomole, fchk, Molden, cube<br>' +
       '<b>Structures</b> XYZ, MOL/SDF, PDB, mmCIF, CIF, Mol2, CML, CJSON, VASP, QE, CASTEP, XSF, GRO, LAMMPS<br>' +
-      '<b>MD</b> prmtop/PSF + inpcrd, DCD, TRR, XTC · .gz · others via Open Babel';
+      '<b>MD</b> prmtop/PSF + inpcrd, DCD, TRR, XTC, Amber NetCDF · .gz · others via Open Babel';
     const mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
     $$('[data-act="save-as"] kbd').forEach(k => { k.textContent = mac ? '⇧⌘S' : 'Ctrl+Shift+S'; });
     if (BM.native && typeof BM.native.onOpenFile === 'function') {

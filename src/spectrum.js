@@ -122,29 +122,129 @@
    *   hlines [{y, label, color}]                   dashed horizontal lines (thresholds)
    *   bars   [{x, y, id, label, color}], barWidth, xTickLabels [{x, label}]
    *   type: 'levels', columns [{name, levels: [{y, occ, id, label, tag}]}], gaps [{col, from, to, text}]
-   * onPick(id, item) is called when a point, stick, bar or level is clicked. */
+   * onPick(id, item) is called when a point, stick, bar or level is clicked.
+ * Zoom (issue #9): drag a box on the plot to zoom into it; zoomIn(), zoomOut() and fit() (the magnifier buttons);
+ * a double-click fits again. The zoom of each plot is kept while its data is redrawn: spec.zoomKey names the plot
+ * (a new key starts unzoomed). The PNG and SVG exports draw what is shown; zoomed() gives the visible ranges.
+ * onZoom(zoomed) is called when the zoom changes. */
   class Plot {
     constructor(canvas) {
       this.canvas = canvas; this.ctx = canvas.getContext('2d');
-      this.spec = null; this.hover = null; this.onPick = null;
+      this.spec = null; this.hover = null; this.onPick = null; this.onZoom = null;
       this.m = { l: 64, r: 18, t: 16, b: 40 };
+      this.zooms = new Map(); this.box = null; this.dragged = false;
       canvas.addEventListener('mousemove', e => this._move(e));
       canvas.addEventListener('mouseleave', () => { this.hover = null; this.draw(); });
+      canvas.addEventListener('mousedown', e => this._down(e));
+      window.addEventListener('mousemove', e => { if (this.box) this._drag(e); });
+      window.addEventListener('mouseup', e => { if (this.box) this._up(e); });
       canvas.addEventListener('click', e => this._click(e));
+      canvas.addEventListener('dblclick', e => { if (this.zoom) { e.preventDefault(); this.fit(); } });
       if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => this.draw()).observe(canvas.parentElement);
     }
-    set(spec) { this.spec = spec; this.hover = null; this.draw(); }
+    set(spec) {
+      this.spec = spec; this.hover = null;
+      // a kept zoom that no longer overlaps the data (another range, unit or file) is dropped
+      const z = this.zoom;
+      if (z && spec && !spec.empty) {
+        const F = this._ranges(this._full().L);
+        if (z.x1 < F.x0 || z.x0 > F.x1 || z.y1 < F.y0 || z.y0 > F.y1) this.zoom = null;
+      }
+      if (this.onZoom) this.onZoom(!!this.zoom);
+      this.draw();
+    }
+    /** The zoom of the plot shown ({x0, x1, y0, y1} in data units, x0 < x1, y0 < y1), or null. */
+    get zoom() { const k = this.spec && this.spec.zoomKey; return k !== undefined && k !== null ? this.zooms.get(k) || null : this._z || null; }
+    set zoom(z) {
+      const k = this.spec && this.spec.zoomKey;
+      if (k !== undefined && k !== null) { this.zooms.delete(k); if (z) this.zooms.set(k, z); if (this.zooms.size > 200) this.zooms.delete(this.zooms.keys().next().value); } else this._z = z;
+      if (this.onZoom) this.onZoom(!!z);
+    }
+    zoomed() { return this.zoom; }
+    /** The layout of the whole plot (as drawn without zoom). */
+    _full() { this._z0 = true; try { return { L: this._layout(this.canvas.clientWidth || 600, this.canvas.clientHeight || 300) }; } finally { this._z0 = false; } }
+    zoomIn(f) { this._scale(f || 0.5); }
+    zoomOut(f) { this._scale(1 / (f || 0.5)); }
+    /** Zoom around the centre of the view by k (k < 1 zooms in). Zooming out stops at the whole plot. */
+    _scale(k) {
+      const s = this.spec;
+      if (!s || s.empty) return;
+      const F = this._ranges(this._full().L), z = this.zoom || F;
+      let x0 = z.x0, x1 = z.x1, y0, y1;
+      if (s.type !== 'levels') { const cx = (z.x0 + z.x1) / 2, hx = (z.x1 - z.x0) / 2 * k; x0 = cx - hx; x1 = cx + hx; }
+      if (s.logY) { const a = Math.log10(z.y0), b = Math.log10(z.y1), c = (a + b) / 2, h = (b - a) / 2 * k; y0 = Math.pow(10, c - h); y1 = Math.pow(10, c + h); }
+      else { const cy = (z.y0 + z.y1) / 2, hy = (z.y1 - z.y0) / 2 * k; y0 = cy - hy; y1 = cy + hy; }
+      this._apply({ x0, x1, y0, y1 }, F);
+    }
+    /** Set a zoom, kept inside the whole plot; the whole plot (or more) is no zoom at all. */
+    _apply(z, F) {
+      const s = this.spec, lg = !!s.logY, eps = 1e-9;
+      const clamp = (a, b, lo, hi) => { const w = b - a; if (w >= (hi - lo) * (1 - eps)) return [lo, hi]; if (a < lo) return [lo, lo + w]; if (b > hi) return [hi - w, hi]; return [a, b]; };
+      let [x0, x1] = clamp(z.x0, z.x1, F.x0, F.x1), y0, y1;
+      if (lg) { const [a, b] = clamp(Math.log10(z.y0), Math.log10(z.y1), Math.log10(F.y0), Math.log10(F.y1)); y0 = Math.pow(10, a); y1 = Math.pow(10, b); }
+      else [y0, y1] = clamp(z.y0, z.y1, F.y0, F.y1);
+      if (s.type === 'levels') { x0 = F.x0; x1 = F.x1; }   // the columns are not an axis
+      // as far as the numbers allow: a millionth of the whole plot
+      const ySpan = lg ? Math.log10(y1) - Math.log10(y0) : y1 - y0, yFull = lg ? Math.log10(F.y1) - Math.log10(F.y0) : F.y1 - F.y0;
+      if (!(x1 - x0 > (F.x1 - F.x0) * 1e-6) || !(ySpan > yFull * 1e-6)) { this.draw(); return; }
+      const xs = F.x1 - F.x0, near = (a, b, w) => Math.abs(a - b) <= w * eps;
+      const whole = near(x0, F.x0, xs) && near(x1, F.x1, xs) && (lg ? near(Math.log10(y0), Math.log10(F.y0), yFull) && near(Math.log10(y1), Math.log10(F.y1), yFull) : near(y0, F.y0, yFull) && near(y1, F.y1, yFull));
+      this.zoom = whole ? null : { x0, x1, y0, y1 };
+      this.draw();
+    }
+    fit() { if (this.zoom) { this.zoom = null; this.draw(); } }
+    _ranges(L) { return { x0: Math.min(L.x0, L.x1), x1: Math.max(L.x0, L.x1), y0: Math.min(L.y0, L.y1), y1: Math.max(L.y0, L.y1) }; }
+    _inside(px, py) { const w = this.canvas.clientWidth, h = this.canvas.clientHeight; return px >= this.m.l && px <= w - this.m.r && py >= this.m.t && py <= h - this.m.b; }
+    _down(e) {
+      if (e.button !== 0 || !this.spec || this.spec.empty) return;
+      const r = this.canvas.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
+      if (!this._inside(px, py)) return;
+      // no text selection while a box is drawn; a number being typed in the plot controls is still committed
+      const a = document.activeElement;
+      if (a && a !== document.body && typeof a.blur === 'function') a.blur();
+      e.preventDefault();
+      this.box = { x0: px, y0: py, x1: px, y1: py, r };
+      this.dragged = false;
+    }
+    _drag(e) {
+      const b = this.box, w = this.canvas.clientWidth, h = this.canvas.clientHeight;
+      b.x1 = Math.max(this.m.l, Math.min(w - this.m.r, e.clientX - b.r.left));
+      b.y1 = Math.max(this.m.t, Math.min(h - this.m.b, e.clientY - b.r.top));
+      if (Math.abs(b.x1 - b.x0) > 5 || Math.abs(b.y1 - b.y0) > 5) this.dragged = true;
+      if (this.dragged) this.draw();
+    }
+    _up() {
+      const b = this.box;
+      this.box = null;
+      if (!this.dragged) return;
+      this.dragged = false;
+      // the click that follows the end of a box (dispatched right after this mouseup) is not a pick
+      this._swallow = true; setTimeout(() => { this._swallow = false; }, 0);
+      const w = this.canvas.clientWidth, h = this.canvas.clientHeight, L = this._layout(w, h);
+      // a narrow box zooms the x axis only (and y only for a flat one)
+      const dx = Math.abs(b.x1 - b.x0), dy = Math.abs(b.y1 - b.y0);
+      const X = px => L.x0 + (px - this.m.l) / L.pw * (L.x1 - L.x0);
+      const Yv = py => { const f = (this.m.t + L.ph - py) / L.ph; return this.spec.logY ? Math.pow(10, Math.log10(L.y0) + f * (Math.log10(L.y1) - Math.log10(L.y0))) : this.spec.invertY ? L.y1 - f * (L.y1 - L.y0) : L.y0 + f * (L.y1 - L.y0); };
+      const cur = this._ranges(L);
+      let x0 = Math.min(X(b.x0), X(b.x1)), x1 = Math.max(X(b.x0), X(b.x1)), y0 = Math.min(Yv(b.y0), Yv(b.y1)), y1 = Math.max(Yv(b.y0), Yv(b.y1));
+      if (dy <= 5) { y0 = cur.y0; y1 = cur.y1; }
+      if (dx <= 5 || this.spec.type === 'levels') { x0 = cur.x0; x1 = cur.x1; }
+      if (!(x1 > x0) || !(y1 > y0)) { this.draw(); return; }
+      this._apply({ x0, x1, y0, y1 }, this._ranges(this._full().L));
+    }
     _lines() {
       const s = this.spec;
       if (s.lines) return s.lines;
       return s.points && s.points.length ? [{ pts: s.points, main: true }] : [];
     }
     _layout(w, h) {
-      const s = this.spec, m = this.m;
+      const s = this.spec, m = this.m, z = this._z0 ? null : this.zoom;
       let [x0, x1] = s.xRange || [0, 1];
-      if (s.reverseX) [x0, x1] = [x1, x0];
+      if (z) { x0 = z.x0; x1 = z.x1; }
+      if (s.reverseX) [x0, x1] = [Math.max(x0, x1), Math.min(x0, x1)];
       let y0, y1;
-      if (s.yRange) [y0, y1] = s.yRange;
+      if (z) { y0 = z.y0; y1 = z.y1; }
+      else if (s.yRange) [y0, y1] = s.yRange;
       else {
         let mn = Infinity, mx = -Infinity;
         const add = v => { if (isFinite(v) && (!s.logY || v > 0)) { if (v < mn) mn = v; if (v > mx) mx = v; } };
@@ -178,6 +278,7 @@
     _stickScale(L) {
       const s = this.spec;
       if (!s.sticks || !s.sticks.length) return 1;
+      if (this.zoom && !this._z0) L = this._full().L;   // the sticks keep their height under a zoom
       const ms = Math.max(...s.sticks.map(p => Math.abs(p.y))) || 1;
       if (s.series && s.series.length) {
         const top = s.sticks.some(p => p.y < 0) ? Math.max(L.y1, -L.y0) * 0.85 : Math.max(L.y1 - (L.y1 - L.y0) * 0.12, 0);
@@ -194,17 +295,18 @@
     /** Items under the cursor: the nearest point, stick, bar or level (pixel distance). */
     _hit(px, py) {
       const s = this.spec; if (!s || s.empty) return null;
-      const w = this.canvas.clientWidth, h = this.canvas.clientHeight, L = this._layout(w, h);
+      const w = this.canvas.clientWidth, h = this.canvas.clientHeight, L = this._layout(w, h), m = this.m;
+      const inX = X => X >= m.l - 1 && X <= m.l + L.pw + 1, inY = Y => Y >= m.t - 1 && Y <= m.t + L.ph + 1;   // drawn, not zoomed away
       let best = null, bd = Infinity;
       if (s.type === 'levels') {
-        for (const g of this._levelGeom(L)) { const dx = px < g.x0 ? g.x0 - px : px > g.x1 ? px - g.x1 : 0, d = Math.hypot(dx * 2, g.y - py); if (d < bd && d < 12) { bd = d; best = g.item; } }
+        for (const g of this._levelGeom(L)) { if (!inY(g.y)) continue; const dx = px < g.x0 ? g.x0 - px : px > g.x1 ? px - g.x1 : 0, d = Math.hypot(dx * 2, g.y - py); if (d < bd && d < 12) { bd = d; best = g.item; } }
         return best;
       }
       const lines = this._lines();
       if (lines.length) {
         const multi = lines.length > 1;
         for (const ln of lines) for (const p of ln.pts) {
-          const X = L.X(p.x), Y = L.Y(p.y); if (!isFinite(Y)) continue;
+          const X = L.X(p.x), Y = L.Y(p.y); if (!isFinite(Y) || !inX(X) || !inY(Y)) continue;
           const d = multi ? Math.hypot(X - px, Y - py) : Math.abs(X - px);
           if (d < bd && d < (multi ? 14 : 9)) { bd = d; best = p; }
         }
@@ -212,25 +314,26 @@
       }
       if (s.bars && s.bars.length) {
         const bw = Math.abs(L.X((s.barWidth || 0.7) / 2) - L.X(0)) + 2;
-        for (const b of s.bars) { const d = Math.abs(L.X(b.x) - px); if (d < bd && d <= Math.max(bw, 4)) { bd = d; best = b; } }
+        for (const b of s.bars) { const X = L.X(b.x), d = Math.abs(X - px); if (inX(X) && d < bd && d <= Math.max(bw, 4)) { bd = d; best = b; } }
         return best;
       }
-      for (const p of s.sticks || []) { const d = Math.abs(L.X(p.x) - px); if (d < bd && d < 9) { bd = d; best = p; } }
+      for (const p of s.sticks || []) { const X = L.X(p.x), d = Math.abs(X - px); if (inX(X) && d < bd && d < 9) { bd = d; best = p; } }
       return best;
     }
     _move(e) {
-      if (!this.spec) return;
+      if (!this.spec || (this.box && this.dragged)) return;
       const r = this.canvas.getBoundingClientRect();
       const px = e.clientX - r.left, py = e.clientY - r.top;
       const hit = this._hit(px, py);
       const w = this.canvas.clientWidth, h = this.canvas.clientHeight, L = this._layout(w, h);
-      const inside = px >= this.m.l && px <= w - this.m.r && py >= this.m.t && py <= h - this.m.b;
+      const inside = this._inside(px, py);
       const xVal = L.x0 + (px - this.m.l) / L.pw * (L.x1 - L.x0);
       this.hover = inside ? { px, py, hit, xVal } : null;
       this.canvas.style.cursor = hit ? 'pointer' : 'crosshair';
       this.draw();
     }
     _click(e) {
+      if (this._swallow) { this._swallow = false; return; }   // the end of a zoom box, not a click
       const r = this.canvas.getBoundingClientRect();
       const hit = this._hit(e.clientX - r.left, e.clientY - r.top);
       if (hit && this.onPick && hit.id !== undefined && hit.id !== null) this.onPick(hit.id, hit);
@@ -248,6 +351,15 @@
       if (!s) return;
       if (s.empty) { ctx.fillStyle = th.fg; ctx.globalAlpha = 0.6; ctx.font = '13px ui-sans-serif, -apple-system, sans-serif'; ctx.textAlign = 'center'; ctx.fillText(s.empty, w / 2, h / 2); ctx.globalAlpha = 1; return; }
       this._render(new CanvasPainter(ctx), w, h, th);
+      if (this.box && this.dragged) {   // the zoom box being drawn, as it will zoom (a narrow box spans the other axis)
+        const b = this.box, m = this.m, pw = w - m.l - m.r, ph = h - m.t - m.b;
+        let x = Math.min(b.x0, b.x1), y = Math.min(b.y0, b.y1), bw = Math.abs(b.x1 - b.x0), bh = Math.abs(b.y1 - b.y0);
+        if (bw <= 5 || s.type === 'levels') { x = m.l; bw = pw; }
+        if (bh <= 5) { y = m.t; bh = ph; }
+        ctx.fillStyle = th.accent; ctx.globalAlpha = 0.14; ctx.fillRect(x, y, bw, bh); ctx.globalAlpha = 1;
+        ctx.strokeStyle = th.accent; ctx.lineWidth = 1; ctx.setLineDash([4, 3]); ctx.strokeRect(x + 0.5, y + 0.5, bw - 1, bh - 1); ctx.setLineDash([]);
+        return;
+      }
       if (this.hover) {
         const hv = this.hover;
         ctx.strokeStyle = th.grid; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
@@ -280,12 +392,15 @@
         const cols = s.columns || [];
         cols.forEach((c, i) => P.text(c.name, m.l + L.pw * (i + 0.5) / cols.length, m.t + L.ph + 16, th.fg, 12, 'center'));
       } else if (s.xTickLabels) {
-        const labs = s.xTickLabels, slot = labs.length > 1 ? Math.abs(L.X(labs[1].x) - L.X(labs[0].x)) : L.pw;
-        const widest = Math.max(...labs.map(t => textW(t.label, 10.5))) + 6, stride = Math.max(1, Math.ceil(widest / Math.max(1, slot)));
+        const lo = Math.min(L.x0, L.x1), hi = Math.max(L.x0, L.x1);
+        const labs = s.xTickLabels.filter(t => t.x >= lo && t.x <= hi), slot = labs.length > 1 ? Math.abs(L.X(labs[1].x) - L.X(labs[0].x)) : L.pw;
+        const widest = labs.reduce((a, t) => Math.max(a, textW(t.label, 10.5)), 0) + 6, stride = Math.max(1, Math.ceil(widest / Math.max(1e-6, slot)));
         labs.forEach((t, k) => { if (k % stride === 0) P.text(t.label, L.X(t.x), m.t + L.ph + 15, th.fg, 10.5, 'center'); });
       } else {
+        const lo = Math.min(L.x0, L.x1), hi = Math.max(L.x0, L.x1), tol = (hi - lo) * 1e-9;
         let xt = ticks(L.x0, L.x1, Math.max(3, Math.floor(L.pw / 80)));
-        if (s.integerX) { xt = xt.filter(v => Math.abs(v - Math.round(v)) < 1e-9); if (xt.length < 2) xt = ticks(Math.ceil(Math.min(L.x0, L.x1)), Math.floor(Math.max(L.x0, L.x1)), 2).map(Math.round); }
+        if (s.integerX) { xt = xt.filter(v => Math.abs(v - Math.round(v)) < 1e-9); if (xt.length < 2) xt = ticks(Math.ceil(lo), Math.floor(hi), 2).map(Math.round).filter((v, i, a) => a.indexOf(v) === i); }
+        xt = xt.filter(v => v >= lo - tol && v <= hi + tol);
         const xs = xt.length > 1 ? Math.abs(xt[1] - xt[0]) : 1;
         for (const v of xt) { const x = L.X(v); P.line(x, m.t, x, m.t + L.ph, th.grid, 1); P.text(fmt(v, xs), x, m.t + L.ph + 15, th.fg, 11, 'center'); }
       }
@@ -398,8 +513,9 @@
       }
       // peak labels
       if (s.peakLabels && s.sticks && s.sticks.length) {
-        const ms = Math.max(...s.sticks.map(p => Math.abs(p.y))) || 1;
-        const strong = s.sticks.filter(p => Math.abs(p.y) > ms * (s.peakThreshold || 0.08)).sort((a, b) => Math.abs(b.y) - Math.abs(a.y)).slice(0, s.maxPeakLabels || 14);
+        const lo = Math.min(L.x0, L.x1), hi = Math.max(L.x0, L.x1), shown = this.zoom ? s.sticks.filter(p => p.x >= lo && p.x <= hi) : s.sticks;   // zoomed: the strongest peaks in view
+        const ms = shown.reduce((a, p) => Math.max(a, Math.abs(p.y)), 0) || 1;
+        const strong = shown.filter(p => Math.abs(p.y) > ms * (s.peakThreshold || 0.08)).sort((a, b) => Math.abs(b.y) - Math.abs(a.y)).slice(0, s.maxPeakLabels || 14);
         const placed = [];
         for (const p of strong) {
           const x = L.X(p.x);
@@ -408,8 +524,8 @@
           const neg = p.y < 0;
           let yv = p.y * k;
           if (s.series && s.series[0]) { // put the label on the curve near this x
-            const ser = s.series[0]; let best = 0;
-            for (let i = 0; i < ser.x.length; i++) if (Math.abs(ser.x[i] - p.x) < Math.abs((L.x1 - L.x0) / 300)) best = neg ? Math.min(best, ser.y[i]) : Math.max(best, ser.y[i]);
+            const ser = s.series[0], win = Math.max(Math.abs((L.x1 - L.x0) / 300), ser.x.length > 1 ? Math.abs(ser.x[1] - ser.x[0]) : 0); let best = 0;
+            for (let i = 0; i < ser.x.length; i++) if (Math.abs(ser.x[i] - p.x) < win) best = neg ? Math.min(best, ser.y[i]) : Math.max(best, ser.y[i]);
             yv = neg ? Math.min(yv, best) : Math.max(yv, best);
           }
           const y = L.Y(yv) + (s.invertY !== neg ? 14 : -7);

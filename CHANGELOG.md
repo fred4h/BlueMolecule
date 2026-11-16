@@ -3,6 +3,39 @@
 BlueMolecule is [vibe-coded](docs/vibe-coding.md). Each version below was written by an AI assistant from the
 author's requests and bug reports.
 
+## 1.5.0 (16 November 2026): big files, trajectories and plots
+
+- **Outputs of several gigabytes open** ([#6](https://github.com/fred4h/BlueMolecule/issues/6)). A QM/MM
+  optimisation and frequency log of 5 GB used to be refused for lack of memory: the JavaScript engine behind the
+  viewer holds about 4 GB at most. Gaussian and ORCA outputs and XYZ trajectories of 64 MB and more are now
+  condensed while they are read. Only the lines the readers use are kept, and geometries and normal-mode
+  displacements go straight into compact number arrays. A synthetic 5 GB ONIOM log (8,144 atoms, 24,426
+  vibrations) opens in about a minute and a half with under 1 GB of memory, and a 10 GB one in about three minutes.
+  Memory messages now say whether the engine or the computer ran out, and what to do.
+- **Choose what to load** ([#7](https://github.com/fred4h/BlueMolecule/issues/7)). For outputs and trajectories of
+  1 GB or more, a dialog offers every Nth step or frame, a range or the last N, and for vibrations all of them, the
+  displacements of the first K, or frequencies and intensities only. It estimates the memory as you choose. For
+  outputs, the energies and convergence data of every step are still read, and the first and last geometry of each
+  job are always loaded. The same choice works for DCD, TRR, XTC, NetCDF and multi-frame XYZ files. The Info tab
+  says what was loaded, and **Load other parts…** reads the file again with another choice.
+- **Amber NetCDF trajectories and restarts** ([#8](https://github.com/fred4h/BlueMolecule/issues/8)), Amber's
+  default formats since Amber 16. They are read without any library, with the box of every frame and the time:
+  `.nc`, `.ncdf`, `.ncrst`, and `.mdcrd`, `.rst7` or `.restrt` files that hold NetCDF. Long trajectories are read in
+  slices like DCD. The tests use files written by SciPy, and real pmemd, sander and cpptraj trajectories gave the
+  same numbers as SciPy. NetCDF 4 files are refused with a command to convert them.
+- **Zoomable plots** ([#9](https://github.com/fred4h/BlueMolecule/issues/9)). Drag a box to zoom into any plot (a
+  flat box zooms x only); the magnifier buttons zoom in, zoom out and fit, and a double-click shows the whole plot.
+  A click still selects. Each plot keeps its zoom while it is redrawn. CSV, PNG and SVG exports follow the zoom:
+  the CSV keeps the rows in view and says so.
+- **QM/MM and ONIOM component energies are plotted** ([#10](https://github.com/fred4h/BlueMolecule/issues/10)):
+  the total and each component (each level on the model and real systems, or QM, MM and QM–MM interaction), each
+  relative to its own final value, with a legend and a CSV in hartree. The Info tab lists the components of the
+  geometry shown.
+- Fixed: the atom labels under the charge plot of a system with more than about 900 atoms overlapped.
+- New tests: condensed reading against the full reading of every example output (`tests/test_condense.js`),
+  NetCDF (`tests/test_netcdf.js`), the 1.5 interface in a browser (`tests/browser_15_test.js`), and synthetic 5 GB
+  and 10 GB logs in `tests/run_all.py --big`.
+
 ## 1.4.2 (16 November 2026): quick fixes
 
 - **Jobs that are still running** ([#1](https://github.com/fred4h/BlueMolecule/issues/1)). A last energy that is

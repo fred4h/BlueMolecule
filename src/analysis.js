@@ -106,6 +106,41 @@
     if (!j) return [0, n - 1];
     return [Math.max(0, Math.min(n - 1, j.frameStart)), Math.max(0, Math.min(n - 1, j.frameEnd))];
   }
+  /** The steps of a job (all jobs: job null or < 0): the frames, or for a huge output read with a step selection
+   *  (ds.steps, see parsers.js splitPhantoms) every step, with frame = its index in ds.frames or null. */
+  function stepItems(ds, job) {
+    if (Array.isArray(ds.steps) && ds.steps.length) return isNum(job) && job >= 0 && ds.jobs && ds.jobs[job] ? ds.steps.filter(s => s.job === job) : ds.steps;
+    const [a, b] = jobRange(ds, job), out = [];
+    for (let i = a; i <= b; i++) { const f = ds.frames[i]; if (f && f.Z && f.xyz) out.push({ energy: f.energy, energies: f.energies, opt: f.opt, label: f.label, converged: f.converged, scan: f.scan, irc: f.irc, frame: i }); }
+    return out;
+  }
+  // ------------------------------------------------------------------ QM/MM and ONIOM energy components (issue #10)
+  const LEVEL = { high: 'High', med: 'Medium', low: 'Low' }, SYSTEM = { model: 'model system', mid: 'intermediate system', real: 'real system' };
+  /** A readable name for an energy component: 'high-model' -> 'High level, model system'; 'QM-MM' -> 'QM–MM interaction'. */
+  function componentLabel(k) {
+    const m = /^(high|med|low)-(model|mid|real)$/.exec(k);
+    if (m) return LEVEL[m[1]] + ' level, ' + SYSTEM[m[2]];
+    return { QM: 'QM', MM: 'MM', 'QM-MM': 'QM–MM interaction', 'QM SCF': 'QM SCF energy', Final: 'Final single point' }[k] || k;
+  }
+  const COMPONENT_ORDER = ['high-model', 'med-model', 'low-model', 'med-mid', 'low-mid', 'low-real', 'QM', 'QM SCF', 'MM', 'QM-MM'];
+  /** The components of the steps' total energies in QM/MM and ONIOM outputs: [{key, label, values (Eh, null where missing)}].
+   *  Values equal to the total (its own key, a "Final" copy) are not components; nor is "QM SCF" when QM or high-model has it. */
+  function energyComponents(ds, steps, minCount) {
+    if (!(ds.meta && ds.meta.qmmm)) return [];
+    const count = new Map();
+    for (const s of steps) {
+      if (!s.energies || !isNum(s.energy)) continue;
+      for (const k of Object.keys(s.energies)) {
+        const v = s.energies[k];
+        if (!isNum(v) || Math.abs(v - s.energy) < 1e-9) continue;
+        if (k === 'QM SCF' && Object.keys(s.energies).some(o => o !== k && isNum(s.energies[o]) && Math.abs(s.energies[o] - v) < 1e-6)) continue;   // a copy of QM or high-model
+        count.set(k, (count.get(k) || 0) + 1);
+      }
+    }
+    const keys = [...count.keys()].filter(k => count.get(k) >= (minCount || 2))
+      .sort((x, y) => (COMPONENT_ORDER.indexOf(x) + 1 || 99) - (COMPONENT_ORDER.indexOf(y) + 1 || 99) || (x < y ? -1 : 1));
+    return keys.map(k => ({ key: k, label: componentLabel(k), values: steps.map(s => (s.energies && isNum(s.energies[k]) ? s.energies[k] : null)) }));
+  }
   const CRITERIA = [
     ['maxForce', 'Max force', 'Eh/bohr'], ['rmsForce', 'RMS force', 'Eh/bohr'],
     ['maxDisp', 'Max displacement', 'bohr'], ['rmsDisp', 'RMS displacement', 'bohr'],
@@ -113,10 +148,9 @@
 
   function convergenceSeries(ds, opts) {
     const job = opts ? opts.job : null;
-    const [a, b] = jobRange(ds, job);
-    const fr = [];
-    for (let i = a; i <= b; i++) { const f = ds.frames[i]; if (f && f.Z && f.xyz && (isNum(f.energy) || f.opt)) fr.push(i); }
-    const nOpt = fr.filter(i => ds.frames[i].opt).length;
+    const [, b] = jobRange(ds, job);
+    const items = stepItems(ds, job).filter(s => isNum(s.energy) || s.opt);
+    const nOpt = items.filter(s => s.opt).length;
     const os = Array.isArray(ds.optSteps) ? ds.optSteps : null;
     const jobKinds = isNum(job) && job >= 0 && ds.jobs && ds.jobs[job] ? ds.jobs[job].kinds || [] : (ds.meta && ds.meta.jobTypes) || [];
     const optJob = jobKinds.some(k => /opt/i.test(k));
@@ -125,10 +159,10 @@
       source = 'optSteps';
       steps = os.map((s, k) => ({ n: isNum(s.step) ? s.step : k + 1, frame: k === os.length - 1 ? b : null, label: 'Cycle ' + (isNum(s.step) ? s.step : k + 1), energy: isNum(s.energy) ? s.energy : null, opt: s.opt || null, converged: false }));
     } else {
-      steps = fr.map((i, k) => { const f = ds.frames[i]; return { n: k + 1, frame: i, label: f.label || 'Geometry ' + (i + 1), energy: isNum(f.energy) ? f.energy : null, opt: f.opt || null, converged: !!f.converged }; });
+      steps = items.map((s, k) => ({ n: k + 1, frame: s.frame, label: s.label || (s.frame === null ? 'Step ' + (k + 1) : 'Geometry ' + (s.frame + 1)), energy: isNum(s.energy) ? s.energy : null, energies: s.energies || null, opt: s.opt || null, converged: !!s.converged }));
     }
     const series = [], ratios = [];
-    const out = { source, isOpt: false, steps: steps.map(s => ({ n: s.n, frame: s.frame, label: s.label })), series, ratios, converged: -1 };
+    const out = { source, isOpt: false, steps: steps.map(s => ({ n: s.n, frame: s.frame, label: s.label })), series, ratios, converged: -1, components: [] };
     if (steps.length < 2) return out;
     const E = steps.map(s => s.energy);
     const lastE = [...E].reverse().find(isNum);
@@ -146,12 +180,14 @@
       if (thr) ratios.push({ key, label, values: vals.map(v => (isNum(v) ? v / thr : null)) });
     }
     out.isOpt = optJob || series.some(s => s.log);
+    out.components = energyComponents(ds, steps);
     if (source === 'frames') {
-      const F = steps.map(s => ds.frames[s.frame]), ref = F[F.length - 1];
+      // (steps whose geometry was not loaded have no frame: no RMSD or step for them)
+      const F = steps.map(s => (s.frame === null ? null : ds.frames[s.frame])), ref = F[F.length - 1], G = F.filter(Boolean);
       // geometry series only for optimisations (not for long MD trajectories with energies)
-      if (out.isOpt && F.length * ref.Z.length <= 2e7 && F.every(f => f.Z.length === ref.Z.length && f.xyz.length === ref.xyz.length) && ref.Z.length) {
-        series.push({ key: 'rmsd', label: 'RMSD to final', unit: 'Å', values: F.map((f, k) => (k === F.length - 1 ? 0 : rmsd(ref.xyz, f.xyz))), threshold: null, log: false });
-        series.push({ key: 'maxStep', label: 'Largest atomic step', unit: 'Å', values: F.map((f, k) => (k ? maxDeviation(F[k - 1].xyz, f.xyz) : null)), threshold: null, log: false });
+      if (out.isOpt && ref && G.length * ref.Z.length <= 2e7 && G.every(f => f.Z.length === ref.Z.length && f.xyz.length === ref.xyz.length) && ref.Z.length) {
+        series.push({ key: 'rmsd', label: 'RMSD to final', unit: 'Å', values: F.map((f, k) => (k === F.length - 1 ? 0 : f ? rmsd(ref.xyz, f.xyz) : null)), threshold: null, log: false });
+        series.push({ key: 'maxStep', label: 'Largest atomic step', unit: 'Å', values: F.map((f, k) => (k && f && F[k - 1] ? maxDeviation(F[k - 1].xyz, f.xyz) : null)), threshold: null, log: false });
       }
       out.converged = steps.findIndex(s => s.converged);
     } else {
@@ -169,13 +205,12 @@
     return '';
   }
   function profiles(ds, opts) {
-    const [a, b] = jobRange(ds, opts ? opts.job : null), out = [];
+    const items = stepItems(ds, opts ? opts.job : null), out = [];
     const scan = [], irc = [];
-    for (let i = a; i <= b; i++) {
-      const f = ds.frames[i];
-      if (!f || !isNum(f.energy)) continue;
-      if (f.scan && isNum(f.scan.value)) scan.push({ x: f.scan.value, energy: f.energy, frame: i, label: (f.scan.coord ? f.scan.coord + ' = ' : '') + f.scan.value, coord: f.scan.coord });
-      if (f.irc && isNum(f.irc.coord)) irc.push({ x: f.irc.coord, energy: f.energy, frame: i, label: f.label || 'IRC point' });
+    for (const f of items) {
+      if (!isNum(f.energy)) continue;
+      if (f.scan && isNum(f.scan.value)) scan.push({ x: f.scan.value, energy: f.energy, frame: f.frame, label: (f.scan.coord ? f.scan.coord + ' = ' : '') + f.scan.value, coord: f.scan.coord });
+      if (f.irc && isNum(f.irc.coord)) irc.push({ x: f.irc.coord, energy: f.energy, frame: f.frame, label: f.label || 'IRC point' });
     }
     if (scan.length >= 2) {
       const c = scan[scan.length - 1].coord;
@@ -183,10 +218,10 @@
     } else {
       const kinds = (ds.meta && ds.meta.jobTypes) || [];
       let scanLike = kinds.indexOf('scan') >= 0;
-      if (!scanLike) for (let i = a; i <= b && !scanLike; i++) scanLike = /\bscan\b/i.test((ds.frames[i] && ds.frames[i].label) || '');
+      if (!scanLike) scanLike = items.some(f => /\bscan\b/i.test(f.label || ''));
       if (scanLike) {
         const pts = [];
-        for (let i = a; i <= b; i++) { const f = ds.frames[i]; if (f && f.converged && isNum(f.energy)) pts.push({ x: pts.length + 1, energy: f.energy, frame: i, label: f.label || 'Scan point ' + (pts.length + 1) }); }
+        for (const f of items) if (f.converged && isNum(f.energy)) pts.push({ x: pts.length + 1, energy: f.energy, frame: f.frame, label: f.label || 'Scan point ' + (pts.length + 1) });
         if (pts.length >= 2) out.push({ kind: 'scan', xLabel: 'Scan point', points: pts });
       }
     }
@@ -240,5 +275,5 @@
     return out;
   }
 
-  BM.analysis = { kabsch, superpose, rmsd, maxDeviation, jobRange, convergenceSeries, profiles, nmrNuclei, nmrSticks, nucleusLabel, moLevels, KCAL };
+  BM.analysis = { kabsch, superpose, rmsd, maxDeviation, jobRange, convergenceSeries, profiles, energyComponents, componentLabel, nmrNuclei, nmrSticks, nucleusLabel, moLevels, KCAL };
 })(typeof window !== 'undefined' ? (window.BM = window.BM || {}) : (globalThis.BM = globalThis.BM || {}));

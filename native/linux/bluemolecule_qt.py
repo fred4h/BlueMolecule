@@ -37,9 +37,23 @@ import types
 from pathlib import Path
 
 APP_ID = 'org.bluemolecule.BlueMolecule'
-VERSION = '1.4.2'
+VERSION = '1.5.0'
 BINDINGS = ('PyQt6', 'PySide6', 'PyQt5')
 INLINE_LIMIT = 32 * 1024 * 1024     # files below this size go to the page in one piece
+
+
+def memory_info():
+    """{'memTotal', 'memAvailable'} in bytes from /proc/meminfo (Linux), or {} when it cannot be read."""
+    out = {}
+    try:
+        with open('/proc/meminfo') as fh:
+            for line in fh:
+                key, _, rest = line.partition(':')
+                if key in ('MemTotal', 'MemAvailable'):
+                    out['memTotal' if key == 'MemTotal' else 'memAvailable'] = int(rest.split()[0]) * 1024
+    except (OSError, ValueError, IndexError):
+        return {}
+    return out
 READ_LIMIT = 6 * 1024 * 1024        # bytes per bmRead reply (8 MiB of base64)
 ICON_SIZES = (48, 64, 128, 256, 512)
 EXTERNAL_SCHEMES = ('http', 'https', 'mailto', 'ftp')
@@ -493,6 +507,7 @@ class Shell:
         self.inject('qwebchannel', self.qwebchannel_js())
         marker = {'shell': 'linux-app', 'version': VERSION, 'binding': Q.binding, 'qt': Q.qt_version,
                   'readLimit': READ_LIMIT, 'inlineLimit': INLINE_LIMIT}
+        marker.update(memory_info())   # the page sizes what it keeps of a huge file to the computer's memory
         self.inject('bm-qt', 'window.BM_QT = Object.freeze(%s);' % json.dumps(marker))
         page.titleChanged.connect(lambda title: win.setWindowTitle(title or 'BlueMolecule'))
         page.loadFinished.connect(self.loaded)

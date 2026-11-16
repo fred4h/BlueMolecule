@@ -6,12 +6,12 @@
  *   poscar, xdatcar, outcar   VASP
  *   qe-in, qe-out             Quantum ESPRESSO pw.x input and output
  *   castep-cell, xsf, cp2k-in CASTEP .cell, XCrySDen XSF/AXSF (with DATAGRID_3D), CP2K input
- *   prmtop, inpcrd, psf, dcd, lammps-data, lammps-dump, trr, xtc   MD topologies and trajectories
+ *   prmtop, inpcrd, psf, dcd, lammps-data, lammps-dump, trr, xtc, netcdf   MD topologies and trajectories
  * Units: Å and Hartree. frame.opt.maxForce / rmsForce are in Hartree/Bohr (max = largest atomic force,
  * rms over all Cartesian components). Extras beyond the core Dataset: frame.chains, frame.cell (only for
  * variable-cell runs), frame.occupancy (CIF), frame.formalCharges (CML, CJSON), frame.time (ps),
  * ds.cellOrigin (LAMMPS box origin), ds.meta.spaceGroup (CIF).
- * Trajectory-only files: meta.needsTopology + meta.natoms, frames with Z = null. DCD / TRR / XTC also read from Blob slices
+ * Trajectory-only files: meta.needsTopology + meta.natoms, frames with Z = null. DCD / TRR / XTC / NetCDF also read from Blob slices
  * (parseSource, BM.structReaders.sources): every Nth frame of multi-GB files, meta.totalFrames / stride / reload(opts).
  * Topology-only files: meta.topologyOnly, one frame with Z and zero coordinates, ds.bonds.
  * Written from public descriptions of the file formats only.
@@ -1865,8 +1865,9 @@
   // ================================================================== trajectories from Blob slices (big files)
   // DCD frames have a fixed size: only the selected frames are read. TRR / XTC are scanned frame by frame in large
   // windows; frames that are not selected are skipped without decoding. Options for all three:
-  //   {stride, first, last (0-based frame indices, inclusive), budget (bytes of coordinates to keep, 512 MB),
-  //    onProgress({bytes, total, frames}), signal}
+  //   {stride, first, last (0-based frame indices, inclusive), tail (only the last N frames), budget (bytes of
+  //    coordinates to keep, 512 MB), onProgress({bytes, total, frames}), signal}
+  // With {probe: true} they only read the header: {frames, atoms, perFrame (bytes kept per frame), exact}.
   // Without a stride, one is chosen so that the kept coordinates fit the budget. The dataset carries
   // meta.totalFrames, meta.stride, meta.first, meta.last and meta.reload(opts) -> Promise<Dataset> (same source).
   const TRAJ_BUDGET = 512 * 1048576, WINDOW = 16 * 1048576;
@@ -1903,7 +1904,7 @@
     ds.meta.totalFrames = total;
     ds.meta.stride = sel.stride; ds.meta.first = sel.first; ds.meta.last = sel.last;
     Object.defineProperty(ds.meta, 'reload', { enumerable: false, configurable: true,
-      value: o => reader(src, fileName, Object.assign({}, opts, { stride: null, first: null, last: null }, o || {})) });
+      value: o => reader(src, fileName, Object.assign({}, opts, { stride: null, first: null, last: null, tail: null }, o || {})) });
     if (sel.stride > 1 || sel.first > 0 || sel.last < total - 1) {
       ds.warnings.push('Loaded ' + ds.frames.length + ' of ' + total + ' frames' + (sel.stride > 1 ? ' (every ' + sel.stride + 'th)' : '') +
         (sel.first > 0 || sel.last < total - 1 ? ', frames ' + (sel.first + 1) + '-' + (sel.last + 1) : '') + '.');
@@ -1963,7 +1964,9 @@
     const size0 = cellLen + (has4D ? 4 : 3) * recLen(n), cnt = free ? free.length : n, sizeK = cellLen + (has4D ? 4 : 3) * recLen(cnt);
     const total = N - pos >= size0 ? 1 + Math.floor((N - pos - size0) / sizeK) : 0;
     if (!total) throw err('The DCD file holds no complete frame.');
-    const sel = trajSelection(total, 24 * n, opts);
+    if (opts.probe) return { frames: total, atoms: n, perFrame: 24 * n, exact: true };
+    const tailN = Math.floor(+opts.tail || 0);
+    const sel = trajSelection(total, 24 * n, tailN > 0 ? Object.assign({}, opts, { first: Math.max(0, total - tailN), last: total - 1, stride: 1 }) : opts);
     const ds = newDs('dcd', fileName, charmm ? 'CHARMM/NAMD' : 'X-PLOR');
     const offset = k => pos + (k === 0 ? 0 : size0 + (k - 1) * sizeK);
     /** One frame from its bytes; null when the record markers do not fit (damaged file). */
@@ -2016,6 +2019,7 @@
     const rd = trajReader(src), N = rd.size;
     const ds = newDs(id, fileName, 'GROMACS');
     let p = 0, k = 0, natoms = 0, sel = null, truncated = false;
+    const tailN = Math.max(0, Math.floor(+opts.tail || 0)), ring = [];   // only the last N frames: found first, decoded at the end
     while (p + 4 <= N) {
       if (aborted(opts)) throw abortErr();
       const hl = Math.min(N - p, headLen);
@@ -2026,8 +2030,10 @@
       if (!info || p + info.len > N) { if (!k) throw err('The first ' + id.toUpperCase() + ' frame is damaged or incomplete.'); truncated = true; break; }
       if (natoms && info.nat !== natoms) throw err('The atom count changes between ' + id.toUpperCase() + ' frames.');
       natoms = info.nat;
-      if (!sel) sel = trajSelection(Math.max(1, Math.floor(N / info.len)), 24 * natoms, opts);
-      if (k >= sel.first && k <= sel.last && (k - sel.first) % sel.stride === 0 && info.hasX) {
+      if (opts.probe) return { frames: Math.max(1, Math.floor(N / info.len)), atoms: info.nat, perFrame: 24 * info.nat, exact: false };
+      if (!sel) sel = tailN ? { first: 0, last: Infinity, stride: 1 } : trajSelection(Math.max(1, Math.floor(N / info.len)), 24 * natoms, opts);
+      if (tailN) { if (info.hasX) { ring.push({ p, info }); if (ring.length > tailN) ring.shift(); } }
+      else if (k >= sel.first && k <= sel.last && (k - sel.first) % sel.stride === 0 && info.hasX) {
         const fb = await rd.get(p, info.len, WINDOW);
         try { ds.frames.push(info.make(new DataView(fb.buffer, fb.byteOffset, fb.byteLength), fb)); }
         catch (e) { if (!ds.frames.length) throw e; ds.warnings.push('Reading stopped at a damaged frame: ' + e.message); break; }
@@ -2035,6 +2041,15 @@
       if (info.hasX || id === 'xtc') k++;
       p += info.len;
       if (opts.onProgress && k % 256 === 0) opts.onProgress({ bytes: p, total: N, frames: ds.frames.length });
+    }
+    if (tailN) {
+      for (const r of ring) {
+        if (aborted(opts)) throw abortErr();
+        const fb = await rd.get(r.p, r.info.len, WINDOW);
+        try { ds.frames.push(r.info.make(new DataView(fb.buffer, fb.byteOffset, fb.byteLength), fb)); }
+        catch (e) { if (!ds.frames.length) throw e; ds.warnings.push('Reading stopped at a damaged frame: ' + e.message); break; }
+      }
+      if (sel) { sel.first = Math.max(0, k - ring.length); sel.last = k - 1; }
     }
     if (!ds.frames.length) throw err('The ' + id.toUpperCase() + ' file holds no frame with coordinates' + (sel && sel.first ? ' in the chosen range' : '') + '.');
     if (truncated) ds.warnings.push('The file ends with an incomplete frame, which was skipped.');
@@ -2098,6 +2113,198 @@
     });
   }
 
+  // ================================================================== Amber NetCDF trajectories and restarts
+  // NetCDF 3 read without a library: the classic (CDF-1), 64-bit offset (CDF-2) and 64-bit data (CDF-5) variants, all
+  // big-endian. A header lists the dimensions, attributes and variables with their file offsets; the variables of the
+  // unlimited (record) dimension are stored record by record, one record per frame. Amber's conventions
+  // (ambermd.org/netcdf/nctraj.xhtml): coordinates(frame, atom, spatial) in Å, cell_lengths / cell_angles(frame, 3) in
+  // Å and degrees, time(frame) in ps; a restart (Conventions "AMBERRESTART") has no frame dimension and one geometry.
+  // NetCDF 4 files (HDF5 inside) are recognised and refused with a way to convert them.
+  const NC_TYPE = { 1: 1, 2: 1, 3: 2, 4: 4, 5: 4, 6: 8, 7: 1, 8: 2, 9: 4, 10: 8, 11: 8 };   // nc_type -> bytes
+  const NC_MORE = 'need more header bytes';
+  const ncMagic = u8 => u8.length >= 4 && u8[0] === 67 && u8[1] === 68 && u8[2] === 70 && (u8[3] === 1 || u8[3] === 2 || u8[3] === 5);
+  const hdf5Magic = u8 => u8.length >= 8 && u8[0] === 0x89 && u8[1] === 0x48 && u8[2] === 0x44 && u8[3] === 0x46 && u8[4] === 0x0d && u8[5] === 0x0a && u8[6] === 0x1a && u8[7] === 0x0a;
+  /** The header of a NetCDF 3 file from its first bytes; throws NC_MORE when it continues past them. */
+  function ncHeader(u8) {
+    if (hdf5Magic(u8)) throw err('This is a NetCDF 4 file (HDF5 inside); BlueMolecule reads NetCDF 3, which Amber writes by default. Convert it, e.g. "nccopy -k 64-bit-offset in.nc out.nc" or with cpptraj.');
+    if (!ncMagic(u8)) {
+      const text = u8.length > 0 && Array.prototype.every.call(u8.subarray(0, Math.min(u8.length, 256)), c => c === 9 || c === 10 || c === 13 || (c >= 32 && c < 127));
+      throw err(text ? 'Not a NetCDF file: this looks like a text file (an ASCII Amber trajectory?). BlueMolecule reads Amber NetCDF trajectories (ioutfm = 1, the default); convert text ones with cpptraj.' : 'Not a NetCDF file (no CDF signature).');
+    }
+    const ver = u8[3], v5 = ver === 5, dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+    let p = 4;
+    const need = n => { if (p + n > u8.length) throw NC_MORE; };
+    const u32 = () => { need(4); const v = dv.getUint32(p, false); p += 4; return v; };
+    const u64 = () => { need(8); const v = dv.getUint32(p, false) * 4294967296 + dv.getUint32(p + 4, false); p += 8; return v; };
+    const count = () => (v5 ? u64() : u32());
+    const offset = () => (ver === 1 ? u32() : u64());
+    const name = () => { const n = count(); need(n); const t = new TextDecoder('utf-8').decode(u8.subarray(p, p + n)); p += Math.ceil(n / 4) * 4; return t; };
+    const values = (type, n) => {
+      const sz = NC_TYPE[type];
+      if (!sz) throw err('The NetCDF header has an unknown data type (' + type + ').');
+      const len = sz * n; need(len);
+      let out;
+      if (type === 2) out = new TextDecoder('utf-8').decode(u8.subarray(p, p + len)).replace(/\0+$/, '');
+      else {
+        out = [];
+        for (let k = 0; k < n; k++) {
+          const q = p + k * sz;
+          out.push(type === 1 ? dv.getInt8(q) : type === 3 ? dv.getInt16(q, false) : type === 4 ? dv.getInt32(q, false) : type === 5 ? dv.getFloat32(q, false)
+            : type === 6 ? dv.getFloat64(q, false) : type === 7 ? dv.getUint8(q) : type === 8 ? dv.getUint16(q, false) : type === 9 ? dv.getUint32(q, false)
+              : Number(type === 10 ? dv.getBigInt64(q, false) : dv.getBigUint64(q, false)));
+        }
+        if (n === 1) out = out[0];
+      }
+      p += Math.ceil(len / 4) * 4;
+      return out;
+    };
+    const list = tag => {
+      const t = u32(), n = count();
+      if (t === 0 && n === 0) return 0;
+      if (t !== tag) throw err('The NetCDF header is damaged (list tag ' + t + ').');
+      return n;
+    };
+    const atts = () => { const o = {}; for (let n = list(12), k = 0; k < n; k++) { const nm = name(), type = u32(), m = count(); o[nm] = values(type, m); } return o; };
+    let numrecs = count();
+    if (numrecs === (v5 ? Math.pow(2, 64) : 4294967295)) numrecs = null;   // "streaming": count from the file size
+    const dims = [];
+    for (let n = list(10), k = 0; k < n; k++) { const nm = name(); dims.push({ name: nm, len: count() }); }
+    const gatts = atts();
+    const vars = [];
+    for (let n = list(11), k = 0; k < n; k++) {
+      const nm = name(), rank = count(), ids = [];
+      for (let r = 0; r < rank; r++) ids.push(count());
+      const a = atts(), type = u32();
+      if (!NC_TYPE[type]) throw err('The NetCDF variable "' + nm + '" has an unknown data type (' + type + ').');
+      count();   // vsize (recomputed below: it overflows for variables over 4 GB)
+      vars.push({ name: nm, ids, atts: a, type, begin: offset() });
+    }
+    const recDim = dims.findIndex(d => d.len === 0);
+    for (const v of vars) {
+      if (v.ids.some(id => !dims[id])) throw err('The NetCDF variable "' + v.name + '" names a missing dimension.');
+      v.rec = recDim >= 0 && v.ids.length > 0 && v.ids[0] === recDim;
+      v.shape = v.ids.map(id => dims[id].len);
+      v.count = (v.rec ? v.shape.slice(1) : v.shape).reduce((a, b) => a * b, 1);
+      v.bytes = v.count * NC_TYPE[v.type];
+    }
+    const recVars = vars.filter(v => v.rec);
+    // one record holds a slab of every record variable, each padded to 4 bytes (not when there is only one)
+    const recSize = recVars.length === 1 ? recVars[0].bytes : recVars.reduce((a, v) => a + Math.ceil(v.bytes / 4) * 4, 0);
+    return { version: ver, numrecs, dims, gatts, vars, recDim, recSize, headerEnd: p };
+  }
+  /** What to read of an Amber NetCDF file: the atoms, frames and the variables of one frame. */
+  function ncPlan(h, fileSize) {
+    const V = n => h.vars.find(v => v.name === n) || null;
+    const conv = String(h.gatts.Conventions || '');
+    const X = V('coordinates');
+    if (!X) throw err('No "coordinates" variable: not an Amber NetCDF trajectory or restart' + (conv ? ' (Conventions: ' + conv + ')' : '') + '.');
+    if (X.type !== 5 && X.type !== 6) throw err('The NetCDF coordinates are not floating-point numbers.');
+    const sh = X.rec ? X.shape.slice(1) : X.shape;
+    if (sh.length !== 2 || sh[1] !== 3) throw err('The NetCDF coordinates do not have the (atom, spatial) shape.');
+    const natoms = sh[0];
+    if (!(natoms > 0)) throw err('The NetCDF file declares no atoms.');
+    const usable = v => v && (v.type === 5 || v.type === 6 || v.type === 4 || v.type === 3) && v.rec === X.rec && v.count === 3 ? v : null;
+    const L = usable(V('cell_lengths')), A = usable(V('cell_angles'));
+    const T = (v => (v && v.rec === X.rec && v.count === 1 && (v.type === 5 || v.type === 6) ? v : null))(V('time'));
+    const unit = v => String((v && v.atts.units) || '').toLowerCase(), sc = v => (v && Number.isFinite(+v.atts.scale_factor) && +v.atts.scale_factor !== 0 ? +v.atts.scale_factor : 1);
+    const nm = u => (/^(nanometer|nanometre|nm)s?$/.test(u) ? 10 : 1);
+    const plan = { natoms, X, L, A, T, rec: X.rec, recSize: h.recSize, conv, xScale: sc(X) * nm(unit(X)), lScale: sc(L) * nm(unit(L)), tScale: sc(T),
+      program: [h.gatts.program, h.gatts.programVersion].filter(x => typeof x === 'string' && x.trim()).join(' ') || 'Amber',
+      title: typeof h.gatts.title === 'string' ? h.gatts.title.trim() : '', velocities: !!V('velocities'), warnings: [] };
+    const need = [X, L && A ? L : null, L && A ? A : null, T].filter(Boolean);
+    plan.need = need;
+    if (!X.rec) { plan.total = 1; return plan; }
+    plan.lo = Math.min(...need.map(v => v.begin));
+    plan.hi = Math.max(...need.map(v => v.begin + v.bytes));
+    // frames: the header's count, or (a run stopped before the file was closed) every complete record in the file
+    const fit = h.recSize > 0 ? Math.max(0, Math.floor((fileSize - plan.hi) / h.recSize) + 1) : 0;
+    let total = h.numrecs === null ? fit : Math.min(h.numrecs, fit);
+    if (h.numrecs !== null && h.numrecs < fit) { plan.warnings.push('The header counts ' + h.numrecs + ' frames; the file holds ' + fit + ' complete ones, which were read (the run may have stopped before the file was closed).'); total = fit; }
+    else if (h.numrecs !== null && h.numrecs > fit) plan.warnings.push('The header counts ' + h.numrecs + ' frames; the file ends after ' + fit + '.');
+    plan.total = total;
+    return plan;
+  }
+  /** One frame from the bytes u (u[0] is at file offset base): coordinates, the box and the time. */
+  function ncFrame(plan, u, base, k) {
+    const dv = new DataView(u.buffer, u.byteOffset, u.byteLength), off = v => v.begin + (v.rec ? k * plan.recSize : 0) - base;
+    const get = (v, i) => { const q = off(v) + i * NC_TYPE[v.type]; return v.type === 6 ? dv.getFloat64(q, false) : v.type === 5 ? dv.getFloat32(q, false) : v.type === 4 ? dv.getInt32(q, false) : dv.getInt16(q, false); };
+    const n3 = 3 * plan.natoms, xyz = new Float64Array(n3), q0 = off(plan.X), s = plan.xScale;
+    if (plan.X.type === 5) for (let i = 0; i < n3; i++) xyz[i] = dv.getFloat32(q0 + 4 * i, false) * s;
+    else for (let i = 0; i < n3; i++) xyz[i] = dv.getFloat64(q0 + 8 * i, false) * s;
+    const f = newFrame(null, xyz);
+    f.label = plan.rec ? 'Frame ' + (k + 1) : 'Restart';
+    if (plan.T) { const t = get(plan.T, 0) * plan.tScale; if (Number.isFinite(t) && Math.abs(t) < 1e30) { f.time = t; if (plan.rec) f.label += ' · t = ' + (+t.toFixed(4)) + ' ps'; } }
+    if (plan.L && plan.A) {
+      const l = [0, 1, 2].map(i => get(plan.L, i) * plan.lScale), a = [0, 1, 2].map(i => get(plan.A, i));
+      if (l.every(x => x > 0 && x < 1e7) && a.every(x => x > 0 && x < 180)) { const c = boxCell(l[0], l[1], l[2], a[0], a[1], a[2]); if (goodCell(c)) f.cell = c; }
+    }
+    return f;
+  }
+  /** Times that do not change (some writers store 0 for every frame) stay on the frames but leave the labels. */
+  function ncTimes(ds) {
+    const t = ds.frames.map(f => f.time);
+    if (ds.frames.length > 1 && t.every(x => x === t[0])) for (const f of ds.frames) f.label = f.label.replace(/ · t = .*$/, '');
+  }
+  function ncDataset(plan, fileName) {
+    const ds = newDs('netcdf', fileName, plan.program);
+    if (plan.title) ds.title = plan.title.slice(0, 120);
+    ds.warnings.push(...plan.warnings);
+    if (plan.velocities) ds.meta.hasVelocities = true;
+    return ds;
+  }
+  /** Small files, read whole. */
+  function readNetcdf(u8, fileName) {
+    let h;
+    try { h = ncHeader(u8); } catch (e) { if (e === NC_MORE) throw err('The NetCDF header is incomplete (the file is cut short).'); throw e; }
+    const plan = ncPlan(h, u8.length), ds = ncDataset(plan, fileName);
+    if (!plan.rec && Math.max(...plan.need.map(v => v.begin + v.bytes)) > u8.length) throw err('The NetCDF restart is cut short: part of its data is missing.');
+    for (let k = 0; k < plan.total; k++) ds.frames.push(ncFrame(plan, u8, 0, k));
+    if (!ds.frames.length) throw err('The NetCDF trajectory holds no complete frame.');
+    ncTimes(ds);
+    settleCells(ds, false);
+    ds.meta.needsTopology = true;
+    ds.meta.natoms = plan.natoms;
+    return ds;
+  }
+  /** Big files, from Blob slices: every Nth frame, a range or the last N (options as for DCD). */
+  async function readNetcdfSource(src, fileName, opts) {
+    opts = opts || {};
+    const rd = trajReader(src), N = rd.size;
+    let h = null;
+    for (let len = Math.min(N, 65536); ; len = Math.min(N, len * 4)) {
+      const u = await rd.get(0, len);
+      try { h = ncHeader(u); break; } catch (e) {
+        if (e !== NC_MORE) throw e;
+        if (len >= N) throw err('The NetCDF header is incomplete (the file is cut short).');
+      }
+    }
+    const plan = ncPlan(h, N);
+    if (opts.probe) return { frames: plan.total, atoms: plan.natoms, perFrame: 24 * plan.natoms, exact: true };
+    const ds = ncDataset(plan, fileName);
+    if (!plan.rec) {   // a restart: one geometry
+      const lo = Math.min(...plan.need.map(v => v.begin)), hi = Math.max(...plan.need.map(v => v.begin + v.bytes));
+      if (hi > N) throw err('The NetCDF restart is cut short: part of its data is missing.');
+      ds.frames.push(ncFrame(plan, await rd.get(lo, hi - lo), lo, 0));
+      settleCells(ds, false);
+      ds.meta.needsTopology = true; ds.meta.natoms = plan.natoms;
+      return ds;
+    }
+    if (!plan.total) throw err('The NetCDF trajectory holds no complete frame.');
+    const tailN = Math.floor(+opts.tail || 0);
+    const sel = trajSelection(plan.total, 24 * plan.natoms, tailN > 0 ? Object.assign({}, opts, { first: Math.max(0, plan.total - tailN), last: plan.total - 1, stride: 1 }) : opts);
+    const span = plan.hi - plan.lo, ahead = sel.stride * plan.recSize < WINDOW ? WINDOW : 0;
+    for (let k = sel.first; k <= sel.last; k += sel.stride) {
+      if (aborted(opts)) throw abortErr();
+      const at = plan.lo + k * plan.recSize;
+      ds.frames.push(ncFrame(plan, await rd.get(at, span, ahead), at, k));
+      if (opts.onProgress && ds.frames.length % 64 === 0) opts.onProgress({ bytes: at, total: N, frames: ds.frames.length });
+    }
+    ncTimes(ds);
+    return finishTraj(ds, sel, plan.total, plan.natoms, src, fileName, opts, readNetcdfSource);
+  }
+  /** NetCDF data in a file whose name does not say so (an Amber restart named .rst7, as pmemd writes by default). */
+  const ncSniff = u8 => ncMagic(u8) || hdf5Magic(u8);
+
   // ================================================================== registration
   const REG = o => BM.registerFormat(o);
   REG({ id: 'cif', name: 'CIF', extensions: ['cif'], kind: 'structure', sniff: sniffCif, parse: readCif });
@@ -2135,10 +2342,12 @@
     sniff: h => (/^ITEM: TIMESTEP/m.test(h) ? 0.95 : 0), parse: readLammpsDump });
   REG({ id: 'trr', name: 'GROMACS TRR', extensions: ['trr'], kind: 'trajectory', binary: true, parseBinary: readTrr, parseSource: readTrrSource });
   REG({ id: 'xtc', name: 'GROMACS XTC', extensions: ['xtc'], kind: 'trajectory', binary: true, parseBinary: readXtc, parseSource: readXtcSource });
+  REG({ id: 'netcdf', name: 'Amber NetCDF trajectory / restart', extensions: ['nc', 'ncdf', 'netcdf', 'ncrst', 'mdcrd'], kind: 'trajectory', binary: true,
+    parseBinary: readNetcdf, parseSource: readNetcdfSource, magic: ncSniff, magicExtensions: ['rst7', 'restrt', 'rst', 'inpcrd', 'crd'] });
 
   BM.structReaders = { cifBlocks, parseSymop, cellFromParams, zFromMass, xtcDecode,
     parsers: { cif: readCif, mol2: readMol2, cml: readCML, cjson: readCJSON, poscar: readPoscar, xdatcar: readXdatcar, outcar: readOutcar,
       qeIn: readQeIn, qeOut: readQeOut, castepCell: readCastepCell, xsf: readXsf, cp2kIn: readCp2kIn, prmtop: readPrmtop,
-      inpcrd: readInpcrd, psf: readPsf, dcd: readDcd, lammpsData: readLammpsData, lammpsDump: readLammpsDump, trr: readTrr, xtc: readXtc },
-    sources: { dcd: readDcdSource, trr: readTrrSource, xtc: readXtcSource } };
+      inpcrd: readInpcrd, psf: readPsf, dcd: readDcd, lammpsData: readLammpsData, lammpsDump: readLammpsDump, trr: readTrr, xtc: readXtc, netcdf: readNetcdf },
+    sources: { dcd: readDcdSource, trr: readTrrSource, xtc: readXtcSource, netcdf: readNetcdfSource }, netcdfHeader: ncHeader };
 })(typeof window !== 'undefined' ? (window.BM = window.BM || {}) : (globalThis.BM = globalThis.BM || {}));

@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 /* BlueMolecule tests for big files: BM.bigfile.readLines (Blob, stream and chunk sources), BM.parseLines, readers on
- * line arrays, and the slice readers for DCD / TRR / XTC (stride, frame range, reload).
+ * line arrays, the condensed reading of huge outputs (condense.js, issue #6) and the slice readers for DCD / TRR / XTC
+ * (stride, frame range, last N, reload).
  *
  *   node tests/test_bigfiles.js            fast checks (a few seconds; ~40 MB generated logs, deleted afterwards)
- *   node tests/test_bigfiles.js --big      also ~600 MB Gaussian and ORCA logs, a ~1.2 GB log and a ~1.1 GB DCD:
- *                                          Node (each in a child process: time, peak RSS) and headless Chromium
- *                                          through the real UI (dist/BlueMolecule.html, setInputFiles)
+ *   node tests/test_bigfiles.js --big      also ~600 MB Gaussian and ORCA logs, a ~1.2 GB log and a ~1.1 GB DCD,
+ *                                          synthetic 5 GB and 10 GB QM/MM opt + freq logs (streamed, never on disk)
+ *                                          and a 1.5 GB one through the loading dialog: Node (each in a child
+ *                                          process: time, peak RSS) and headless Chromium through the real UI
+ *                                          (dist/BlueMolecule.html, setInputFiles)
  *   options: --keep (keep generated files), --no-browser; BM_BIG_DIR=dir for the generated files (default: a
  *   temporary directory). Big logs come from tools/make_big_fixture.py.
  */
@@ -15,9 +18,46 @@ const os = require('os');
 const path = require('path');
 const { spawnSync, execSync } = require('child_process');
 const ROOT = path.join(__dirname, '..');
-for (const f of ['elements.js', 'bigfile.js', 'parsers.js', 'readers-struct.js', 'writers.js', 'readers-qc.js']) require(path.join(ROOT, 'src', f));
+for (const f of ['elements.js', 'bigfile.js', 'parsers.js', 'condense.js', 'readers-struct.js', 'writers.js', 'readers-qc.js']) require(path.join(ROOT, 'src', f));
 const BM = globalThis.BM;
 const BF = BM.bigfile;
+const synth = require('./bigsynth.js');
+/** A condenser for the outputs that have one (as the app reads big files), or null (all lines kept). */
+const pickFor = (name, load) => head => { const id = BM.detectFormat(name, head); return BM.condense.formats.indexOf(id) >= 0 ? BM.condense.create(id, { load }) : null; };
+
+// ------------------------------------------------------------------ child mode: a synthetic stream of N GB (bigsynth.js)
+if (process.argv[2] === '--synth') {
+  (async () => {
+    const atoms = +process.argv[3], steps = +process.argv[4] || 20, load = process.argv[5] ? JSON.parse(process.argv[5]) : null;
+    const g = synth.gaussianOniom({ atoms, steps });
+    const out = { atoms, steps };
+    const t0 = Date.now();
+    try {
+      let bytes = 0;
+      const lines = await BF.readCondensed(g.stream(), pickFor('synthetic.log', load), { onProgress: p => { bytes = p.bytes; } });
+      out.bytes = bytes; out.readS = (Date.now() - t0) / 1000; out.lines = lines.length; out.kept = lines.bmSide ? lines.bmSide.loaded.bytes : null;
+      const t1 = Date.now();
+      const ds = BM.parseLines('synthetic.log', lines);
+      out.parseS = (Date.now() - t1) / 1000;
+      const v = ds.vibrations, e = g.expected;
+      out.frames = ds.frames.length; out.nAtoms = ds.frames[0].Z.length; out.steps = ds.steps ? ds.steps.length : ds.frames.length;
+      out.energies = (ds.steps || ds.frames).map(f => f.energy);
+      out.expEnergies = e.energies; out.expFrames = e.frames; out.expModes = e.nModes;
+      out.nModes = v ? v.freqs.length : 0; out.modesLoaded = v ? (v.modesLoaded === undefined ? v.freqs.length : v.modesLoaded) : 0;
+      out.freqOk = !!v && [0, 1, e.nModes >> 1, e.nModes - 1].every(m => Math.abs(v.freqs[m] - e.freq(m)) < 1e-4);
+      out.modeOk = !!v && [[0, 0, 0], [1, 5, 2], [e.nModes >> 1, atoms >> 1, 1], [e.nModes - 1, atoms - 1, 2]].every(([m, a, c]) => {
+        const vec = v.modes[m];
+        return vec === null ? m >= out.modesLoaded : Math.abs(vec[3 * a + c] - e.mode(m, a, c)) < 1e-12;
+      });
+      out.layersOk = !!ds.layers && ds.layers.atomLayer.filter(x => x === 'H').length === e.qm;
+      out.xyzOk = Array.from(ds.frames[0].xyz.slice(0, 9)).every((x, k) => Math.abs(x - e.xyz0[k]) < 1e-6);
+    } catch (err) { out.error = err.message; out.oom = BF.isOutOfMemory(err); }
+    out.totalS = (Date.now() - t0) / 1000;
+    out.maxRssMB = Math.round(process.resourceUsage().maxRSS / 1024);
+    process.stdout.write(JSON.stringify(out));
+  })();
+  return;
+}
 
 // ------------------------------------------------------------------ child mode: one big file in a fresh process
 if (process.argv[2] === '--child') {
@@ -32,8 +72,8 @@ if (process.argv[2] === '--child') {
         Object.assign(out, { readS: (Date.now() - t0) / 1000, frames: ds.frames.length, totalFrames: ds.meta.totalFrames, stride: ds.meta.stride,
           natoms: ds.meta.natoms, sample: Array.from(ds.frames[ds.frames.length - 1].xyz.slice(0, 3)) });
       } else {
-        const lines = await BF.readLines(blob, {});
-        out.readS = (Date.now() - t0) / 1000; out.lines = lines.length;
+        const lines = await BF.readCondensed(blob, pickFor(path.basename(file)), {});
+        out.readS = (Date.now() - t0) / 1000; out.lines = lines.length; out.condensed = !!lines.bmSide;
         const t1 = Date.now();
         const ds = BM.parseLines(path.basename(file), lines);
         out.parseS = (Date.now() - t1) / 1000;
@@ -306,6 +346,23 @@ function xtcSmall(frames, n) {           // <= 9 atoms: uncompressed XTC frames
     }
   });
 
+  await test('condensed reading of a synthetic QM/MM opt + freq stream (~30 MB)', async () => {
+    const N = synth.atomsForSize(30 * 1048576, 6), g = synth.gaussianOniom({ atoms: N, steps: 6 }), e = g.expected;
+    const lines = await BF.readCondensed(g.stream(), pickFor('syn.log'), {});
+    ok(!!lines.bmSide && lines.length < 20000, 'condensed to few lines: ' + lines.length);
+    const ds = BM.parseLines('syn.log', lines);
+    eq(ds.frames.length, e.frames, 'frames'); eq(ds.frames[0].Z.length, N, 'atoms');
+    arrNear(ds.frames.map(f => f.energy), e.energies, 1e-9, 'energies');
+    eq(ds.vibrations.freqs.length, e.nModes, 'every vibration');
+    ok([[0, 0, 0], [e.nModes - 1, N - 1, 2], [7, 3, 1]].every(([m, a, c]) => Math.abs(ds.vibrations.modes[m][3 * a + c] - e.mode(m, a, c)) < 1e-12), 'mode displacements decoded exactly');
+    ok(ds.meta.qmmm && ds.layers.atomLayer.filter(x => x === 'H').length === e.qm, 'ONIOM layers');
+    const part = BM.parseLines('syn.log', await BF.readCondensed(g.stream(), pickFor('syn.log', { steps: { mode: 'last', n: 2 }, modes: { mode: 'first', n: 10 } }), {}));
+    eq(part.steps.length, e.frames, 'with a selection: every step kept as data'); ok(part.frames.length < e.frames, 'fewer geometries: ' + part.frames.length);
+    arrNear(part.steps.map(s => s.energy), e.energies, 1e-9, 'all energies kept');
+    eq(part.vibrations.modesLoaded, 10, '10 displacements'); ok(part.vibrations.modes[10] === null && !!part.vibrations.modes[9], 'the others not loaded');
+    eq(part.meta.loaded.modes.total, e.nModes, 'meta.loaded counts all vibrations');
+  });
+
   // ================================================================ the app's reading paths in Chromium
   if (!NOBROWSER && fs.existsSync(path.join(ROOT, 'dist', 'BlueMolecule.html'))) await hostTests();
 
@@ -316,7 +373,7 @@ function xtcSmall(frames, n) {           // <= 9 atoms: uncompressed XTC frames
   if (!KEEP && !process.env.BM_BIG_DIR) try { fs.rmdirSync(WORK); } catch (e) { /* not empty */ }
   console.log('');
   for (const m of failures) console.log('FAIL ' + m);
-  console.log('BlueMolecule big-file tests: ' + pass + ' passed, ' + fail + ' failed' + (BIGRUN ? '' : ' (run with --big for the 600 MB / 1.2 GB files)'));
+  console.log('BlueMolecule big-file tests: ' + pass + ' passed, ' + fail + ' failed' + (BIGRUN ? '' : ' (run with --big for the 600 MB to 10 GB files)'));
   process.exit(fail ? 1 : 0);
 })();
 
@@ -404,13 +461,24 @@ async function hostTests() {
     const d = await page.evaluate(() => window.__doc());
     eq(d.name, 'host70.log', 'name without .gz'); eq(d.frames, exp.frames, 'frames from the decompressed stream');
   });
-  await test('host: a file that cannot fit the heap is refused with a clear message', async () => {
+  await test('host: with a small heap, a big output still opens (condensed) and other text is refused clearly', async () => {
     await page.evaluate(() => { Object.defineProperty(performance, 'memory', { configurable: true, get: () => ({ jsHeapSizeLimit: 60e6, usedJSHeapSize: 20e6, totalJSHeapSize: 30e6 }) }); });
     await page.evaluate(() => { window.__hostCb('huge.log', window.__chunks(0, 'huge.log')); });
+    await page.evaluate(() => window.__wait(6, 60000));
+    const d = await page.evaluate(() => window.__doc());
+    eq(d.name, 'huge.log', 'the 70 MB output opens in a 60 MB heap'); eq(d.frames, exp.frames, 'frames');
+    // a 70 MB PDB (no condenser): refused before reading, with the engine named as the limit
+    const pdb = path.join(WORK, 'huge.pdb');
+    const rows = [];
+    for (let i = 0; i < 880000; i++) rows.push('ATOM  ' + String(i % 99999 + 1).padStart(5) + '  CA  ALA A' + String(i % 9999 + 1).padStart(4) + '    ' + (i % 97).toFixed(3).padStart(8) + '   1.000   2.000  1.00  0.00           C');
+    fs.writeFileSync(pdb, rows.join('\n') + '\nEND\n');
+    made.push(pdb);
+    await page.setInputFiles('#tmp-in', pdb);
+    await page.evaluate(() => { const f = document.querySelector('#tmp-in').files[0]; window.__hostCb('huge.pdb', { name: 'huge.pdb', size: f.size, readChunk: (o, n) => f.slice(o, o + n).arrayBuffer().then(b => new Uint8Array(b)) }); });
     await page.waitForFunction(() => /Not enough memory/.test(document.querySelector('#toast').textContent), null, { timeout: 20000 });
     const t = await page.textContent('#toast');
-    ok(/Not enough memory to open "huge\.log" \(\d+ MB\)/.test(t), 'toast: ' + t);
-    eq(await page.evaluate(() => window.BM.app.state.docs.length), 5, 'nothing opened');
+    ok(/Not enough memory to open "huge\.pdb" \(\d+ MB\)/.test(t) && /JavaScript engine/.test(t), 'toast names the engine limit: ' + t);
+    eq(await page.evaluate(() => window.BM.app.state.docs.length), 6, 'nothing more opened');
   });
   ok(!errors.length, 'no page errors: ' + errors.join('; '));
   await browser.close();
@@ -477,6 +545,25 @@ async function bigTests() {
     else { eq(r.frames, exp.frames, '1.2 GB frames'); arrNear(r.energies, exp.energies, 1e-7, '1.2 GB energies'); }
     rows.push(['Node', 'big1200g.log', exp.bytes, r.lines, r.readS, r.parseS, r.totalS, r.maxRssMB, r.error ? 'ERROR ' + r.error : r.frames + ' frames']);
   });
+  for (const gb of [5, 10]) {
+    await test('big: Node, synthetic ' + gb + ' GB QM/MM opt + freq log (a stream; nothing on disk)', async () => {
+      const N = synth.atomsForSize(gb * 1073741824, 20);
+      const r = spawnSync(process.execPath, [__filename, '--synth', String(N), '20'], { encoding: 'utf8', maxBuffer: 1 << 26, timeout: 1800000 });
+      let o;
+      try { o = JSON.parse(r.stdout); } catch (e) { o = { error: 'child failed (status ' + r.status + ', signal ' + r.signal + '): ' + (r.stderr || '').slice(-400) }; }
+      ok(!o.error, gb + ' GB: ' + (o.error || 'ok'));
+      if (!o.error) {
+        ok(o.bytes > 0.95 * gb * 1073741824, gb + ' GB: the stream had ' + (o.bytes / 1073741824).toFixed(2) + ' GB');
+        eq(o.frames, o.expFrames, gb + ' GB frames'); eq(o.nAtoms, N, gb + ' GB atoms');
+        arrNear(o.energies, o.expEnergies, 1e-9, gb + ' GB energies');
+        eq(o.nModes, o.expModes, gb + ' GB vibrations'); eq(o.modesLoaded, o.expModes, gb + ' GB every displacement loaded');
+        ok(o.freqOk && o.modeOk, gb + ' GB frequencies and displacements read exactly');
+        ok(o.layersOk && o.xyzOk, gb + ' GB layers and coordinates');
+        ok(o.maxRssMB * 1048576 < o.bytes / 3, gb + ' GB: peak memory ' + o.maxRssMB + ' MB, far below the file size');
+      }
+      rows.push(['Node', 'synth ' + gb + ' GB', o.bytes || 0, o.lines, o.readS, o.parseS, o.totalS, o.maxRssMB, o.error ? 'ERROR ' + o.error : o.frames + ' frames, ' + o.nModes + ' modes']);
+    });
+  }
   await test('big: Node, 1.1 GB DCD as every Nth frame', async () => {
     const r = child(dcd, 'dcd');
     ok(!r.error, 'dcd: ' + (r.error || 'ok'));
@@ -495,14 +582,21 @@ async function bigTests() {
     page.on('crash', () => errors.push('renderer crashed'));
     await page.goto('file://' + path.join(ROOT, 'dist', 'BlueMolecule.html'));
     await page.waitForFunction(() => window.BM && window.BM.app && window.BM.bigfile);
-    const openBig = async file => {
+    /** Opens a big file through the file input; answer(page) handles the loading dialog (default: Load as proposed). */
+    const openBig = async (file, answer) => {
       const before = await page.evaluate(() => ({ n: window.BM.app.state.docs.length, f: window.BM.app.state.active ? window.BM.app.state.active.data.frames.length : 0 }));
-      let peak = 0, bar = false;
+      let peak = 0, bar = false, asked = false;
       const t0 = Date.now();
       await page.setInputFiles('#file-input', file);
       let st = null;
       for (let i = 0; i < 1500; i++) {
         await page.waitForTimeout(200);
+        if (!asked && await page.$('#dlg[open] [name="ld-steps"]')) {
+          asked = true;
+          if (answer) await answer(page);
+          await page.click('#dlg .btn.primary');
+          continue;
+        }
         peak = Math.max(peak, rendererRss());
         st = await page.evaluate(b => {
           const s = window.BM.app.state, el = document.querySelector('#bm-progress');
@@ -512,7 +606,7 @@ async function bigTests() {
         if (!st.busy && (st.changed || /could not|not enough|memory|cancel/i.test(st.toast))) break;
       }
       const d = await page.evaluate(() => { const a = window.BM.app.state.active; return a ? { frames: a.data.frames.length, atoms: a.data.frames[0].Z.length, energies: a.data.frames.map(f => f.energy), meta: { totalFrames: a.data.meta.totalFrames, stride: a.data.meta.stride } } : null; });
-      return { s: (Date.now() - t0) / 1000, peak, bar, toast: st && st.toast, d };
+      return { s: (Date.now() - t0) / 1000, peak, bar, asked, toast: st && st.toast, d };
     };
     await test('big: Chromium opens the ~600 MB logs through the file input', async () => {
       for (const name of ['big600g.log', 'big600o.out']) {
@@ -533,6 +627,36 @@ async function bigTests() {
       rows.push(['Chromium', 'big1200g.log', exp.bytes, null, null, null, r.s, r.peak, r.d && r.d.frames === exp.frames ? r.d.frames + ' frames' : r.toast]);
       await page.evaluate(() => { const s = window.BM.app.state; s.docs.length = 0; s.active = null; });
     });
+    await test('big: Chromium, synthetic 1.5 GB QM/MM log: the loading dialog, part of the steps and vibrations', async () => {
+      const N = synth.atomsForSize(1.5 * 1073741824, 20), g = synth.gaussianOniom({ atoms: N, steps: 20 }), e = g.expected;
+      const file = path.join(WORK, 'synth1500.log');
+      const fd = fs.openSync(file, 'w'), rd = g.stream().getReader();
+      for (;;) { const x = await rd.read(); if (x.done) break; fs.writeSync(fd, x.value); }
+      fs.closeSync(fd);
+      made.push(file);
+      const r = await openBig(file, async pg => {
+        await pg.click('#dlg input[name="ld-steps"][value="last"]'); await pg.fill('#dlg [data-ld="last"]', '5');
+        await pg.click('#dlg input[name="ld-modes"][value="first"]'); await pg.fill('#dlg [data-ld="first"]', '500');
+      });
+      ok(r.asked, '1.5 GB: the loading dialog was shown');
+      const d = await page.evaluate(() => { const a = window.BM.app.state.active, v = a.data.vibrations;
+        return { frames: a.data.frames.length, steps: a.data.steps ? a.data.steps.length : 0, E: (a.data.steps || []).map(s => s.energy), nV: v.freqs.length, loaded: v.modesLoaded, m0: !!v.modes[0], m600: v.modes[600], tab: a.tab }; });
+      ok(d.frames === 6 && d.steps === e.frames, '1.5 GB: the first and the last 5 geometries of ' + e.frames + ' steps: ' + d.frames + ' / ' + d.steps);
+      arrNear(d.E, e.energies, 1e-9, '1.5 GB: every step keeps its energy');
+      ok(d.nV === e.nModes && d.loaded === 500 && d.m0 && d.m600 === null, '1.5 GB: 500 of ' + d.nV + ' displacements');
+      // the vibration list shows a window of rows; a mode without displacements says so
+      await page.click('#tabs [data-tab="vib"]');
+      const rowsShown = await page.evaluate(() => document.querySelectorAll('#vib-table tr.row').length);
+      ok(rowsShown <= 2000 && rowsShown > 100, 'vibration rows rendered: ' + rowsShown);
+      await page.evaluate(() => BM.app.selectVib(BM.app.state.active, 600));
+      ok(/not loaded/.test(await page.textContent('#status-msg')), 'a vibration without displacements says so');
+      await page.click('#tabs [data-tab="info"]');
+      ok(/500 of [\d,]+ vibrations/.test(await page.textContent('#sec-loaded')), 'Info tab: what was loaded');
+      rows.push(['Chromium', 'synth1500.log', fs.statSync(file).size, null, null, null, r.s, r.peak, d.frames + ' frames, ' + d.loaded + '/' + d.nV + ' modes']);
+      ok(r.peak < 1500, '1.5 GB: renderer memory ' + r.peak + ' MB');
+      await page.evaluate(() => { const s = window.BM.app.state; s.docs.length = 0; s.active = null; });
+      try { fs.unlinkSync(file); } catch (err) { /* gone */ }
+    });
     await test('big: Chromium, 20000-atom topology + 1.1 GB DCD', async () => {
       const xyz = path.join(WORK, 'topo20k.xyz');
       fs.writeFileSync(xyz, '20000\nbig topology\n' + Array.from({ length: 20000 }, (_, i) => 'Ar ' + gridPos(i).map(v => v.toFixed(3)).join(' ')).join('\n') + '\n');
@@ -540,7 +664,7 @@ async function bigTests() {
       await openBig(xyz);
       const r = await openBig(dcd);
       ok(r.d && r.d.atoms === 20000 && r.d.frames > 100 && r.d.frames < 4601, 'DCD frames attached: ' + (r.d && r.d.frames) + ' (' + r.toast + ')');
-      ok(/of 4600 frames loaded/.test(r.toast || ''), 'toast tells the stride: ' + r.toast);
+      ok(r.asked ? /of 4600 frames|frames loaded/.test(r.toast || '') || r.d.frames < 4600 : /of 4600 frames loaded/.test(r.toast || ''), 'toast or dialog tells the part loaded: ' + r.toast);
       rows.push(['Chromium', 'big.dcd', fs.statSync(dcd).size, null, null, null, r.s, r.peak, r.toast]);
     });
     ok(!errors.length, 'no page errors: ' + errors.join('; '));

@@ -23,10 +23,11 @@ A QM/MM or ONIOM output prints many energies in each optimisation cycle:
 
 A reader that treats every printed energy as a new point produces an energy graph that jumps back and forth.
 
-BlueMolecule keeps **one geometry per optimisation step**: the full system, with **the total energy only**. For
+BlueMolecule keeps **one geometry per optimisation step**: the full system, with **one total energy**. For
 Gaussian that is the `ONIOM: extrapolated energy`; for ORCA, the total QM/MM (or QM/QM2) energy. The layer and
-component energies are read and stored with each step, but the interface currently plots only the total (see
-[limitations](limitations.md)).
+component energies are read and stored with each step too. The **Energy components** plot (in the plot picker's
+*Optimisation* group) draws the total and each component, each relative to its own final value, so you can see
+which part of the system drives the optimisation. The Info tab lists the components of the geometry shown.
 
 When an output does not echo the molecule in Cartesian form, BlueMolecule cannot assign the layers and says so
 under **Reader notes**. For example, this happens with Gaussian `geom=check`, where the molecule is taken from the
