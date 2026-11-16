@@ -49,7 +49,14 @@ Below the overview:
 
 ## Optimisations
 
-Every geometry of an optimisation is a frame. Play them with the playbar, or click a row of the **Steps** tab.
+Every geometry of an optimisation is a frame. Play them with the playbar, click a row of the **Steps** tab, or
+press **↑ / ↓** (or **← / →**) to go to the previous or next geometry; **Page Up / Page Down** jump 10 rows and
+**Home / End** go to the first and last. The same keys move through the **Vibrations** and **States** lists.
+
+**Jobs that are still running** can be opened at any time. A geometry whose energy is not printed yet is marked
+*in progress* and has no ΔE and no point in the energy plots; it is never counted as 0. If the file ends in the middle of a line,
+that line is left out, and the Info tab says *Not finished: still running?*. Open the file again later to see the
+new steps.
 
 **Steps tab**
 - Each geometry with its energy (Eh) and ΔE in kcal/mol, kJ/mol or eV, relative to the lowest, first or last

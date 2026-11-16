@@ -1389,7 +1389,8 @@
           if (q) v[q[1]] = q[2];
         }
         const yes = k => (v[k] === undefined ? undefined : /YES/i.test(v[k]));
-        st.energy = num(v['Total Energy']);
+        const eTot = num(v['Total Energy']);
+        st.energy = Number.isFinite(eTot) ? eTot : null;   // missing in a cycle that is still running
         setOpt(st.opt, 'energyChange', num(v['Real energy change']));
         setOpt(st.opt, 'maxDisp', num(v['Max. step size']), num(v['Conv. limit for step size']), yes('Convergence in step size'));
         setOpt(st.opt, 'rmsDisp', num(v['RMS step size']), num(v['Conv. limit for RMS step']), yes('Convergence in RMS step'));

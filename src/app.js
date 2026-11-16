@@ -7,7 +7,7 @@
   const HARTREE = { kcal: 627.509474, kj: 2625.49964, ev: 27.211386 };
   const UNIT_LABEL = { kcal: 'kcal/mol', kj: 'kJ/mol', ev: 'eV' };
   const BG = { navy: [0.063, 0.090, 0.133], black: [0, 0, 0], white: [1, 1, 1], gray: [0.91, 0.925, 0.945] };
-  const VERSION = '1.4.1';
+  const VERSION = '1.4.2';
   const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const isNum = v => typeof v === 'number' && isFinite(v);
   const fx = (v, d) => (isNum(v) ? v.toFixed(d) : '—');
@@ -1089,6 +1089,33 @@
     if (d.tab === 'build') { clearTimeout(buildTimer); if (fromAnim) buildTimer = setTimeout(renderPanel, 250); else renderPanel(); }
   }
   let buildTimer = 0;
+  function selectState(d, i) {
+    d.stateIndex = i;
+    renderPanel();
+    if (d.plotType !== 'uv' && d.plotType !== 'ecd' && plotTypes(d).some(p => p[0] === 'uv')) { d.plotType = 'uv'; renderPlot(); } else renderPlotDraw();
+  }
+  /** Up/Down (and Page Up/Down, Home/End) in the Steps, Vibrations and States lists move to another row, as Left/Right
+   *  do in the plot (issue #4). False when the active tab has no such list, so the key keeps its usual meaning. */
+  function listKey(d, key) {
+    const tab = d.tab, updown = key === 'ArrowUp' || key === 'ArrowDown', back = key === 'ArrowUp' || key === 'PageUp' || key === 'Home';
+    if (tab === 'steps' && d.data.frames.length > 1) {
+      if (updown) { stepFrame(back ? -1 : 1); return true; }
+      const vis = visibleFrames(d), k = Math.max(0, vis.indexOf(d.frameIndex));
+      const to = key === 'PageUp' ? Math.max(0, k - 10) : key === 'PageDown' ? Math.min(vis.length - 1, k + 10) : key === 'Home' ? 0 : vis.length - 1;
+      setFrame(d, vis[to]);
+      return true;
+    }
+    const n = tab === 'vib' && d.data.vibrations ? d.data.vibrations.freqs.length
+      : tab === 'states' && d.data.excitedStates ? d.data.excitedStates.length : 0;
+    if (!n) return false;
+    const cur = tab === 'vib' ? d.vibIndex : d.stateIndex;
+    let k;
+    if (updown) k = cur < 0 ? (back ? n - 1 : 0) : (cur + (back ? -1 : 1) + n) % n;
+    else if (key === 'PageUp' || key === 'PageDown') k = Math.max(0, Math.min(n - 1, Math.max(0, cur) + (back ? -10 : 10)));
+    else k = back ? 0 : n - 1;
+    if (tab === 'vib') { selectVib(d, k); renderPanel(); } else selectState(d, k);
+    return true;
+  }
   function stepFrame(delta) {
     const d = state.active; if (!d) return;
     const vis = visibleFrames(d);
@@ -1202,7 +1229,7 @@
     const d = state.active; if (!d) return;
     const lab = $('#pb-label'), sl = $('#playbar input[data-pb=frame]');
     const vis = visibleFrames(d), k = vis.indexOf(d.frameIndex);
-    if (lab) lab.innerHTML = `Geometry <b class="mono">${d.frameIndex + 1}</b> / ${d.data.frames.length}${isNum(curFrame(d).energy) ? ' · <span class="mono">' + curFrame(d).energy.toFixed(6) + '</span> Eh' : ''}`;
+    if (lab) lab.innerHTML = `Geometry <b class="mono">${d.frameIndex + 1}</b> / ${d.data.frames.length}${isNum(curFrame(d).energy) ? ' · <span class="mono">' + curFrame(d).energy.toFixed(6) + '</span> Eh' : inProgress(d, d.frameIndex) ? ' · in progress' : ''}`;
     if (sl && k >= 0) sl.value = k;
   }
 
@@ -1282,6 +1309,7 @@
     let term = null;
     if (m.normalTermination === true) term = '<span class="pill ok">Normal termination</span>';
     else if (m.normalTermination === false) term = '<span class="pill bad">Error / incomplete</span>';
+    else if (m.running) term = '<span class="pill warn" title="No termination message yet: the job is still running, or it was stopped">Not finished: still running?</span>';
     const vib = data.vibrations;
     let vibTxt = null;
     if (vib) {
@@ -1428,13 +1456,19 @@
     if (d.spec.energy.ref === 'last') return E[E.length - 1];
     return Math.min(...E);
   }
+  /** The last geometry of a job that is still running, whose energy is not printed yet. */
+  function inProgress(d, i) {
+    const fr = d.data.frames;
+    return !!(d.data.meta && d.data.meta.running) && i === fr.length - 1 && fr.length > 1 && !isNum(fr[i].energy);
+  }
   function panelSteps(d) {
     const fr = d.data.frames, ref = energyRef(d), u = UNIT_LABEL[d.spec.energy.unit];
     const vis = visibleFrames(d);
     const anyConv = fr.some(f => f.converged);
     const rows = vis.slice(0, 5000).map(i => {
       const f = fr[i];
-      return `<tr class="row" data-i="${i}"><td>${i + 1}${f.label ? ` <span class="lab" title="${esc(f.label)}">${esc(f.label)}</span>` : ''}</td><td>${fx(f.energy, 6)}</td><td>${isNum(f.energy) ? energyIn(d, f.energy, ref).toFixed(2) : '—'}</td><td>${f.converged ? '<span class="ok-mark">●</span>' : ''}</td></tr>`;
+      const busy = inProgress(d, i);
+      return `<tr class="row" data-i="${i}"><td>${i + 1}${f.label ? ` <span class="lab" title="${esc(f.label)}">${esc(f.label)}</span>` : ''}${busy ? ' <span class="lab busy" title="The job is still running: this step has no energy yet">in progress</span>' : ''}</td><td>${fx(f.energy, 6)}</td><td>${isNum(f.energy) ? energyIn(d, f.energy, ref).toFixed(2) : '—'}</td><td>${f.converged ? '<span class="ok-mark">●</span>' : ''}</td></tr>`;
     }).join('');
     return `<div class="sec"><div class="controls">
         ${d.data.jobs && d.data.jobs.length > 1 ? jobSelect(d) : ''}
@@ -2012,8 +2046,8 @@
     const fileRoute = /^gaussian/.test(d.data.format) && m.route ? String(m.route) : null;
     const fileKw = d.data.format === 'orca-out' && m.keywords ? String(m.keywords) : null;
     const cd = chargeDefaults(d);
-    const base = baseName(d).replace(/[^A-Za-z0-9_.-]+/g, '_').replace(/^[._-]+|[._-]+$/g, '') || 'job';
-    const title = d.built ? d.name : (d.data.title && d.data.title !== d.name ? d.data.title : baseName(d)) + (f.label ? ' (' + f.label + ')' : '');
+    // the Job name is the title of the input and, made safe, the name of its files (issue #3)
+    const jobName = d.built ? d.name : baseName(d);
     const body = `
       <div class="two"><label class="field"><span>Program</span><select data-c="program">${progs.map(p => `<option value="${p.id}" ${p.id === pid ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>
         <label class="field"><span>Task</span><select data-c="task"></select></label></div>
@@ -2029,7 +2063,7 @@
       <div class="two"><label class="field"><span>Cores</span><input type="number" data-c="nprocs" value="${prefs.nprocs}" min="1" step="1"></label>
         <label class="field"><span>Memory (MB)</span><input type="number" data-c="mem" value="${prefs.memoryMB}" min="0" step="500"></label></div>
       <div class="two"><label class="field"><span>Solvent</span><input type="text" data-c="solvent" placeholder="none (gas phase)" spellcheck="false"></label>
-        <label class="field"><span>Title</span><input type="text" data-c="title" value="${esc(title)}"></label></div>
+        <label class="field" title="Used as the file name (and the checkpoint name) and as the title of the input"><span>Job name</span><input type="text" data-c="title" value="${esc(jobName)}" spellcheck="false"></label></div>
       <label class="field cw"><span>Extra keywords</span><input type="text" data-c="extra" placeholder="optional; written where the program expects extra input" spellcheck="false"></label>
       <textarea data-c="preview" spellcheck="false"></textarea>
       <p class="note" data-c="note"></p>`;
@@ -2037,8 +2071,9 @@
     const V = (form, k) => $(`[data-c="${k}"]`, form);
     const prog = form => progs.find(p => p.id === V(form, 'program').value) || progs[0];
     const usesFile = (form, p) => (p.id === 'gaussian' && fileRoute && V(form, 'useRoute').checked) || (p.id === 'orca' && fileKw && V(form, 'useKw').checked);
+    const baseOf = form => BM.writers.fileBase(V(form, 'title').value, 'job');
     const build = form => {
-      const p = prog(form), n = s => V(form, s).value;
+      const p = prog(form), n = s => V(form, s).value, base = baseOf(form);
       const o = { Z: g.Z, xyz: g.xyz, charge: parseInt(n('charge'), 10) || 0, multiplicity: parseInt(n('mult'), 10) || 1, method: n('method').trim(), basis: n('basis').trim(), task: n('task'),
         nprocs: Math.max(1, parseInt(n('nprocs'), 10) || 1), memoryMB: Math.max(0, parseInt(n('mem'), 10) || 0), title: n('title'), solvent: n('solvent').trim() || undefined, extra: n('extra').trim() || undefined, baseName: base };
       const notes = [cd.note];
@@ -2059,6 +2094,7 @@
         notes.push(result.note);
         if (result.files && result.files.length > 1) notes.push('Saves ' + result.files.map(x => x.name).join(' and ') + '.');
         else if (result.files && result.files.length) notes.push('Saves ' + result.files[0].name + '.');
+        else notes.push('Saves ' + base + '.' + (p.ext || 'inp') + '.');
         if (result.command) notes.push('Run: <code>' + esc(result.command) + '</code>');
         V(form, 'note').innerHTML = notes.filter(Boolean).map(x => (/^Run: /.test(x) ? x : esc(x))).join(' ') || `The preview is editable. Geometry ${d.frameIndex + 1} of ${d.data.frames.length} is used.`;
         V(form, 'note').classList.remove('err');
@@ -2110,7 +2146,7 @@
               for (let k = 0; k < files.length; k++) await saveFile(files[k].name, k === 0 ? text : files[k].text);
               toast('Saved ' + files.map(x => x.name).join(', ') + (command ? ' · run: ' + command : ''));
             })();
-          } else saveFile(base + '.' + (p.ext || 'inp'), text);
+          } else saveFile(baseOf(form) + '.' + (p.ext || 'inp'), text);
         }
       }
     ], form => {
@@ -2290,7 +2326,7 @@
         ${k('Left drag', 'Rotate')}${k('Right / Shift+drag', 'Move (pan)')}${k('Alt/Option+drag', 'Rotate in the screen plane')}${k('Wheel / pinch', 'Zoom')}
         ${k('Click atom', 'Select; 2–4 atoms measure')}${k('Double-click atom', 'Centre view on atom')}${k('Click empty space', 'Clear selection')}${k('Ctrl/⌘ + O', 'Open files')}
         ${k('Ctrl/⌘ + Shift + S', 'Save as… (any format)')}${k('?', 'This help')}
-        ${k('Space', 'Play / pause')}${k('← / →', 'Previous / next geometry')}${k('Home / End', 'First / last geometry')}${k('1 2 3 4', 'Ball & stick, sticks, spacefill, wire')}
+        ${k('Space', 'Play / pause')}${k('← / →', 'Previous / next geometry')}${k('↑ / ↓', 'Previous / next row of the Steps, Vibrations or States list')}${k('Home / End', 'First / last geometry (or row)')}${k('1 2 3 4', 'Ball & stick, sticks, spacefill, wire')}
         ${k('H', 'Toggle hydrogens')}${k('L', 'Cycle labels')}${k('B', 'Toggle bond lengths')}${k('P', 'Perspective / orthographic')}
         ${k('R', 'Reset view')}${k('Esc', 'Stop animation or clean-up, clear selection')}
       </div>
@@ -2298,10 +2334,11 @@
       <div class="keys">
         ${k('N', 'Navigate: rotate, pan, zoom; click atoms to measure')}
         ${k('S', 'Select: drag a box (Shift adds, Ctrl/⌘ removes), click toggles, double-click selects a fragment')}
-        ${k('D', 'Draw: click to add an atom, drag from an atom for a bonded atom, click a bond to cycle 1→2→3, Alt/Option-click deletes')}
+        ${k('D', 'Draw: click to add an atom, drag from an atom for a bonded atom, click a bond to cycle 1→2→3, right-click or Alt/Option-click deletes an atom or bond')}
         ${k('T', 'Template: insert molecules and metal centres, attach groups, replace ligands')}
         ${k('K', 'Bond-centric: drag a bond to rotate its smaller side, Shift-drag to stretch it')}
         ${k('M', 'Manipulate: drag an atom to move its fragment or the selection, Shift-drag to rotate')}
+        ${k('Right-click atom', 'Delete it (Draw, Template, Bond-centric and Manipulate; right-drag still pans)')}
         ${k('Ctrl/⌘ + A', 'Select all atoms')}${k('Delete / Backspace', 'Delete the selected atoms')}
         ${k('Ctrl/⌘ + Z', 'Undo (Ctrl/⌘ + Shift + Z or Ctrl + Y: redo)')}
       </div>
@@ -2473,7 +2510,7 @@
       const t = row.closest('table');
       if (t.id === 'steps-table') setFrame(d, +row.dataset.i);
       else if (t.id === 'vib-table') { const i = +row.dataset.i; if (d.vibIndex === i && state.anim.kind === 'vib') toggleVibPlay(); else { selectVib(d, i); renderPanel(); } }
-      else if (t.id === 'states-table') { d.stateIndex = +row.dataset.i; renderPanel(); if (d.plotType !== 'uv' && d.plotType !== 'ecd' && plotTypes(d).some(p => p[0] === 'uv')) { d.plotType = 'uv'; renderPlot(); } else renderPlotDraw(); }
+      else if (t.id === 'states-table') selectState(d, +row.dataset.i);
       else if (row.dataset.atom !== undefined) { onAtomClick(+row.dataset.atom); }
     });
     panel.addEventListener('input', e => {
@@ -2593,8 +2630,9 @@
         case ' ': e.preventDefault(); togglePlay(); break;
         case 'ArrowLeft': if (d) { e.preventDefault(); stepFrame(-1); } break;
         case 'ArrowRight': if (d) { e.preventDefault(); stepFrame(1); } break;
-        case 'Home': if (d) setFrame(d, visibleFrames(d)[0]); break;
-        case 'End': if (d) { const v = visibleFrames(d); setFrame(d, v[v.length - 1]); } break;
+        case 'ArrowUp': case 'ArrowDown': case 'PageUp': case 'PageDown': if (d && listKey(d, e.key)) e.preventDefault(); break;
+        case 'Home': if (d && !listKey(d, 'Home')) setFrame(d, visibleFrames(d)[0]); break;
+        case 'End': if (d && !listKey(d, 'End')) { const v = visibleFrames(d); setFrame(d, v[v.length - 1]); } break;
         case '1': setView({ style: 'ballstick' }); break;
         case '2': setView({ style: 'sticks' }); break;
         case '3': setView({ style: 'spacefill' }); break;

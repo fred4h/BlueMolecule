@@ -71,17 +71,17 @@ Download the latest release from the **[Releases page](https://github.com/fred4h
 **Linux** (the main platform; needs `python3`):
 
 ```bash
-tar xzf BlueMolecule-1.4.1-linux.tar.gz
-cd BlueMolecule-1.4.1-linux
+tar xzf BlueMolecule-1.4.2-linux.tar.gz
+cd BlueMolecule-1.4.2-linux
 ./install.sh                 # installs for your user in ~/.local; offers to install Qt WebEngine for Python
 bluemolecule calc.log        # or start it from the applications menu, or use "Open With" on a file
 ```
 
-**Windows 10 and 11** (experimental, not yet tested on a real PC): extract `BlueMolecule-1.4.1-windows.zip`, then
+**Windows 10 and 11** (experimental, not yet tested on a real PC): extract `BlueMolecule-1.4.2-windows.zip`, then
 double-click **Install BlueMolecule.cmd**. It needs no administrator rights and nothing installed first. It adds
 BlueMolecule to the Start menu and to **Open with** for chemistry files.
 
-**macOS** (experimental, not yet tested on a real Mac): unzip `BlueMolecule-1.4.1-macOS.zip`, then double-click
+**macOS** (experimental, not yet tested on a real Mac): unzip `BlueMolecule-1.4.2-macOS.zip`, then double-click
 **Install BlueMolecule.command**. It needs Apple's free Command Line Tools.
 
 **Any computer:** open `BlueMolecule.html` in Chrome, Edge, Firefox or Safari. It works offline, but Open Babel is
@@ -110,7 +110,8 @@ Building from source needs only Python 3: `python3 tools/build.py`.
 
 ## Status
 
-BlueMolecule 1.4.1 is the first public release. The automated test suite has about 8,000 checks in 27 suites:
+BlueMolecule 1.4.2 is the current release (1.4.1 was the first public one). The automated test suite has about
+30,000 checks in 29 suites, 22,000 of them from cutting example outputs as a running job would leave them:
 - format readers and writers against example files;
 - chemistry routines;
 - the selection language;

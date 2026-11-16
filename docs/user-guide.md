@@ -76,7 +76,8 @@ Press **?** in the window to see this list.
 | **Ctrl/⌘ + Shift + S** | Save as… (any format) |
 | **Space** | Play or pause the geometries or the vibration |
 | **← / →** | Previous or next geometry |
-| **Home / End** | First or last geometry |
+| **↑ / ↓** | Previous or next row of the Steps, Vibrations or States list (**Page Up / Page Down** jump 10 rows) |
+| **Home / End** | First or last geometry (or row) |
 | **1 2 3 4** | Ball & stick, sticks, spacefill, wire |
 | **H** | Show or hide hydrogens |
 | **L** | Cycle the atom labels |
@@ -87,6 +88,7 @@ Press **?** in the window to see this list.
 | **N S D T K M** | Build tools: Navigate, Select, Draw, Template, Bond-centric, Manipulate ([building](building-and-editing.md)) |
 | **Ctrl/⌘ + A** | Select all atoms |
 | **Delete / Backspace** | Delete the selected atoms |
+| **Right-click an atom** | Delete it, in the Draw, Template, Bond-centric and Manipulate tools (right-drag still pans) |
 | **Ctrl/⌘ + Z** | Undo. **Ctrl/⌘ + Shift + Z** or **Ctrl + Y**: redo |
 | **?** | Help and shortcuts |
 

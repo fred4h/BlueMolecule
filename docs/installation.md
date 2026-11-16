@@ -27,8 +27,8 @@ It works on X11 and Wayland desktops (KDE Plasma, GNOME and others).
 ### Install
 
 ```bash
-tar xzf BlueMolecule-1.4.1-linux.tar.gz
-cd BlueMolecule-1.4.1-linux
+tar xzf BlueMolecule-1.4.2-linux.tar.gz
+cd BlueMolecule-1.4.2-linux
 ./install.sh
 ```
 
@@ -107,7 +107,7 @@ tools.
 
 ### Install
 
-1. Extract `BlueMolecule-1.4.1-windows.zip`: right-click it and choose **Extract All**.
+1. Extract `BlueMolecule-1.4.2-windows.zip`: right-click it and choose **Extract All**.
 2. Double-click **Install BlueMolecule.cmd**. If Windows says it protected your PC, click **More info → Run anyway**.
 
 The installer needs **no administrator rights and nothing installed first**. It uses only Windows PowerShell, the
@@ -148,7 +148,7 @@ no special browser settings, but it works for files up to **64 MB**. Open larger
 > The macOS version has **not yet been tested on a real Mac**. It was written and checked on Linux, and the Swift
 > code is compiled on your Mac during installation. Please report what happens.
 
-1. Unzip `BlueMolecule-1.4.1-macOS.zip`.
+1. Unzip `BlueMolecule-1.4.2-macOS.zip`.
 2. Double-click **Install BlueMolecule.command**. The installer:
    - compiles the small native app (a WKWebView window, Swift source in `native/macos/`) with Apple's free Command
      Line Tools; if they are missing, it starts their installer, and you run the BlueMolecule installer again

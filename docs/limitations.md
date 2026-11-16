@@ -5,7 +5,8 @@ as honestly as possible, what has been checked, what has not, and what the progr
 
 ## What has been checked
 
-- **About 8,000 automated checks in 27 test suites**, all passing for this release
+- **About 30,000 automated checks in 29 test suites** (22,000 of them cut example outputs as a running job would
+  leave them), all passing for this release
   ([how to run them](developer-guide.md#tests)). They cover:
   - every reader and writer, including format detection and the units and conventions of each program;
   - the chemistry routines;

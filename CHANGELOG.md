@@ -3,6 +3,30 @@
 BlueMolecule is [vibe-coded](docs/vibe-coding.md). Each version below was written by an AI assistant from the
 author's requests and bug reports.
 
+## 1.4.2 (16 November 2026): quick fixes
+
+- **Jobs that are still running** ([#1](https://github.com/fred4h/BlueMolecule/issues/1)). A last energy that is
+  not printed yet, or cut in the middle of its number, no longer becomes 0 or a truncated number, so ΔE and
+  the energy and convergence plots stay correct. The incomplete last line of an output is left out, the step
+  without an energy is marked *in progress*, and the Info tab says *Not finished: still running?*. A new test cuts
+  every example output at thousands of places.
+- **Drop-down menus stay open after a click** ([#2](https://github.com/fred4h/BlueMolecule/issues/2)), including
+  the plot picker. BlueMolecule now draws its own menus: click to open, click an option; press, drag and release
+  also works, and so do the keys (Enter, Space, ↑ ↓, Home, End, letters, Esc). After a choice with the mouse the
+  arrow keys and shortcuts work again at once.
+- **The Job name of the calculation-input dialog is the file name**
+  ([#3](https://github.com/fred4h/BlueMolecule/issues/3)), made safe for file names and with the program's extension
+  (for example `My job 1` → `My_job_1.inp`). It starts as the name of the opened file and is also the Gaussian
+  checkpoint name.
+- **↑ / ↓ move through the Steps, Vibrations and States lists**
+  ([#4](https://github.com/fred4h/BlueMolecule/issues/4)), as ← / → do; Page Up / Page Down jump 10 rows and Home /
+  End go to the first and last row, which stays in view.
+- **Right-click deletes an atom while building** ([#5](https://github.com/fred4h/BlueMolecule/issues/5)), in the
+  Draw, Template, Bond-centric and Manipulate tools, and a bond in the Draw tool. Each deletion can be undone.
+  Right-drag still pans, and Navigate and Select never delete. Deleting every atom of a file geometry is refused,
+  as with the Delete key.
+- New browser test of these interface details (`tests/browser_ui_test.js`).
+
 ## 1.4.1 (10 November 2026): first public release
 
 - Full documentation in `docs/`, with a clear notice that the project is vibe-coded. The notice also appears in the
