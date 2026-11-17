@@ -311,7 +311,7 @@
   /** Memory the computer can give to the number arrays of a big file (bytes): what the Linux app reports as free, else
    *  half of the browser's hint (navigator.deviceMemory: rounded, at most 8 GB), else unknown (no limit). */
   function ramLimit() {
-    const q = window.BM_QT;
+    const q = window.BM_QT || window.BM_TAURI;   // the Linux Qt window or the desktop app
     if (q && q.memAvailable > 0) return 0.8 * q.memAvailable;
     const dm = typeof navigator !== 'undefined' ? navigator.deviceMemory : 0;
     return dm > 0 ? 0.5 * dm * 1073741824 : undefined;
@@ -2699,7 +2699,43 @@
         ${k('Export', 'Save as… (structure, crystal, MD and QC formats, plus Open Babel), calculation inputs for ten programs, images, vibration animations')}
       </div>
       <p class="note">The Build tab adds SMILES, a fragment library, hydrogens, bond orders, alignment, a clean-up force field (not a QM method), symmetry and a coordinate editor. BlueMolecule is an independent viewer for quantum-chemistry work; everything runs locally and files never leave your computer.</p>`,
-    [{ label: 'Close', primary: true }]);
+    (BM.native && BM.native.updates ? [{ label: 'Check for updates…', onClick: () => { checkUpdates(true); return true; } }] : []).concat([{ label: 'Close', primary: true }]));
+  }
+
+  // ---------------- updates (the desktop app, issue #12) ----------------
+  const UPDATES_KEY = 'bluemolecule.updates.auto';
+  function updatesAuto() { try { return localStorage.getItem(UPDATES_KEY) === '1'; } catch (e) { return false; } }
+  function setUpdatesAuto(on) { try { localStorage.setItem(UPDATES_KEY, on ? '1' : '0'); } catch (e) { /* ignore */ } }
+  /** Help → Check for updates (manual), or the opt-in check at start-up (quiet unless there is a new version). The
+   *  check asks GitHub for the latest release; the update is installed only after its signature is checked. */
+  async function checkUpdates(manual) {
+    const up = BM.native && BM.native.updates;
+    if (!up) return;
+    if (manual) status('Checking for updates…');
+    let r;
+    try { r = await up.check(); } catch (e) { r = { supported: up.supported, available: false, error: String((e && e.message) || e) }; }
+    r = r || {};
+    if (!manual) {
+      if (r.available) toast(`BlueMolecule ${r.version} is available: Help → Check for updates.`);
+      return;
+    }
+    status(r.available ? 'An update is available' : 'Ready');
+    const box = r.supported === false ? '' : `<label class="upd-auto"><input type="checkbox" data-upd="auto"${updatesAuto() ? ' checked' : ''}> Check for updates when BlueMolecule starts</label>
+      <p class="note">A check asks GitHub for the latest release and sends nothing else. It is BlueMolecule's only use of the network, and it never happens unless you ask or tick this box.</p>`;
+    const keep = form => { const c = form.querySelector('[data-upd="auto"]'); if (c) setUpdatesAuto(c.checked); };
+    if (r.available) {
+      dialog(`BlueMolecule ${esc(r.version)} is available`, `<p>You have version ${esc(r.current)}${r.date ? '; this one was released on ' + esc(String(r.date).slice(0, 10)) : ''}.</p>
+        ${r.notes ? `<div class="upd-notes">${esc(r.notes)}</div>` : ''}${box}`, [
+        { label: 'Later', onClick: f => { keep(f); } },
+        { label: 'Install and restart', primary: true, onClick: async f => {
+          keep(f);
+          status('Downloading and installing the update…');
+          try { await up.install(); } catch (e) { toast('The update was not installed: ' + ((e && e.message) || e), true); }
+        } }]);
+    } else {
+      const msg = r.error ? 'The check did not succeed: ' + esc(r.error) : `BlueMolecule ${esc(r.current)} is the latest version.`;
+      dialog('Updates', `<p>${msg}</p>${box}`, [{ label: 'Close', primary: true, onClick: f => { keep(f); } }]);
+    }
   }
 
   // ---------------- status ----------------
@@ -3059,6 +3095,7 @@
       '<b>MD</b> prmtop/PSF + inpcrd, DCD, TRR, XTC, Amber NetCDF · .gz · others via Open Babel';
     const mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
     $$('[data-act="save-as"] kbd').forEach(k => { k.textContent = mac ? '⇧⌘S' : 'Ctrl+Shift+S'; });
+    if (BM.native && BM.native.updates && BM.native.updates.supported && updatesAuto()) setTimeout(() => checkUpdates(false), 8000);
     if (BM.native && typeof BM.native.onOpenFile === 'function') {
       BM.native.onOpenFile((name, data) => { try { openHostFile(hostItem(name, data)); } catch (e) { toast(e.message || String(e), true); } });
     }

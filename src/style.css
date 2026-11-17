@@ -436,3 +436,8 @@ select.bm-open { border-color: var(--accent) !important; }
 #dlg .ld-opt { display: flex; align-items: center; gap: 6px; padding: 3px 0; }
 #dlg .ld-opt input[type=number] { margin: 0 4px; }
 table.list tr.nodisp td { opacity: 0.55; }
+
+/* updates (the desktop app) */
+#dlg .upd-notes { max-height: 260px; overflow: auto; white-space: pre-wrap; font-size: 12px; line-height: 1.45; padding: 8px 10px;
+  border: 1px solid var(--line-2); border-radius: 6px; background: var(--panel-2); margin: 8px 0; }
+#dlg .upd-auto { display: flex; gap: 8px; align-items: center; margin-top: 10px; }

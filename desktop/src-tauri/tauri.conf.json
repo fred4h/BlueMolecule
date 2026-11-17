@@ -1,0 +1,76 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "BlueMolecule",
+  "mainBinaryName": "bluemolecule",
+  "version": "2.0.0",
+  "identifier": "org.bluemolecule.BlueMolecule",
+  "build": {
+    "frontendDist": "../www"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["deb", "appimage", "nsis", "app", "dmg"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "publisher": "Frederico Henrique Do. C. R. Ferreira",
+    "copyright": "Copyright (c) 2026 Frederico Henrique Do. C. R. Ferreira. MIT License.",
+    "category": "Education",
+    "shortDescription": "Viewer and builder for molecules and quantum-chemistry outputs",
+    "longDescription": "BlueMolecule opens quantum-chemistry outputs (Gaussian, ORCA and many more), structures and MD trajectories: 3D view, vibrations, spectra, orbitals, energy and convergence plots, and a molecule builder. A vibe-coded project: its code was written by an AI assistant (Claude, by Anthropic) from its author's instructions.",
+    "license": "MIT",
+    "createUpdaterArtifacts": false,
+    "fileAssociations": [
+      { "ext": ["xyz"], "name": "XYZ coordinates", "mimeType": "chemical/x-xyz", "role": "Viewer", "rank": "Alternate" },
+      { "ext": ["cube", "cub"], "name": "Gaussian cube", "mimeType": "chemical/x-gaussian-cube", "role": "Viewer", "rank": "Alternate" },
+      { "ext": ["fchk", "fch"], "name": "Gaussian formatted checkpoint", "mimeType": "chemical/x-gaussian-checkpoint", "role": "Viewer", "rank": "Alternate" },
+      { "ext": ["gjf"], "name": "Gaussian input", "mimeType": "chemical/x-gaussian-input", "role": "Viewer", "rank": "Alternate" },
+      { "ext": ["molden"], "name": "Molden file", "mimeType": "chemical/x-molden", "role": "Viewer", "rank": "Alternate" },
+      { "ext": ["mol"], "name": "MDL molfile", "mimeType": "chemical/x-mdl-molfile", "role": "Viewer", "rank": "Alternate" },
+      { "ext": ["sdf"], "name": "MDL SD file", "mimeType": "chemical/x-mdl-sdfile", "role": "Viewer", "rank": "Alternate" },
+      { "ext": ["mol2"], "name": "Tripos Mol2", "mimeType": "chemical/x-mol2", "role": "Viewer", "rank": "Alternate" },
+      { "ext": ["pdb", "ent"], "name": "Protein Data Bank file", "mimeType": "chemical/x-pdb", "role": "Viewer", "rank": "Alternate" },
+      { "ext": ["cif", "mmcif"], "name": "Crystallographic information file", "mimeType": "chemical/x-cif", "role": "Viewer", "rank": "Alternate" },
+      { "ext": ["gro"], "name": "GROMACS structure", "mimeType": "chemical/x-gromacs-gro", "role": "Viewer", "rank": "Alternate" },
+      { "ext": ["cml"], "name": "Chemical Markup Language", "mimeType": "chemical/x-cml", "role": "Viewer", "rank": "Alternate" },
+      { "ext": ["cjson"], "name": "Chemical JSON", "mimeType": "chemical/x-cjson", "role": "Viewer", "rank": "Alternate" },
+      { "ext": ["xsf", "axsf"], "name": "XCrySDen structure", "mimeType": "chemical/x-xsf", "role": "Viewer", "rank": "Alternate" }
+    ],
+    "linux": {
+      "deb": {
+        "files": {
+          "/usr/share/mime/packages/org.bluemolecule.BlueMolecule.xml": "../../native/linux/org.bluemolecule.BlueMolecule.xml"
+        },
+        "postInstallScript": "linux/postinst.sh",
+        "postRemoveScript": "linux/postrm.sh"
+      }
+    },
+    "macOS": {
+      "minimumSystemVersion": "10.15"
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "installerHooks": "windows/hooks.nsh"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "",
+      "endpoints": ["https://github.com/fred4h/BlueMolecule/releases/latest/download/latest.json"],
+      "windows": { "installMode": "passive" }
+    }
+  }
+}
