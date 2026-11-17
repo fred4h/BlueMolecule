@@ -114,7 +114,7 @@ Building from source needs only Python 3: `python3 tools/build.py`.
 ## Status
 
 BlueMolecule 1.5.0 is the current release (1.4.1 was the first public one). The automated test suite has about
-32,000 checks in 32 suites, 22,000 of them from cutting example outputs as a running job would leave them:
+32,000 checks in 33 suites, 22,000 of them from cutting example outputs as a running job would leave them:
 - format readers and writers against example files;
 - chemistry routines;
 - the selection language;

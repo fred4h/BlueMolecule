@@ -32,9 +32,15 @@ author's requests and bug reports.
   relative to its own final value, with a legend and a CSV in hartree. The Info tab lists the components of the
   geometry shown.
 - Fixed: the atom labels under the charge plot of a system with more than about 900 atoms overlapped.
+- Fixed: a Gaussian frequency job showed only its first three vibrations, which could not be animated, when a value
+  of the first block was too wide for its column. Gaussian then prints asterisks right after the dashes
+  (`IR Inten    --************`), as for the huge IR intensities of charged QM/MM systems. Such lines, unknown lines
+  among a block's labels and atom numbers printed as asterisks no longer end the section. A section that still ends
+  early says so in the Reader notes, and a vibration without displacements in the file says so when clicked.
 - New tests: condensed reading against the full reading of every example output (`tests/test_condense.js`),
-  NetCDF (`tests/test_netcdf.js`), the 1.5 interface in a browser (`tests/browser_15_test.js`), and synthetic 5 GB
-  and 10 GB logs in `tests/run_all.py --big`.
+  NetCDF (`tests/test_netcdf.js`), Gaussian frequency sections of many blocks (`tests/test_freq_sections.js`), the
+  1.5 interface in a browser (`tests/browser_15_test.js`), and synthetic 5 GB and 10 GB logs in
+  `tests/run_all.py --big`.
 
 ## 1.4.2 (16 November 2026): quick fixes
 
