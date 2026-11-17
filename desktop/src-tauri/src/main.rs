@@ -451,7 +451,7 @@ struct UpdateInfo {
 
 fn updater(app: &AppHandle) -> Result<tauri_plugin_updater::Updater, String> {
     use tauri_plugin_updater::UpdaterExt;
-    let key = updater_key().ok_or_else(|| "This build of BlueMolecule cannot update itself: it was not made for a release.".to_string())?;
+    let key = updater_key().ok_or_else(|| "This is a test build of BlueMolecule, which does not look for updates. The installers on the Releases page do.".to_string())?;
     let url = tauri::Url::parse(UPDATE_URL).map_err(|e| e.to_string())?;
     app.updater_builder()
         .pubkey(key)

@@ -127,6 +127,16 @@ function mockTauri(files, opts) {
   check(await page.evaluate(() => window.__opened) === 'https://github.com/fred4h/BlueMolecule/releases/latest', 'which opens in the browser');
   await page.context().close();
 
+  console.log('a test build without the update key');
+  page = await open(mockTauri([], { updates: true, update: { supported: false, available: false, current: '2.0.0',
+    error: 'This is a test build of BlueMolecule, which does not look for updates. The installers on the Releases page do.' } }));
+  await page.click('#btn-help');
+  await page.click('#dlg .dlg-foot button:has-text("Check for updates")');
+  await page.waitForFunction(() => /test build/.test(document.querySelector('#dlg').textContent));
+  const tb = await page.$eval('#dlg', e => e.textContent);
+  check(!/did not succeed/.test(tb) && !/when BlueMolecule starts/.test(tb), 'a test build says so as a note, not as a failed check, and offers no start-up check');
+  await page.context().close();
+
   console.log('start-up check and cancelled dialog');
   page = await open(mockTauri([], { dialogCancel: true, updates: true, update: { supported: true, available: true, current: '2.0.0', version: '2.1.0' } }),
     `try { localStorage.setItem('bluemolecule.updates.auto', '1'); } catch (e) {}`);

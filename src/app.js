@@ -2735,7 +2735,9 @@
             try { await up.install(); } catch (e) { toast('The update was not installed: ' + ((e && e.message) || e), true); }
           } }]);
     } else {
-      const msg = r.error ? 'The check did not succeed: ' + esc(r.error) : `BlueMolecule ${esc(r.current)} is the latest version.`;
+      // (a build without the update key says so as a plain note: nothing went wrong)
+      const msg = r.supported === false && r.error ? esc(r.error)
+        : r.error ? 'The check did not succeed: ' + esc(r.error) : `BlueMolecule ${esc(r.current)} is the latest version.`;
       dialog('Updates', `<p>${msg}</p>${box}`, [{ label: 'Close', primary: true, onClick: f => { keep(f); } }]);
     }
   }
