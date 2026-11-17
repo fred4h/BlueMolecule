@@ -1,0 +1,31 @@
+[package]
+name = "bluemolecule"
+version = "2.0.0"
+description = "BlueMolecule: a viewer and builder for molecules and quantum-chemistry outputs"
+authors = ["Frederico Henrique Do. C. R. Ferreira"]
+license = "MIT"
+repository = "https://github.com/fred4h/BlueMolecule"
+edition = "2021"
+rust-version = "1.77.2"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-updater = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
+sysinfo = "0.30"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

@@ -1,52 +1,57 @@
 # Troubleshooting
 
-## First step: `bluemolecule --diagnose`
+## First step: the log and the version
 
-On Linux and macOS, this prints:
-- the Pythons and Qt bindings that were found;
-- the browsers that were found;
-- which window kind BlueMolecule would use, and why;
-- where the log file is.
+- **Version:** Help (the **?** button) shows it in its title.
+- **Log** of the desktop program:
+  - Linux: `~/.local/share/org.bluemolecule.BlueMolecule/logs/bluemolecule.log`
+  - Windows: `%LOCALAPPDATA%\org.bluemolecule.BlueMolecule\logs\bluemolecule.log`
+  - macOS: `~/Library/Logs/org.bluemolecule.BlueMolecule/bluemolecule.log`
+- Starting it from a terminal shows its messages: `bluemolecule calc.log` on Linux,
+  `/Applications/BlueMolecule.app/Contents/MacOS/bluemolecule` on macOS.
 
-Include its output in bug reports about starting the program.
+Include the version, your system and what the log says in bug reports.
 
-- Log on Linux: `~/.local/state/bluemolecule/bluemolecule.log`
-- Logs on macOS: `~/Library/Logs/BlueMolecule.log` and `~/Library/Logs/BlueMolecule-install.log`
-- In the Linux Qt window, **F12** opens the developer tools: the console shows JavaScript errors.
+## The window does not start, or stays white (Linux)
 
-## The window opens as a browser tab or shows the browser's icon
+The desktop program uses WebKitGTK. With some graphics drivers, especially NVIDIA on Wayland, its window stays
+white or the program closes. Start it with one of these, and tell us which one helped:
 
-BlueMolecule only gets its own taskbar entry and icon in the **native Qt window** (Linux) or the **native app**
-(macOS). It falls back to a browser app window when those are not available.
+```bash
+WEBKIT_DISABLE_DMABUF_RENDERER=1 bluemolecule
+WEBKIT_DISABLE_COMPOSITING_MODE=1 bluemolecule
+```
 
-- **Linux:** install Qt WebEngine for Python, e.g. on Ubuntu or Kubuntu:
-  `sudo apt install python3-pyqt6.qtwebengine`. Then check with `bluemolecule --diagnose`. The launcher also checks
-  `/usr/bin/python3`, so a conda Python earlier on your `PATH` does not get in the way.
-- **Forcing a window kind:** `bluemolecule --tier qt`, `--tier chromium` or `--tier firefox`, or set
-  `BLUEMOLECULE_TIER`.
-- **A browser tab instead of an app window** happens with `--tab`, or when no Chromium-family browser or Firefox is
-  found. Install one, or point to it with `--browser /path/to/browser`.
-- **KDE on Wayland, browser app window:** the browser runs under XWayland so that the window matches
-  BlueMolecule's desktop entry. If the taskbar still shows the browser's icon, run `./install.sh` again. It
-  refreshes KDE's desktop-file cache. Then log out and in.
+If one works, you can put it before `bluemolecule` in the `Exec=` line of a copy of
+`/usr/share/applications/BlueMolecule.desktop` in `~/.local/share/applications/`.
 
-## Windows
+## Two BlueMolecule entries, or the old window opens (Linux)
 
-- **"Windows protected your PC"** when you start `Install BlueMolecule.cmd`: click **More info → Run anyway**. The
-  file comes from the internet and is not signed.
-- **The installer could not compile BlueMolecule.exe:** it prints the compiler's messages. Please report them. The
-  Start-menu entry then opens BlueMolecule directly, without **Open with**.
-- **Diagnostics:** run `"%LOCALAPPDATA%\Programs\BlueMolecule\BlueMolecule.exe" --diagnose`. It shows the
-  browser, page and folders it uses. The log is `%LOCALAPPDATA%\BlueMolecule\bluemolecule.log`.
-- **A file was "not opened automatically":** files over 64 MB are not handed over by **Open with**. Open them from
-  the window with **Open…** or drag them in.
-- **The wrong browser opens:** set the environment variable `BLUEMOLECULE_BROWSER` to the browser's `.exe`, for
-  example `C:\Program Files\Google\Chrome\Application\chrome.exe`.
+A BlueMolecule 1.x installation is still there: its command in `~/.local/bin` comes before the new one. Remove it
+with `./uninstall.sh` from the unpacked 1.x folder ([details](installation.md#coming-from-bluemolecule-1x)).
+
+## Windows and macOS warnings
+
+- **"Windows protected your PC"** when you start the installer: click **More info → Run anyway**. The installer is
+  not code-signed.
+- **macOS says it cannot check BlueMolecule for malicious software:** open it once, then click **Open Anyway** in
+  **System Settings → Privacy & Security** (on older macOS: right-click the app, **Open**). See
+  [installation](installation.md#macos).
+- **macOS says BlueMolecule "is damaged":** this is the download quarantine. Run
+  `xattr -dr com.apple.quarantine /Applications/BlueMolecule.app` in Terminal.
+
+## Updates
+
+- **"This build of BlueMolecule cannot update itself":** only the installers from the Releases page update
+  themselves; builds made elsewhere (for example the test builds of the cloud) do not.
+- **The check did not succeed:** the computer may be offline, or GitHub unreachable. Try again later, or download
+  the new version from the Releases page.
 
 ## "Open With BlueMolecule" is missing for a file type
 
-The installer registers `.xyz .cube .fchk .molden .mol .sdf .mol2 .pdb .cif .gro .gjf .cml .cjson .xsf`. Outputs
-such as `.log` and `.out` are plain text to the desktop. Open them from inside BlueMolecule, by drag and drop, or
+On Linux and macOS, the installer registers `.xyz .cube .fchk .molden .mol .sdf .mol2 .pdb .cif .gro .gjf .cml
+.cjson .xsf`; on Windows, also `.log`, `.out`, `.inp` and the MD formats. On Linux and macOS, outputs such as `.log`
+and `.out` are plain text to the desktop. Open them from inside BlueMolecule, by drag and drop, or
 from the terminal with `bluemolecule file.log`. You can also choose BlueMolecule once in your file manager's
 **Open With → Other application** dialog.
 
@@ -88,5 +93,5 @@ installed versions show a Save dialog.
 ## Open Babel is not found
 
 Install it ([how](installation.md#open-babel-optional)), make sure `obabel` runs in a terminal, and restart
-BlueMolecule. The launcher looks on your `PATH` and in the usual Homebrew and conda folders. The Open Babel group
+BlueMolecule. It looks on your `PATH` and in the usual Homebrew, conda and `Program Files` folders. The Open Babel group
 in Save as… shows "checking…" until `obabel` answers.

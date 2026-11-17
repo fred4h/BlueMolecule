@@ -10,6 +10,10 @@
  *                 _resolve. Documents named on the command line arrive as _receiveFile(name, base64) or,
  *                 from 32 MB on, as _receiveLargeFile(name, size, fileId), read on demand with
  *                 bmRead {id, fileId, offset, length} → {ok, base64, offset, length, eof} (≤ 8 MB of base64);
+ *   'tauri-app' — the desktop app (desktop/src-tauri, Tauri 2; window.__TAURI__ and window.BM_TAURI). Requests are
+ *                 Tauri commands (bm_save, bm_read, bm_obabel, bm_copy, bm_log, bm_open_dialog, bm_open_url,
+ *                 bm_update_check, bm_update_install). Documents from the command line, "Open with" and a second
+ *                 launch come from bm_ready and "bm-open" events as {name, size, fileId}, read with bm_read;
  *   'launcher'  — the Python launcher (window.BM_LAUNCH; HTTP endpoints on 127.0.0.1);
  *   'browser'   — a plain browser: save/copy report "not handled" (null) so the UI uses its own paths.
  *
@@ -26,13 +30,17 @@
 
   const handlers = () => (G.webkit && G.webkit.messageHandlers) || null;
   const QT = G.BM_QT && typeof G.BM_QT === 'object' ? G.BM_QT : null;
+  const TAURI = G.__TAURI__ && G.__TAURI__.core && typeof G.__TAURI__.core.invoke === 'function' ? G.__TAURI__ : null;
   const kind = (() => {
+    if (TAURI) return 'tauri-app';
     const h = handlers();
     if (h && h.bmSave) return 'macos-app';
     if (QT) return 'linux-app';
     if (G.BM_LAUNCH) return 'launcher';
     return 'browser';
   })();
+  /** Bytes per bm_read of the desktop app (raw bytes). */
+  const TAURI_READ = 16 * 1048576;
   /** Bytes per bmRead reply: 6 MiB, i.e. 8 MiB of base64 (the Linux app may lower it). */
   const READ_LIMIT = QT && Number.isSafeInteger(QT.readLimit) && QT.readLimit > 0 ? Math.min(QT.readLimit, 6291456) : 6291456;
 
@@ -94,7 +102,9 @@
     attempt();
   }
   /** Whether the host's own Save dialog, clipboard and messages can be used. */
-  const appBridge = () => kind === 'macos-app' || (kind === 'linux-app' && qtState !== 'failed');
+  const appBridge = () => kind === 'macos-app' || kind === 'tauri-app' || (kind === 'linux-app' && qtState !== 'failed');
+  /** A command of the desktop app; rejects with the app's error text. */
+  const invoke = (cmd, args) => TAURI.core.invoke(cmd, args || {});
 
   // ---------------- requests to the app ----------------
   let seq = 0;
@@ -135,6 +145,13 @@
   async function save(name, data) {
     if (!appBridge()) return null;
     const bytes = await toBytes(data);
+    if (kind === 'tauri-app') {
+      let r;
+      try { r = await invoke('bm_save', { name: String(name || 'untitled'), data: bytesToBase64(bytes) }); }
+      catch (e) { r = { ok: false, error: String((e && e.message) || e) }; }
+      native.lastSave = r;
+      return !!(r && r.ok);
+    }
     const mime = (data && typeof data.type === 'string' && data.type) || 'application/octet-stream';
     const r = await call('bmSave', { name: String(name || 'untitled'), mime, base64: bytesToBase64(bytes) });
     native.lastSave = r;
@@ -143,12 +160,14 @@
   /** Plain text to the system clipboard. true/false, or null when the host has no native clipboard. */
   function copyText(text) {
     if (!appBridge()) return Promise.resolve(null);
+    if (kind === 'tauri-app') return invoke('bm_copy', { text: String(text == null ? '' : text) }).then(ok => !!ok, () => false);
     try { post('bmCopy', { text: String(text == null ? '' : text) }); return Promise.resolve(true); }
     catch (e) { return Promise.resolve(false); }
   }
   /** A line for the app's log file (bmLog {level, message}). true/false, or null without an app. */
   function log(level, message) {
     if (!appBridge()) return null;
+    if (kind === 'tauri-app') { invoke('bm_log', { level: String(level || 'log'), message: String(message == null ? '' : message).slice(0, 8000) }).catch(() => {}); return true; }
     try { post('bmLog', { level: String(level || 'log'), message: String(message == null ? '' : message).slice(0, 8000) }); return true; }
     catch (e) { return false; }
   }
@@ -156,7 +175,8 @@
   // ---------------- Open Babel ----------------
   async function obabelRequest(payload) {
     let r;
-    if (kind === 'macos-app' || kind === 'linux-app') r = await call('bmObabel', payload, 90000);
+    if (kind === 'tauri-app') r = await invoke('bm_obabel', { request: payload });
+    else if (kind === 'macos-app' || kind === 'linux-app') r = await call('bmObabel', payload, 90000);
     else if (kind === 'launcher' && G.BM_LAUNCH.obabel) {
       const resp = await G.fetch(G.BM_LAUNCH.obabel, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (!resp.ok) throw new Error('Open Babel request failed (HTTP ' + resp.status + ')');
@@ -218,9 +238,15 @@
       const out = new Uint8Array(end - offset);
       let pos = offset;
       while (pos < end) {
-        const r = await call('bmRead', { fileId, offset: pos, length: Math.min(READ_LIMIT, end - pos) }, 120000);
-        if (!r || !r.ok) throw new Error((r && r.error) || 'Could not read ' + name);
-        const bytes = base64ToBytes(r.base64);
+        let bytes;
+        if (kind === 'tauri-app') {   // raw bytes, no base64
+          const buf = await invoke('bm_read', { fileId, offset: pos, length: Math.min(TAURI_READ, end - pos) });
+          bytes = buf instanceof ArrayBuffer ? new Uint8Array(buf) : ArrayBuffer.isView(buf) ? new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength) : Uint8Array.from(buf || []);
+        } else {
+          const r = await call('bmRead', { fileId, offset: pos, length: Math.min(READ_LIMIT, end - pos) }, 120000);
+          if (!r || !r.ok) throw new Error((r && r.error) || 'Could not read ' + name);
+          bytes = base64ToBytes(r.base64);
+        }
         if (!bytes.length) break;                       // the file became shorter since it was opened
         const take = Math.min(bytes.length, end - pos);
         out.set(take === bytes.length ? bytes : bytes.subarray(0, take), pos - offset);
@@ -347,14 +373,64 @@
     G.addEventListener('pageshow', e => { if (e && e.persisted) send('visible'); });
   }
 
+  // ---------------- the desktop app (Tauri) ----------------
+  const tauriDoc = d => (d && typeof d === 'object' && Number.isSafeInteger(d.size) && d.fileId ? fileHandle(String(d.name || 'untitled'), d.size, String(d.fileId)) : null);
+  /** The system's Open dialog: an array of documents read on demand, or undefined when cancelled. */
+  async function openDialog(opts) {
+    const r = await invoke('bm_open_dialog', { multiple: !(opts && opts.multiple === false) });
+    if (!r) return undefined;
+    return r.map(tauriDoc).filter(Boolean);
+  }
+  /** Documents the app was opened with (and later ones): listen first, then ask for those already waiting. */
+  function tauriStart() {
+    const ev = TAURI.event;
+    const take = d => { const h = tauriDoc(d); if (h) { inbox.push([h.name, h]); flushInbox(); } };
+    const ready = () => invoke('bm_ready').then(list => (list || []).forEach(take), e => console.error(e));
+    if (ev && typeof ev.listen === 'function') ev.listen('bm-open', e => take(e && e.payload)).then(ready, ready);
+    else ready();
+    // web links open in the default browser, not in the app window
+    const D = G.document;
+    if (D && D.addEventListener) {
+      D.addEventListener('click', e => {
+        const a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+        const href = a && a.getAttribute('href');
+        if (href && /^(https?:|mailto:)/i.test(href) && !a.hasAttribute('download')) {
+          e.preventDefault();
+          invoke('bm_open_url', { url: a.href }).catch(err => console.error(err));
+        }
+      }, true);
+    }
+    // errors of the page go to the app's log file (see docs/troubleshooting.md)
+    G.addEventListener('error', e => log('error', String((e && e.message) || e) + (e && e.filename ? ' (' + e.filename.split('/').pop() + ':' + e.lineno + ')' : '')));
+    G.addEventListener('unhandledrejection', e => log('error', 'unhandled: ' + String((e && e.reason && (e.reason.stack || e.reason.message)) || (e && e.reason))));
+    log('info', 'BlueMolecule ' + ((G.BM_TAURI && G.BM_TAURI.version) || '') + ' started on ' + ((G.BM_TAURI && G.BM_TAURI.os) || '?') + ' · ' + ((G.navigator && G.navigator.userAgent) || ''));
+    const open = G.open;
+    G.open = function (url) {
+      if (typeof url === 'string' && /^(https?:|mailto:)/i.test(url)) { invoke('bm_open_url', { url }).catch(err => console.error(err)); return null; }
+      return open ? open.apply(G, arguments) : null;
+    };
+  }
+  /** The built-in updater: check() → {supported, available, current, version, notes, date, error}; install()
+   *  downloads, checks the signature, installs and restarts. */
+  const updates = kind === 'tauri-app' ? Object.freeze({
+    supported: !!(G.BM_TAURI && G.BM_TAURI.updates),
+    /** Linux .deb installations are updated with the new .deb (only the AppImage replaces itself). */
+    selfInstall: !(G.BM_TAURI && G.BM_TAURI.os === 'linux' && !G.BM_TAURI.appImage),
+    openReleases: () => invoke('bm_open_url', { url: 'https://github.com/fred4h/BlueMolecule/releases/latest' }),
+    check: () => invoke('bm_update_check'),
+    install: () => invoke('bm_update_install')
+  }) : null;
+
   const native = {
     kind, version: VERSION,
     save, copyText, log, obabel, onOpenFile,
     _resolve, _receiveFile, _receiveLargeFile, _parseFormats: parseFormats,
     lastSave: null
   };
+  if (kind === 'tauri-app') { native.openDialog = openDialog; native.updates = updates; }
   BM.native = native;
   if (kind === 'linux-app') qtConnect();
-  if (kind === 'macos-app' || kind === 'linux-app') { installAppShims(); announceReady(); }
+  if (kind === 'tauri-app') { installAppShims(); tauriStart(); }
+  else if (kind === 'macos-app' || kind === 'linux-app') { installAppShims(); announceReady(); }
   else if (kind === 'launcher') installLauncherHeartbeat();
 })(typeof window !== 'undefined' ? (window.BM = window.BM || {}) : (globalThis.BM = globalThis.BM || {}));

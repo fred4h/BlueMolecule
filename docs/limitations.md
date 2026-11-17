@@ -5,7 +5,7 @@ as honestly as possible, what has been checked, what has not, and what the progr
 
 ## What has been checked
 
-- **About 32,000 automated checks in 32 test suites** (22,000 of them cut example outputs as a running job would
+- **About 32,000 automated checks in 34 test suites** (22,000 of them cut example outputs as a running job would
   leave them), all passing for this release
   ([how to run them](developer-guide.md#tests)). They cover:
   - every reader and writer, including format detection and the units and conventions of each program;
@@ -19,6 +19,13 @@ as honestly as possible, what has been checked, what has not, and what the progr
 - **Amber NetCDF:** besides files written by SciPy, real trajectories written by pmemd 16, sander 9 and cpptraj 6.4
   (public test files of the MDAnalysis project, not included here) were read and compared with SciPy's reading:
   the same coordinates, boxes and times.
+- **Gaussian frequencies:** real Gaussian 09 and 16 frequency outputs (public test files of the cclib project, not
+  included here, with up to 18 blocks of normal modes and the hpmodes layout) read the same in full and condensed.
+  `tests/test_freq_sections.js` adds layouts seen in big jobs: values too wide for their column (asterisks), unknown
+  lines among the labels, atom numbers beyond the column width.
+- **The desktop program:** every change is built on Linux, Windows and macOS by the cloud builds and started once
+  there with a self-test: the 3D view (WebGL 2) in each system's web engine, a 900 MB log and a molecule opened
+  through the native bridge, a save, and a picture of the view.
 - **Script injection:** crafted files with HTML in titles, atom and residue names, labels and file names. None of it
   may become markup in the page (`tests/browser_xss_test.js`).
 - **Screenshots** of the interface, produced by the browser tests, were inspected during development.
@@ -34,10 +41,10 @@ as honestly as possible, what has been checked, what has not, and what the progr
   - xtb ONIOM.
 - **Real huge outputs.** Condensed reading was tested on synthetic logs of up to 10 GB and on every example output.
   A real multi-gigabyte QM/MM output has not been opened with it yet.
-- **The macOS app** has never been compiled or run on a Mac. It was written and checked on Linux.
-- **The Windows version** has never been run on Windows. Its launcher (C# 5) and installer (Windows PowerShell)
-  were written and checked on Linux. The checks cover syntax limits, registry symmetry and the page they produce,
-  which is opened in Chromium the way Edge would open it. The launcher itself has not been compiled yet.
+- **The desktop installers by hand.** The cloud builds start the program on each system, but nobody has yet
+  installed the Windows and macOS installers on a personal computer, clicked through their warnings, used **Open
+  with** from Explorer or the Finder, or installed an update with the built-in updater.
+- **The 1.x macOS app and Windows launcher** (no longer released) were never compiled or run on a Mac or a PC.
 - **The Linux Qt window** has been tested against a simulated Qt in the test suite, and the app-window fallbacks in
   a headless browser. It still needs confirmation on real desktops.
 - **The macromolecule views** were tested on generated protein, membrane, glycan and DNA structures, not yet on

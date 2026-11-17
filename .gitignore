@@ -11,3 +11,8 @@ node_modules/
 .DS_Store
 *.swp
 *~
+
+# Desktop app (Tauri): build output and the page copied in for a build
+/desktop/www/
+/desktop/src-tauri/target/
+/desktop/src-tauri/gen/

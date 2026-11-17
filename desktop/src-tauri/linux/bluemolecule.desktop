@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name={{name}}
+GenericName=Molecule Viewer
+Comment={{comment}}
+Exec={{exec}} %F
+Icon={{icon}}
+Terminal=false
+Categories=Education;Science;Chemistry;
+Keywords=chemistry;molecule;Gaussian;ORCA;XYZ;cube;orbital;trajectory;
+StartupWMClass={{exec}}
+{{#if mime_type}}
+MimeType={{mime_type}}
+{{/if}}

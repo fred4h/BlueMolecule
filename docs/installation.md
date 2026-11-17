@@ -1,177 +1,99 @@
 # Installation
 
-BlueMolecule comes in three forms, all from the [Releases page](https://github.com/fred4h/BlueMolecule/releases):
+Since version 2.0, BlueMolecule is a desktop program of its own on Linux, Windows and macOS: a native window with
+BlueMolecule's name and icon, an installer, **Open with** entries for chemistry files and a built-in updater. All
+downloads are on the [Releases page](https://github.com/fred4h/BlueMolecule/releases):
 
-| Download | For | What you get |
-|---|---|---|
-| `BlueMolecule-VERSION-linux.tar.gz` | Linux (main platform) | The `bluemolecule` command, a menu entry, file associations and its own window |
-| `BlueMolecule-VERSION-windows.zip` | Windows 10 and 11 (experimental) | A Start-menu entry, "Open with" for chemistry files and its own Edge window |
-| `BlueMolecule-VERSION-macOS.zip` | macOS (experimental) | A native app in Applications and the `bluemolecule` command |
-| `BlueMolecule.html` | Any computer with a modern browser | The whole viewer in one offline file |
+| Download | For |
+|---|---|
+| `BlueMolecule_VERSION_amd64.deb` | Ubuntu, Kubuntu, Debian, Linux Mint and other Debian-based Linux (64-bit Intel/AMD) |
+| `BlueMolecule_VERSION_amd64.AppImage` | Any other 64-bit Linux: one file that runs without installing |
+| `BlueMolecule_VERSION_x64-setup.exe` | Windows 10 and 11 |
+| `BlueMolecule_VERSION_universal.dmg` | macOS 10.15 or later, Apple silicon and Intel Macs |
+| `BlueMolecule.html` | Any computer with a modern browser: the whole viewer in one offline file |
 
-All of them contain the same viewer. Everything runs on your computer and files are never uploaded.
+They all contain the same viewer. Everything runs on your computer and files are never uploaded.
+
+> [!NOTE]
+> The installers are **not code-signed** (that needs paid certificates). Windows and macOS therefore warn once,
+> before the first start, that the publisher is unknown; the steps below say how to go on. Updates are checked
+> against BlueMolecule's own signing key either way ([Updates](#updates)).
 
 ## Linux
 
-### Requirements
-
-- `python3`: only the standard library is needed.
-- For its own window, any **one** of:
-  - Python's Qt WebEngine (recommended);
-  - Chrome, Chromium, Edge, Brave or Vivaldi;
-  - Firefox.
-- Optional: [Open Babel](#open-babel-optional) for extra file formats.
-
-It works on X11 and Wayland desktops (KDE Plasma, GNOME and others).
-
-### Install
+### The .deb package (Ubuntu, Kubuntu, Debian…)
 
 ```bash
-tar xzf BlueMolecule-1.5.0-linux.tar.gz
-cd BlueMolecule-1.5.0-linux
-./install.sh
+sudo apt install ./BlueMolecule_2.0.0_amd64.deb
 ```
 
-`install.sh` installs for your user, under `~/.local`:
-- `~/.local/share/bluemolecule/`: the viewer, the launcher and the Qt window script.
-- `~/.local/bin/bluemolecule`: the command. If `~/.local/bin` is not on your `PATH`, the installer says how to add
-  it.
-- A desktop entry, so BlueMolecule appears in the applications menu with its own icon.
-- MIME types, so chemistry files offer **Open With → BlueMolecule**. This covers `.xyz .cube .fchk .molden .mol
-  .sdf .mol2 .pdb .cif .gro .gjf .cml .cjson .xsf`. Gaussian `.log` and ORCA `.out` files are plain text, so open
-  them from inside BlueMolecule or from the command line.
+This installs the `bluemolecule` command, a menu entry under Science / Education, and the chemistry file types:
+chemistry files then offer **Open With → BlueMolecule**. This covers `.xyz .cube .fchk .molden .mol .sdf .mol2 .pdb
+.cif .gro .gjf .cml .cjson .xsf`. Gaussian `.log` and ORCA `.out` files are plain text: open them from inside
+BlueMolecule, by dragging them onto its window, with **Open With → Other application**, or from a terminal:
+`bluemolecule calc.log`.
 
-Running `./install.sh` again updates or repairs an installation, including one from an older version.
+The package needs WebKitGTK 4.1 (`libwebkit2gtk-4.1-0`), which apt installs with it; it is part of Ubuntu 22.04,
+Debian 12 and later. Uninstall with `sudo apt remove bluemolecule`.
 
-- **System-wide:** `sudo PREFIX=/usr/local ./install.sh`
-- **Without installing:** `./bluemolecule calc.log` from the unpacked folder.
-- **Uninstall:** `./uninstall.sh`. Your settings in `~/.local/share/bluemolecule/` are kept unless you delete that
-  folder.
-
-### Its own window: the native Qt window
-
-BlueMolecule tries three kinds of window, in this order:
-
-1. **A native Qt WebEngine window.** This is used when a Python on your computer has PyQt6, PySide6 or PyQt5 with
-   QtWebEngine. It is the best option, especially on KDE: a real application window with BlueMolecule's name and
-   icon in the taskbar.
-2. **An app window of Chrome, Chromium, Edge, Brave or Vivaldi**, with no tabs or address bar, in a separate profile.
-   On Wayland it runs under XWayland so that the desktop matches the window to BlueMolecule's icon.
-3. **Firefox** with a separate BlueMolecule profile.
-
-At the end, `install.sh` tells you which window you will get. If Qt WebEngine is missing, it shows the command that
-installs it and asks before running it; nothing is ever installed with `sudo` without asking. On Ubuntu and Kubuntu:
+### The AppImage (any distribution)
 
 ```bash
-sudo apt install python3-pyqt6.qtwebengine
+chmod +x BlueMolecule_2.0.0_amd64.AppImage
+./BlueMolecule_2.0.0_amd64.AppImage calc.log
 ```
 
-On Fedora, `sudo dnf install python3-pyqt6-webengine`. On Arch, `sudo pacman -S python-pyqt6-webengine`.
-`BLUEMOLECULE_NO_PROMPT=1 ./install.sh` skips the question.
+It brings its own libraries and needs nothing installed. Tools such as AppImageLauncher or Gear Lever add it to the
+menu. The built-in updater updates the AppImage in place.
 
-The launcher checks several Pythons: the one running it, `/usr/bin/python3`, `/usr/local/bin/python3` and `python3` on
-your `PATH`. A conda or virtual-environment Python that comes first on `PATH` therefore does not hide the system's
-Qt. To see which window will be used and why:
+### Coming from BlueMolecule 1.x
 
-```bash
-bluemolecule --diagnose
-```
+Remove the 1.x installation first: run `./uninstall.sh` from the unpacked 1.x folder (for example
+`BlueMolecule-1.5.0-linux`). Otherwise its `~/.local/bin/bluemolecule` command comes first on your `PATH`, and the
+menu shows two BlueMolecule entries. View settings and calculation defaults made in 1.x do not carry over to the
+new window.
 
-### Command line
+## Windows
 
-```text
-bluemolecule [options] [files ...]
+1. Run `BlueMolecule_2.0.0_x64-setup.exe`. If Windows says it protected your PC, click **More info → Run anyway**.
+2. The installer needs **no administrator rights**. It installs for your user, in `%LOCALAPPDATA%\BlueMolecule`,
+   adds BlueMolecule to the **Start menu**, and adds **Open with → BlueMolecule** for chemistry files: Gaussian
+   `.log`/`.gjf`, ORCA `.out`/`.inp`, `.xyz`, `.fchk`, `.cube`, `.molden`, `.pdb`, `.cif`, `.sdf`, `.mol2`, `.gro`
+   and MD files. It never changes the program a file type opens with by default.
+3. The window uses Microsoft Edge WebView2, which Windows 10 and 11 already have; the installer fetches it if not.
 
-  files                  any supported files; .gz-compressed files are fine
-  --tier auto|qt|chromium|firefox
-                         force a window kind (also: environment variable BLUEMOLECULE_TIER)
-  --browser PATH         use this browser executable
-  --tab                  open in a normal browser tab instead of an app window
-  --port N               preferred local port (default 47591; the next 19 are tried when it is busy;
-                         0 = any free port)
-  --no-open              print the address instead of opening a window
-  --diagnose             show the environment and which window kind would be used, and why
-  --version
-```
+Uninstall in **Settings → Apps → Installed apps → BlueMolecule**. This also removes the Open-with entries.
 
-With the browser window types, the launcher serves the viewer on `http://127.0.0.1:47591/<random token>/`. The
-fixed port lets the browser keep your settings between sessions. The launcher quits when the window is closed.
-It writes a log to `~/.local/state/bluemolecule/bluemolecule.log`. In the Qt window, **F12** opens the developer
-tools.
+## macOS
 
-## Windows (experimental)
+1. Open `BlueMolecule_2.0.0_universal.dmg` and drag **BlueMolecule** to **Applications**.
+2. The first time, macOS says it cannot check the app for malicious software (it is not notarized):
+   - **macOS 15 Sequoia and later:** try to open it once, then go to **System Settings → Privacy & Security**,
+     scroll down to the message about BlueMolecule and click **Open Anyway**.
+   - **Earlier versions:** right-click (or Control-click) BlueMolecule in Applications and choose **Open**.
+   - Or, in Terminal: `xattr -dr com.apple.quarantine /Applications/BlueMolecule.app`
+3. After that, BlueMolecule opens normally, also from **Open With** in the Finder for chemistry files.
 
-> [!WARNING]
-> The Windows version has **not yet been tested on a real Windows PC**. It was written and checked on Linux, and
-> its small launcher is compiled on your PC during installation. Please report what happens.
+## Updates
 
-### Install
+**Help → Check for updates…** asks GitHub for the latest release. If there is a newer one, BlueMolecule shows its
+release notes and, when you agree, downloads it, checks its signature, installs it and restarts. The signature is
+made with a key that only BlueMolecule's maintainer holds, so a damaged or altered download is never installed.
 
-1. Extract `BlueMolecule-1.5.0-windows.zip`: right-click it and choose **Extract All**.
-2. Double-click **Install BlueMolecule.cmd**. If Windows says it protected your PC, click **More info → Run anyway**.
+Checking is **BlueMolecule's only use of the network**, and it happens only when you ask. In the same dialog you can
+tick **Check for updates when BlueMolecule starts**; it is off until you do.
 
-The installer needs **no administrator rights and nothing installed first**. It uses only Windows PowerShell, the
-C# compiler of the .NET Framework and Microsoft Edge, all of which come with Windows 10 and 11. It:
-- copies BlueMolecule into `%LOCALAPPDATA%\Programs\BlueMolecule`;
-- compiles the small **BlueMolecule.exe** launcher from `BlueMolecule.cs`, so the launcher has BlueMolecule's name
-  and icon;
-- adds BlueMolecule to the **Start menu**;
-- adds **Open with → BlueMolecule** for chemistry files, including Gaussian `.log`/`.gjf`, ORCA `.out`/`.inp`,
-  `.xyz`, `.fchk`, `.cube`, `.molden`, `.pdb`, `.cif`, `.sdf`, `.mol2`, `.gro` and MD files. It never changes the
-  program that a file type opens with by default;
-- registers an uninstaller under **Settings → Apps → Installed apps → BlueMolecule**.
-
-Running the installer again updates the installation. If the launcher cannot be compiled, the installer says why
-and makes the Start-menu entry open BlueMolecule directly. In that case **Open with** is not available.
-
-### How it runs
-
-BlueMolecule opens in an **app window of Microsoft Edge**, with no tabs or address bar and a separate BlueMolecule
-profile in `%LOCALAPPDATA%\BlueMolecule\browser`. Chrome, Brave or Vivaldi are used when Edge is missing. To
-choose the browser, set the environment variable `BLUEMOLECULE_BROWSER` to the browser's `.exe`.
-
-Files opened with **Open with**, or dropped on the program's icon, are handed to the window inside a temporary copy
-of the page. That copy is kept for a day in `%LOCALAPPDATA%\BlueMolecule\launch`. This needs no local server and
-no special browser settings, but it works for files up to **64 MB**. Open larger files from the window with
-**Open…** or by drag and drop, which read files of any size. Saving shows the Windows Save dialog.
-
-- Diagnostics: `"%LOCALAPPDATA%\Programs\BlueMolecule\BlueMolecule.exe" --diagnose`
-- Log: `%LOCALAPPDATA%\BlueMolecule\bluemolecule.log`
-- Open Babel conversions are not available in the Windows version yet.
-- **Uninstall:** use **Settings → Apps → Installed apps → BlueMolecule → Uninstall**. This removes the program, the
-  Start-menu entry and the Open-with entries. Your settings in `%LOCALAPPDATA%\BlueMolecule` stay until you delete
-  that folder.
-
-## macOS (experimental)
-
-> [!WARNING]
-> The macOS version has **not yet been tested on a real Mac**. It was written and checked on Linux, and the Swift
-> code is compiled on your Mac during installation. Please report what happens.
-
-1. Unzip `BlueMolecule-1.5.0-macOS.zip`.
-2. Double-click **Install BlueMolecule.command**. The installer:
-   - compiles the small native app (a WKWebView window, Swift source in `native/macos/`) with Apple's free Command
-     Line Tools; if they are missing, it starts their installer, and you run the BlueMolecule installer again
-     afterwards;
-   - signs the app ad hoc and installs it in `~/Applications` (or `/Applications`);
-   - adds the `bluemolecule` terminal command.
-3. If macOS says the installer "cannot be opened" because it was downloaded, do one of these:
-   - right-click it and choose **Open**;
-   - allow it under **System Settings → Privacy & Security**;
-   - run `bash "Install BlueMolecule.command"` in Terminal.
-
-If the native app cannot be built, the installer installs a simpler browser-window app instead and tells you why.
-That app opens BlueMolecule in a Chromium-family browser's app window, or in your default browser. Logs are in
-`~/Library/Logs/BlueMolecule.log` and `~/Library/Logs/BlueMolecule-install.log`.
+On Linux, the AppImage updates itself. A `.deb` installation is updated by installing the new `.deb`: the update
+dialog then offers to open the Releases page instead.
 
 ## Any computer: the single HTML file
 
 Download `BlueMolecule.html` and open it in Chrome, Edge, Firefox or Safari. It needs no installation and no
-network. The differences from the installed versions:
+network. The differences from the desktop program:
 - saving shows a Save dialog in Chrome and Edge, and goes to the downloads folder in other browsers;
 - Open Babel conversions are not available;
 - very large files are limited by the browser's memory;
-- your browser may not offer to open chemistry files with it.
+- there are no Open-with entries and no updater.
 
 ## Open Babel (optional)
 
@@ -185,17 +107,25 @@ Install Open Babel and BlueMolecule uses it automatically, through the `obabel` 
 | Fedora | `sudo dnf install openbabel` |
 | conda (any OS) | `conda install -c conda-forge openbabel` |
 | macOS (Homebrew) | `brew install open-babel` |
+| Windows | the installer from the [Open Babel releases](https://github.com/openbabel/openbabel/releases), or conda |
 
-The launcher looks for `obabel` on your `PATH` and in the usual Homebrew and conda locations.
+BlueMolecule looks for `obabel` on your `PATH` and in the usual Homebrew, conda and `Program Files` locations, so
+it is found also when BlueMolecule is started from the menu or the Dock.
 
 ## Building from source
 
 ```bash
 git clone https://github.com/fred4h/BlueMolecule.git
 cd BlueMolecule
-python3 tools/build.py              # the package for this computer's OS, plus dist/BlueMolecule.html
-python3 tools/build.py --target all # the Linux, Windows and macOS packages
+python3 tools/build.py              # dist/BlueMolecule.html (and the 1.x-style packages)
 ```
 
-The build needs only Python 3 and writes everything into `dist/`. For running the tests, see the
+The desktop program is built with Rust and Node.js: see [desktop/README.md](../desktop/README.md). The cloud builds
+of the repository build and test it on all three systems. For running the tests, see the
 [developer guide](developer-guide.md#tests).
+
+## Older versions (1.x)
+
+Versions 1.0 to 1.5 came as a Linux package with a Python launcher and a Qt window, and as experimental Windows and
+macOS packages that compiled a small launcher during installation. They are still on the Releases page. Their
+guide is [the 1.5 version of this page](https://github.com/fred4h/BlueMolecule/blob/v1.5.0/docs/installation.md).

@@ -385,6 +385,38 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   check(st === 'Frame 2,Frame 3,Frame 4', 'a frame range: ' + st);
   await page.evaluate(() => { window.__bmAskSize = 0; window.__bmBigSize = 0; });
 
+  // ================================================================ the vibrations of a big frequency job
+  console.log('Vibrations: every block, also after an IR intensity printed as asterisks');
+  const FS = require('./test_freq_sections.js');
+  for (const big of [false, true]) {
+    await page.evaluate(b => { window.__bmAskSize = 0; window.__bmBigSize = b ? 1 : 0; }, big);
+    await page.setInputFiles('#file-input', { name: 'stars-freq.log', mimeType: 'text/plain', buffer: Buffer.from(FS.log({ stars: true })) });
+    await page.waitForFunction(() => BM.app.state.active && BM.app.state.active.name === 'stars-freq.log' && BM.app.state.active.data.vibrations);
+    await sleep(150);
+    const how = big ? 'condensed' : 'whole';
+    st = await doc(() => { const v = BM.app.state.active.data.vibrations; return { n: v.freqs.length, ir: !!v.ir }; });
+    check(st.n === FS.NM && st.ir, `${how}: all ${FS.NM} vibrations and their IR intensities (${st.n})`);
+    await page.click('#tabs [data-tab="vib"]'); await sleep(80);
+    check((await page.$$('#vib-table tr.row')).length === FS.NM && (await page.$eval('#tabs [data-tab="vib"]', e => e.textContent)).includes(String(FS.NM)), `${how}: the Vibrations tab lists them all`);
+    await page.click('#vib-table tr.row[data-i="7"]'); await sleep(400);
+    st = await doc(() => { const d = BM.app.state.active, eq = d.data.frames[d.data.vibrations.frameIndex].xyz, x = d._animXyz; let m = 0; for (let i = 0; i < eq.length; i++) m = Math.max(m, Math.abs(x[i] - eq[i])); return { vib: d.vibIndex, moved: m, anim: !!d._vibVec }; });
+    check(st.vib === 7 && st.anim && st.moved > 0.05, `${how}: a click on mode 8 animates it (largest shift so far ${st.moved.toFixed(3)} Å)`);
+  }
+  await page.evaluate(() => { window.__bmAskSize = 0; window.__bmBigSize = 0; });
+  // a vibration without displacements in the file says so instead of standing still silently
+  await page.setInputFiles('#file-input', { name: 'nodisp-freq.log', mimeType: 'text/plain', buffer: Buffer.from(FS.log({ damaged: true })) });
+  await page.waitForFunction(() => BM.app.state.active && BM.app.state.active.name === 'nodisp-freq.log');
+  await sleep(150);
+  st = await doc(() => { const d = BM.app.state.active; return { n: d.data.vibrations.freqs.length, notes: d.data.warnings.join(' | ') }; });
+  check(st.n === 9 && /stopped early, after 9 vibrations/.test(st.notes), 'a damaged row: the blocks before it, and a reader note: ' + st.notes.slice(0, 120));
+  await page.setInputFiles('#file-input', { name: 'norows-freq.log', mimeType: 'text/plain', buffer: Buffer.from(FS.log({ noRowsLast: true })) });
+  await page.waitForFunction(() => BM.app.state.active && BM.app.state.active.name === 'norows-freq.log');
+  await sleep(150);
+  await page.click('#tabs [data-tab="vib"]'); await sleep(80);
+  await page.click(`#vib-table tr.row[data-i="${FS.NM - 1}"]`); await sleep(200);
+  const stText = await page.$eval('#status-msg', e => e.textContent);
+  check(/no atom displacements for this vibration/.test(stText) && (await doc(() => BM.app.state.active._vibVec)) === null, 'a vibration printed without displacements says so when clicked: ' + stText);
+
   // ================================================================ summary
   const errs = errors.filter(e => !/favicon|WebGL|GPU stall|swiftshader/i.test(e));
   check(errs.length === 0, 'no page errors: ' + errs.join(' | '));

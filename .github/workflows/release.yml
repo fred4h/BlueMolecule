@@ -1,0 +1,119 @@
+# BlueMolecule release builds: when a release is published on GitHub (tag vX.Y.Z), build the desktop app on Linux,
+# Windows and macOS, sign the update packages with BlueMolecule's update key, and attach the installers, the update
+# files (latest.json and .sig) and the single-file BlueMolecule.html to that release.
+#
+# Needs, once (see docs/developer-guide.md, "Releases"):
+#   desktop/updater-key.pub                   the public update key (in git)
+#   secret TAURI_SIGNING_PRIVATE_KEY          the private key, held by the maintainer only
+#   secret TAURI_SIGNING_PRIVATE_KEY_PASSWORD its password
+# The installers are not code-signed: Windows and macOS warn once before the first start (docs/installation.md).
+name: Release builds
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to build and attach to (e.g. v2.0.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.v.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+      - id: v
+        name: Tag, version and key
+        run: |
+          tag="${{ github.event.release.tag_name || inputs.tag }}"
+          conf=$(python3 -c "import json; print(json.load(open('desktop/src-tauri/tauri.conf.json'))['version'])")
+          app=$(sed -n "s/^  const VERSION = '\(.*\)';/\1/p" src/app.js)
+          echo "tag $tag, desktop app $conf, page $app"
+          [ "$tag" = "v$conf" ] || { echo "::error::The tag $tag does not match the desktop app's version $conf (desktop/src-tauri/tauri.conf.json)."; exit 1; }
+          [ "$conf" = "$app" ] || { echo "::error::The desktop app ($conf) and the page ($app, src/app.js) have different versions."; exit 1; }
+          [ -s desktop/updater-key.pub ] || { echo "::error::desktop/updater-key.pub is missing: the update key has not been set up yet."; exit 1; }
+          [ -n "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}" ] || { echo "::error::The secret TAURI_SIGNING_PRIVATE_KEY is missing."; exit 1; }
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: check
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux, os: ubuntu-22.04, args: '' }
+          - { name: windows, os: windows-latest, args: '' }
+          - { name: macos, os: macos-latest, args: '--target universal-apple-darwin' }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.check.outputs.tag }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.name == 'macos' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: System libraries (Linux)
+        if: matrix.name == 'linux'
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - name: The page and the update key
+        run: |
+          python tools/build.py --target linux
+          mkdir -p desktop/www
+          cp dist/BlueMolecule.html desktop/www/index.html
+          echo "BM_UPDATER_PUBKEY=$(tr -d '\r\n' < desktop/updater-key.pub)" >> "$GITHUB_ENV"
+
+      - name: Build, sign and attach
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: desktop
+          tauriScript: npx --yes @tauri-apps/cli@2
+          tagName: ${{ needs.check.outputs.tag }}
+          releaseName: BlueMolecule ${{ needs.check.outputs.tag }}
+          releaseDraft: false
+          includeUpdaterJson: true
+          updaterJsonPreferNsis: true
+          args: ${{ matrix.args }} --config src-tauri/tauri.release.conf.json
+
+  page:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.check.outputs.tag }}
+      - name: Attach BlueMolecule.html
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 tools/build.py --target linux
+          gh release upload "${{ needs.check.outputs.tag }}" dist/BlueMolecule.html --clobber
