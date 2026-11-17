@@ -194,3 +194,32 @@ jobs:
           git add -A
           git -c user.name="BlueMolecule builds" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -qm "Reports of run $RUN ($REF, $RESULT)"
           git push -q origin ci-reports
+
+      - uses: actions/download-artifact@v4
+        if: github.event_name != 'pull_request'
+        with:
+          pattern: BlueMolecule-*
+          path: installers
+
+      # The installers of the newest build, on a branch of one commit that each build replaces (git history does not
+      # grow), so they can be fetched with git where the Actions downloads cannot be reached.
+      - name: Publish the installers on the ci-installers branch
+        if: github.event_name != 'pull_request'
+        env:
+          TOKEN: ${{ github.token }}
+          RUN: ${{ github.run_id }}
+          SHA: ${{ github.sha }}
+          REF: ${{ github.ref_name }}
+          RESULT: ${{ needs.build.result }}
+        run: |
+          set -e
+          [ -d installers ] || { echo "no installers"; exit 0; }
+          git init -q inst && cd inst
+          git checkout -q --orphan ci-installers
+          cp -r ../installers/. .
+          { printf 'Installers of desktop build %s (%s, %s, commit %s), for trying out before a release.\n' "$RUN" "$REF" "$RESULT" "$SHA"
+            printf 'Only the newest build is kept here. Releases are on the Releases page.\n\n'
+            find . -type f ! -path './.git/*' ! -name README.md -exec ls -l {} \; | awk '{ print $5, $NF }'; } > README.md
+          git add -A
+          git -c user.name="BlueMolecule builds" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -qm "Installers of run $RUN ($REF, $RESULT)"
+          git push -q -f "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-installers
