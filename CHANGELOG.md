@@ -23,8 +23,9 @@ author's requests and bug reports.
   Windows and macOS warn once before the first start.
 - **Big files in WebKit** (Safari, and the desktop program on macOS and Linux): reading a big output kept the whole
   file in memory as well, because WebKit's JavaScript engine kept every short line that BlueMolecule kept as a
-  view of the 32 MB piece of text around it. Lines are now copied, and a big file needs about as much memory as in
-  Chrome or Edge.
+  view of the 32 MB piece of text around it. Lines are now copied: opening the 900 MB log of the cloud self-test
+  takes at most 0.8 GB of memory on macOS and 1.1 GB on Linux (before: 1.7 GB and rising), as against 0.6 GB on
+  Windows.
 - The 1.x packages (the Python launcher and Qt window, and the experimental Windows and macOS packages that
   compiled a launcher during installation) are no longer released; `BlueMolecule.html` still is.
 - New tests: `tests/browser_tauri_bridge_test.js` (the page side of the desktop program, with a stand-in for
