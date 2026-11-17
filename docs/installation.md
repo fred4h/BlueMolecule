@@ -34,7 +34,7 @@ BlueMolecule, by dragging them onto its window, with **Open With → Other appli
 `bluemolecule calc.log`.
 
 The package needs WebKitGTK 4.1 (`libwebkit2gtk-4.1-0`), which apt installs with it; it is part of Ubuntu 22.04,
-Debian 12 and later. Uninstall with `sudo apt remove bluemolecule`.
+Debian 12 and later. Uninstall with `sudo apt remove blue-molecule` (the package name; the command is `bluemolecule`).
 
 ### The AppImage (any distribution)
 

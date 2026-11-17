@@ -42,8 +42,8 @@ with `./uninstall.sh` from the unpacked 1.x folder ([details](installation.md#co
 
 ## Updates
 
-- **"This build of BlueMolecule cannot update itself":** only the installers from the Releases page update
-  themselves; builds made elsewhere (for example the test builds of the cloud) do not.
+- **"This is a test build of BlueMolecule, which does not look for updates":** only the installers from the
+  Releases page update themselves; builds made elsewhere (for example the test builds of the cloud) do not.
 - **The check did not succeed:** the computer may be offline, or GitHub unreachable. Try again later, or download
   the new version from the Releases page.
 
