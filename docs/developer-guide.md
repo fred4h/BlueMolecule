@@ -216,6 +216,9 @@ pictures, package contents) are copied to the `ci-reports` branch, `runs/<run id
 2. Publish a release on GitHub with the tag `vX.Y.Z`. `.github/workflows/release.yml` then builds the three systems
    (macOS as one universal app), signs the update packages, and attaches the installers, `latest.json` (what the
    updater reads) and `BlueMolecule.html` to the release.
+3. If a release build fails, fix the workflow on `main` and build the release again without a new tag:
+   `gh workflow run release.yml --repo fred4h/BlueMolecule -f tag=vX.Y.Z`. That uses the workflow of `main` with the
+   code of the tag, and attaches to the existing release.
 
 The update key is set up once, by the maintainer:
 

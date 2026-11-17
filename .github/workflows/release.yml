@@ -87,6 +87,9 @@ jobs:
           mkdir -p desktop/www
           cp dist/BlueMolecule.html desktop/www/index.html
           echo "BM_UPDATER_PUBKEY=$(tr -d '\r\n' < desktop/updater-key.pub)" >> "$GITHUB_ENV"
+          # the build checks each new update signature against plugins > updater > pubkey: the same key, from the
+          # same file (done here, not in git, so that a re-run of an older tag gets it too)
+          python -c "import json; p = 'desktop/src-tauri/tauri.release.conf.json'; c = json.load(open(p)); c.setdefault('plugins', {}).setdefault('updater', {})['pubkey'] = open('desktop/updater-key.pub').read().strip(); json.dump(c, open(p, 'w'), indent=2); print(open(p).read())"
 
       - name: Build, sign and attach
         uses: tauri-apps/tauri-action@v0
