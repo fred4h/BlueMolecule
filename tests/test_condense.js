@@ -176,6 +176,30 @@ for (const file of ['g16_water_optfreq.log', 'qmmm/g16_oniom_amber_opt.log', 'qm
   check(dsC.frames.every(f => f.Z === dsC.frames[0].Z), 'condensed XYZ frames share one element list');
 }
 
+// ------------------------------------------------------------------ 5. kept lines are copies of the text
+{
+  const own = BM.condense.own;
+  const odd = ['', 'a', '\u00e9', '\u4e2d', 'ab', ' 64', '\u0001G12', 'x\u2028y', '\ud83d\ude00', 'lone \ud800 surrogate', 'tab\there', '"quoted" \\ back', ' Normal termination of Gaussian 16'];
+  check(odd.every(s => own(s) === s), 'own() keeps every string as it is');
+  // the copies must not keep the big piece they were cut from alive (V8 here; WebKit is checked by the desktop builds)
+  require('v8').setFlagsFromString('--expose_gc');
+  const gc = require('vm').runInNewContext('gc');
+  const heap = () => { gc(); gc(); return process.memoryUsage().heapUsed; };
+  // (all in a function, so that no stale stack slot of this frame still points at the piece when h2 is taken)
+  const cut = () => {
+    const line = new TextEncoder().encode(' 12345 a line of the output 7\n'), bytes = new Uint8Array(30 * 400000);
+    for (let o = 0; o < bytes.length; o += 30) bytes.set(line, o);
+    const h0 = heap();
+    const piece = new TextDecoder().decode(bytes), kept = [];   // 12 MB, decoded as bigfile.js does
+    for (let i = 0; i < 4000; i++) { const p = 30 * i * 97; kept.push(own(piece.slice(p + 1, p + 6)), own(piece.slice(p, p + 29))); }
+    return { h0, h1: heap(), len: piece.length, kept };
+  };
+  const { h0, h1, len, kept } = cut();
+  const h2 = heap();
+  check(len === 12e6 && h1 - h0 > 1e7 && h2 - h0 < 3e6 && kept.every((s, k) => s === (k % 2 ? ' 12345 a line of the output 7' : '12345')),
+    'kept copies do not keep the piece of text alive (heap +' + ((h1 - h0) / 1e6).toFixed(1) + ' MB, then +' + ((h2 - h0) / 1e6).toFixed(1) + ' MB; ' + kept.length + ' kept)');
+}
+
 for (const f of fails) console.log('  FAIL:', f);
 console.log(`Condensed-reading tests: ${passes} passed, ${failures} failed (${all.length} files, ${nCut} cut versions)`);
 process.exit(failures ? 1 : 0);

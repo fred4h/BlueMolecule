@@ -33,8 +33,11 @@
   const PH = '\u0001';
   const DROPPED = '0';   // stands for a run of dropped rows starting with a digit (the readers skip such rows)
 
-  /** V8 keeps a substring as a slice of the 32 MB piece of text it was split from: a kept line must be a copy. */
-  const own = s => (s.length < 13 ? s : (' ' + s).slice(1));
+  /** A kept line must be a copy: the engines keep a substring as a view of the 32 MB piece of text it was split
+   *  from (V8 from 13 characters on; JavaScriptCore, WebKit's engine, from 3 on), so one short kept line would keep
+   *  its whole piece alive. JavaScriptCore even returns s itself for (' ' + s).slice(1), and on macOS and Linux the
+   *  desktop app then held the whole file. JSON.parse builds a new string in every engine (about 0.2 µs a line). */
+  const own = s => (s ? JSON.parse(JSON.stringify(s)) : s);
 
   // ------------------------------------------------------------------ fast, exact number scanning
   // A plain decimal with d digits after the point is the integer M / 10^d, which the division rounds exactly as

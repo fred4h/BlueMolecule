@@ -88,21 +88,33 @@ jobs:
           if [ ! -f "$exe" ]; then echo "no executable" > report/selftest-exit.txt; exit 1; fi
           here="$PWD"
           if [ "${{ matrix.name }}" = windows ]; then here=$(cygpath -m "$PWD"); fi   # C:/… for a Windows program
-          # memory of the program and its web engine, every 3 s, while the self-test runs
+          # memory of the program and its web engine every 2 s while the self-test runs: "time total MB | process MB
+          # (count) | …". Above the limit the program is stopped, so that a runner with little memory (macOS: 7 GB)
+          # still finishes the job and writes its report.
+          limit=$([ "${{ matrix.name }}" = macos ] && echo 4500 || echo 9000)
           sample() {
             if [ "${{ matrix.name }}" = windows ]; then
-              powershell -NoProfile -Command "\$p = Get-Process bluemolecule,msedgewebview2 -ErrorAction SilentlyContinue; '{0} {1:N0} MB' -f (Get-Date -Format HH:mm:ss), ((\$p | Measure-Object WorkingSet64 -Sum).Sum / 1MB)"
+              powershell -NoProfile -Command "\$p = Get-Process bluemolecule,msedgewebview2 -ErrorAction SilentlyContinue; \$t = (\$p | Measure-Object WorkingSet64 -Sum).Sum / 1MB; \$g = \$p | Group-Object ProcessName | ForEach-Object { '{0} {1:F0} ({2})' -f \$_.Name, ((\$_.Group | Measure-Object WorkingSet64 -Sum).Sum / 1MB), \$_.Count }; '{0} {1:F0} MB | {2}' -f (Get-Date -Format HH:mm:ss), \$t, (\$g -join ' | ')"
             else
-              ps -axo rss=,comm= | awk -v t="$(date +%T)" 'tolower($0) ~ /bluemolecule|webkit|webcontent/ {s += $1} END {printf "%s %d MB\n", t, s / 1024}'
+              ps -axo rss=,comm= | awk -v t="$(date +%T)" '{ r = $1; sub(/^ *[0-9]+ +/, ""); n = split($0, p, "/"); k = p[n]; if (tolower(k) ~ /bluemolecule|webkit|webcontent/) { s[k] += r; c[k]++; tot += r } } END { printf "%s %d MB", t, tot / 1024; for (k in s) printf " | %s %d (%d)", k, s[k] / 1024, c[k]; printf "\n" }'
             fi
           }
-          ( while true; do sample >> report/memory.txt 2>&1; sleep 3; done ) &
+          ( while true; do
+              line=$(sample 2>&1); echo "$line" >> report/memory.txt
+              mb=$(echo "$line" | awk '{ print int($2) }')
+              if [ "${mb:-0}" -gt "$limit" ]; then
+                echo "above $limit MB: the program is stopped" >> report/memory.txt
+                if [ "${{ matrix.name }}" = windows ]; then taskkill //IM bluemolecule.exe //F > /dev/null 2>&1; else pkill -x bluemolecule; fi
+              fi
+              sleep 2
+            done ) &
           monitor=$!
           start=$(date +%s)
           "${run[@]}" "$exe" "--self-test=$here/report/selftest.json" "$here/selftest/cisplatin.xyz" "$here/selftest/big-opt.log" > report/selftest-output.txt 2>&1
           code=$?
           kill $monitor 2>/dev/null
-          echo "exit=$code seconds=$(( $(date +%s) - start ))" > report/selftest-exit.txt
+          peak=$(awk '$3 == "MB" { print int($2) }' report/memory.txt 2>/dev/null | sort -n | tail -1)
+          echo "exit=$code seconds=$(( $(date +%s) - start )) peak=${peak:-?}MB" > report/selftest-exit.txt
           cat report/selftest-exit.txt
           cat report/selftest.json 2>/dev/null | head -c 6000
           exit $code
