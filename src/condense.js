@@ -29,7 +29,7 @@
   'use strict';
   const P = BM._parse;
   if (!P) throw new Error('condense.js needs parsers.js');
-  const { tok, isIntTok, isNumTok, num, int, floatsIn, modRedCoord, DEC10 } = P;
+  const { tok, isIntTok, isNumTok, num, int, floatsIn, modRedCoord, DEC10, FREQ_LABEL, STARS } = P;
   const PH = '\u0001';
   const DROPPED = '0';   // stands for a run of dropped rows starting with a digit (the readers skip such rows)
 
@@ -281,7 +281,7 @@
   const G_SHIELD_ROW = /^\s*(\d+)\s+\S+\s+Isotropic\s*=\s*(\S+)\s+Anisotropy\s*=\s*(\S+)/, G_SHIELD_SUB = /^\s*(XX=|XY=|XZ=|Eigenvalues:)/;
   const G_BERNY_HEAD = /^Variable\s+Old X\s+-DE\/DX/, G_BERNY_ROW = /^\s*[A-Z][A-Za-z]?\d+\s+-?\d+\.\d+(?:\s+-?\d+\.\d+){4,6}\s*$/;
   const G_FREQ_TEXT = /^(activities|incident light|and normal coordinates|depolarization|reduced masses)/i;
-  const G_LABEL = /^([A-Za-z].*?)\s*(---|--)(?:\s+(.*))?$/;
+  const G_LABEL = FREQ_LABEL;   // the reader's own rule (parsers.js)
 
   function Gaussian(opts) {
     Base.call(this, 'gaussian-log', opts);
@@ -362,7 +362,7 @@
     if (c === 'H' && t.startsWith('Harmonic frequencies')) {
       this.keep(line);
       this.mode = M_FREQ;
-      this.fr = { block: null, expectSym: false, freqs: false, hp: false, run: null, skip: this.hpAt === this.side.geoms.length, rank: 0 };
+      this.fr = { block: null, expectSym: false, freqs: false, hp: false, run: null, skip: this.hpAt === this.side.geoms.length, rank: 0, rowsIn: false, odd: 0, lastA: -1 };
       return;
     }
     if (c === 'E' && t.startsWith('Excited State')) {
@@ -427,6 +427,7 @@
       if (a1 > 0) {
         const R = this.run(), V = R.vecs, a = a1 - 1, base = 3 * a;
         if (a1 > R.nAtoms) R.nAtoms = a1;
+        F.rowsIn = true; F.lastA = a;
         for (let k = 0; k < bl; k++) {
           const v = V[k];
           if (!v) continue;
@@ -460,7 +461,7 @@
     const tk = t.split(/\s+/);
     if (tk.every(isIntTok)) {
       this.flushRun();
-      F.block = tk.map(x => int(x) - 1); F.expectSym = true;
+      F.block = tk.map(x => int(x) - 1); F.expectSym = true; F.rowsIn = false; F.odd = 0; F.lastA = -1;
       return this.keepFreq(line);
     }
     const lm = G_LABEL.exec(t);
@@ -472,13 +473,15 @@
     }
     if (F.expectSym && F.block && tk.length === F.block.length) { F.expectSym = false; return this.keepFreq(line); }
     if (/^Atom\s+AN\b/.test(t) || /^Coord\s+Atom\s+Element/.test(t)) return this.keepFreq(line);
-    if (F.block && tk.length >= 3 && isIntTok(tk[0]) && isIntTok(tk[1])) {
-      if (F.hp && isIntTok(tk[2]) && tk.length === 3 + F.block.length) {
+    if (F.block && tk.length >= 3 && (isIntTok(tk[0]) || (STARS.test(tk[0]) && F.lastA >= 0)) && isIntTok(tk[1])) {
+      if (F.hp && isIntTok(tk[0]) && isIntTok(tk[2]) && tk.length === 3 + F.block.length) {
         const cc = int(tk[0]) - 1, a = int(tk[1]) - 1;
         if (cc >= 0 && cc < 3 && a >= 0) return this.hpRow(tk, cc, a, F.block.length);
       }
-      if (tk.length === 2 + 3 * F.block.length) return this.stdRow(tk, int(tk[0]) - 1, F.block.length);
+      if (tk.length === 2 + 3 * F.block.length) return this.stdRow(tk, isIntTok(tk[0]) ? int(tk[0]) - 1 : F.lastA + 1, F.block.length);
     }
+    if (/^Harmonic frequencies/.test(t)) return this.endFreq(line);
+    if (F.block && !F.rowsIn && ++F.odd <= 8) return this.keepFreq(line);   // as the reader: an unknown line among the labels
     return this.endFreq(line);
   };
   Gaussian.prototype.keepFreq = function (line) { this.flushRun(); this.keep(line); };
@@ -497,11 +500,13 @@
   };
   Gaussian.prototype.stdRow = function (src, a, bl) {
     const R = this.run(), V = R.vecs;
+    this.fr.rowsIn = true; this.fr.lastA = a;
     if (a + 1 > R.nAtoms) R.nAtoms = a + 1;
     for (let k = 0; k < bl; k++) { const v = V[k]; if (v) for (let c = 0; c < 3; c++) putValue(v, 3 * a + c, src, 2 + 3 * k + c); }
   };
   Gaussian.prototype.hpRow = function (src, cc, a, bl) {
     const R = this.run(), V = R.vecs;
+    this.fr.rowsIn = true;
     if (a + 1 > R.nAtoms) R.nAtoms = a + 1;
     for (let k = 0; k < bl; k++) { const v = V[k]; if (v) putValue(v, 3 * a + cc, src, 3 + k); }
   };
@@ -524,7 +529,11 @@
     this.fr = null;
     this.mode = M_PASS;
     this.closeStep();
+    // a line that starts with a digit would be dropped as "0", which the reader would take for the mode numbers of a
+    // next block: the line that ends the section is kept as it is, so the section ends there for the reader too
+    const n = this.out.length;
     this.pass(line);
+    if (this.out.length === n + 1 && this.out[n] === DROPPED) { this.out[n] = own(line); this.chars += line.length; this.dropping = false; }
   };
   Gaussian.prototype.close = function () {
     if (this.mode === M_OHEAD || this.mode === M_OROWS) { if (!this.rows) { this.rows = new Rows(16); this.tv = []; } this.endTable(false); }

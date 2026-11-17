@@ -30,7 +30,7 @@ and 1.4.2 and 1.5.0 on 16 November (see the [changelog](../CHANGELOG.md)).
 
 ## How the program was checked
 
-- **Automated tests.** Every feature came with tests: about 32,000 checks in 32 suites, run with
+- **Automated tests.** Every feature came with tests: about 32,000 checks in 33 suites, run with
   `python3 tests/run_all.py --browser` ([developer guide](developer-guide.md#tests)). They cover:
   - the readers and writers of each format;
   - format detection;

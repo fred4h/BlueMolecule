@@ -5,7 +5,7 @@ as honestly as possible, what has been checked, what has not, and what the progr
 
 ## What has been checked
 
-- **About 32,000 automated checks in 32 test suites** (22,000 of them cut example outputs as a running job would
+- **About 32,000 automated checks in 33 test suites** (22,000 of them cut example outputs as a running job would
   leave them), all passing for this release
   ([how to run them](developer-guide.md#tests)). They cover:
   - every reader and writer, including format detection and the units and conventions of each program;
@@ -19,6 +19,10 @@ as honestly as possible, what has been checked, what has not, and what the progr
 - **Amber NetCDF:** besides files written by SciPy, real trajectories written by pmemd 16, sander 9 and cpptraj 6.4
   (public test files of the MDAnalysis project, not included here) were read and compared with SciPy's reading:
   the same coordinates, boxes and times.
+- **Gaussian frequencies:** real Gaussian 09 and 16 frequency outputs (public test files of the cclib project, not
+  included here, with up to 18 blocks of normal modes and the hpmodes layout) read the same in full and condensed.
+  `tests/test_freq_sections.js` adds layouts seen in big jobs: values too wide for their column (asterisks), unknown
+  lines among the labels, atom numbers beyond the column width.
 - **Script injection:** crafted files with HTML in titles, atom and residue names, labels and file names. None of it
   may become markup in the page (`tests/browser_xss_test.js`).
 - **Screenshots** of the interface, produced by the browser tests, were inspected during development.

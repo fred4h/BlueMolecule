@@ -213,6 +213,7 @@ Each suite can also be run alone, e.g. `node tests/test_parsers.js`.
 | `test_chem.js`, `test_ff.js`, `test_templates.js`, `test_symmetry.js`, `test_analysis.js` | SMILES, bond orders, hydrogens, force field, building library, point groups, convergence analysis |
 | `test_running_jobs.js` | Outputs of jobs that are still running: every example output cut at thousands of places (line ends, inside energy numbers, at random), read as text and as lines; no energy or plotted point that the complete file does not contain |
 | `test_condense.js` | Condensed reading (huge outputs): the same dataset as a full read for every example output and its cut versions, and each loading choice (every Nth, last N, range, vibrations) |
+| `test_freq_sections.js` | Gaussian frequency sections of many blocks in the layout of real outputs, read in full and condensed: imaginary modes, asterisks for values too wide for their column, unknown lines among the labels, damaged rows, a second section |
 | `test_netcdf.js` | Amber NetCDF trajectories and restarts written by SciPy (and CDF-5 by `tests/make_netcdf.py`): coordinates, boxes, times, slices, damaged and streaming files, NetCDF 4 refusal |
 | `test_reps.js`, `test_cartoon.js` | Selection language, residue and sugar classification, presets, cartoon geometry (synthetic structures from `tests/synth.js`) |
 | `test_native_bridge.js`, `test_launcher.py`, `test_native_packaging.py` | Host bridge, launcher (server, security, window selection with simulated browsers and a simulated Qt), packages and installers |

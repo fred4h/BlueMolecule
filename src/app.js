@@ -1422,8 +1422,10 @@
     d.vibIndex = i;
     d._vibVec = vibVec(d, i, state.vib.amplitude);
     d._animXyz = Float64Array.from(d.data.frames[v.frameIndex].xyz);
+    const still = d._vibVec && !d._vibVec.some(x => x !== 0);   // the file gave no displacements for it
+    if (still) d._vibVec = null;
     if (!d._vibVec) {
-      status(NOT_LOADED);
+      status(still ? 'The file has no atom displacements for this vibration, so it cannot be animated.' : NOT_LOADED);
       refreshScene(true); highlightRow('#vib-table', i); renderPlaybar();
       if (d.plotType === 'ir' || d.plotType === 'raman') renderPlotDraw();
       return;

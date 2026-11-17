@@ -391,10 +391,15 @@
   }
 
   // --------------------------------------------------------- Gaussian log
+  /** A label line of a frequency block: "Frequencies --", hpmodes "Frequencies ---", ROA "Raman1 Fr= 1--" (no blank
+   *  before the dashes). A value too wide for its column is printed as asterisks right after the dashes
+   *  ("IR Inten    --************", e.g. the huge IR intensities of a charged QM/MM system): it still is a label line. */
+  const FREQ_LABEL = /^([A-Za-z].*?)\s*(---|--)(?![-\d.])\s*(.*)$/;
+  const STARS = /^\*+$/;
   function parseGaussFreqSection(L, i0) {
     const rec = { hp: false, freqs: [], redMass: [], forceConst: [], ir: [], raman: [], depol: [], sym: [],
       modes: [], nAtoms: 0 };
-    let block = null, expectSym = false, depolSeen = false;
+    let block = null, expectSym = false, depolSeen = false, rowsIn = false, odd = 0, lastA = -1;
     let j = i0 + 1;
     for (; j < L.length; j++) {
       if (block && isPH(L[j]) && L.bmSide) {   // the atom rows of this block, condensed (vecs[k] null: not loaded)
@@ -402,6 +407,7 @@
         if (!rec.packed) rec.packed = [];
         block.forEach((m, k) => { rec.packed[m] = run.vecs[k] || null; });
         rec.nAtoms = Math.max(rec.nAtoms, run.nAtoms);
+        rowsIn = true;
         continue;
       }
       const t = L[j].trim();
@@ -411,11 +417,10 @@
       if (tk.every(isIntTok)) {
         block = tk.map(x => int(x) - 1);
         for (const m of block) if (!rec.modes[m]) rec.modes[m] = [];
-        expectSym = true; depolSeen = false;
+        expectSym = true; depolSeen = false; rowsIn = false; odd = 0; lastA = -1;
         continue;
       }
-      // "Frequencies --", hpmodes "Frequencies ---", ROA "Raman1 Fr= 1--" (no blank before the dashes)
-      const lm = /^([A-Za-z].*?)\s*(---|--)(?:\s+(.*))?$/.exec(t);
+      const lm = FREQ_LABEL.exec(t);
       if (lm && block) {
         expectSym = false;
         if (lm[2] === '---') rec.hp = true;
@@ -437,22 +442,29 @@
         continue;
       }
       if (/^Atom\s+AN\b/.test(t) || /^Coord\s+Atom\s+Element/.test(t)) continue;
-      if (block && tk.length >= 3 && isIntTok(tk[0]) && isIntTok(tk[1])) {
-        if (rec.hp && isIntTok(tk[2]) && tk.length === 3 + block.length) {
+      // an atom number too wide for its column (asterisks) is the one after the previous row's
+      if (block && tk.length >= 3 && (isIntTok(tk[0]) || (STARS.test(tk[0]) && lastA >= 0)) && isIntTok(tk[1])) {
+        if (rec.hp && isIntTok(tk[0]) && isIntTok(tk[2]) && tk.length === 3 + block.length) {
           const c = int(tk[0]) - 1, a = int(tk[1]) - 1;
           if (c >= 0 && c < 3 && a >= 0) {
             block.forEach((m, k) => { rec.modes[m][3 * a + c] = num(tk[3 + k]); });
             rec.nAtoms = Math.max(rec.nAtoms, a + 1);
+            rowsIn = true;
             continue;
           }
         }
         if (tk.length === 2 + 3 * block.length) {
-          const a = int(tk[0]) - 1;
+          const a = isIntTok(tk[0]) ? int(tk[0]) - 1 : lastA + 1;
           block.forEach((m, k) => { for (let c = 0; c < 3; c++) rec.modes[m][3 * a + c] = num(tk[2 + 3 * k + c]); });
           rec.nAtoms = Math.max(rec.nAtoms, a + 1);
+          rowsIn = true; lastA = a;
           continue;
         }
       }
+      if (/^Harmonic frequencies/.test(t)) break;   // the next section (hpmodes prints both)
+      // a line this reader does not know among the labels of a block, before its atom rows: skipped (a few at most)
+      if (block && !rowsIn && ++odd <= 8) continue;
+      if (rec.freqs.length) rec.stopped = { line: j, text: /^\d/.test(t) ? null : t.slice(0, 70) };
       break;
     }
     return { rec, end: j };
@@ -1031,6 +1043,10 @@
       if (t.startsWith('Harmonic frequencies')) {
         const r = parseGaussFreqSection(L, i);
         if (r.rec.freqs.length) freqSets.push({ rec: r.rec, frameIndex: ds.frames.length - 1, job });
+        if (r.rec.stopped) {
+          ds.warnings.push('The vibrations section stopped early, after ' + r.rec.freqs.length + ' vibrations, at a line it did not understand' +
+            (r.rec.stopped.text ? ': "' + r.rec.stopped.text + '"' : ' (an atom row of an unexpected form)') + '. Vibrations printed after it were not read.');
+        }
         i = r.end - 1;
         continue;
       }
@@ -1119,13 +1135,15 @@
     if (nmr) { ds.nmr = nmr; if (nmr.couplings === undefined) delete nmr.couplings; addJobType(meta, 'nmr'); }
     if (cellVecs) ds.cell = padCell(cellVecs);
     if (freqSets.length) {
-      let pick = last(freqSets);
-      if (!pick.rec.hp) {
-        for (let k = freqSets.length - 2; k >= 0; k--) {
-          const s = freqSets[k];
-          if (s.job !== pick.job || s.frameIndex !== pick.frameIndex) break;
-          if (s.rec.hp) { pick = s; break; }
-        }
+      // the last geometry's frequencies; of several sections for it (hpmodes prints two), the one with the most
+      // vibrations, then the high-precision one
+      const end = last(freqSets);
+      let pick = end;
+      for (let k = freqSets.length - 2; k >= 0; k--) {
+        const s = freqSets[k];
+        if (s.job !== end.job || s.frameIndex !== end.frameIndex) break;
+        const n = s.rec.freqs.length, np = pick.rec.freqs.length;
+        if (n > np || (n === np && s.rec.hp && !pick.rec.hp)) pick = s;
       }
       ds.vibrations = buildVibrations(pick.rec, pick.frameIndex, ds);
     }
@@ -3290,7 +3308,7 @@
   }
   BM.detectFormat = detectFormat;
   // shared with condense.js (the condensers must classify lines exactly as the readers do)
-  Object.defineProperty(BM, '_parse', { value: Object.freeze({ tok, isIntTok, isNumTok, num, int, floatsIn, modRedCoord, DEC10 }), configurable: true });
+  Object.defineProperty(BM, '_parse', { value: Object.freeze({ tok, isIntTok, isNumTok, num, int, floatsIn, modRedCoord, DEC10, FREQ_LABEL, STARS }), configurable: true });
   BM.parseSource = parseSource;
   BM.hasSourceReader = fileName => !!sourceReaderFor(fileName);
   /** BM.probeSource(fileName, source) -> Promise<{frames, atoms, perFrame, exact}>: a big trajectory's header only. */
