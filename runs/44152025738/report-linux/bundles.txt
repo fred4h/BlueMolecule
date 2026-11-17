@@ -1,0 +1,64 @@
+## files
+-rwxr-xr-x 1 runner runner 82328056 Nov 17 18:56 desktop/src-tauri/target/release/bundle/appimage/BlueMolecule_2.0.0_amd64.AppImage
+-rw-r--r-- 1 runner runner 927 Nov 17 18:54 desktop/src-tauri/target/release/bundle/deb/BlueMolecule_2.0.0_amd64/control.tar.gz
+-rw-r--r-- 1 runner runner 3847351 Nov 17 18:54 desktop/src-tauri/target/release/bundle/deb/BlueMolecule_2.0.0_amd64/data.tar.gz
+-rw-r--r-- 1 runner runner 3848472 Nov 17 18:54 desktop/src-tauri/target/release/bundle/deb/BlueMolecule_2.0.0_amd64.deb
+## desktop/src-tauri/target/release/bundle/deb/BlueMolecule_2.0.0_amd64.deb
+ new Debian package, version 2.0.
+ size 3848472 bytes: control archive=927 bytes.
+     586 bytes,     9 lines      control              
+     489 bytes,     6 lines      md5sums              
+     310 bytes,     5 lines   *  postinst             #!/bin/sh
+     292 bytes,     5 lines   *  postrm               #!/bin/sh
+ Package: blue-molecule
+ Version: 2.0.0
+ Architecture: amd64
+ Installed-Size: 7797
+ Maintainer: Frederico Henrique Do. C. R. Ferreira
+ Priority: optional
+ Depends: libwebkit2gtk-4.1-0, libgtk-3-0
+ Description: Viewer and builder for molecules and quantum-chemistry outputs
+  BlueMolecule opens quantum-chemistry outputs (Gaussian, ORCA and many more), structures and MD trajectories: 3D view, vibrations, spectra, orbitals, energy and convergence plots, and a molecule builder. A vibe-coded project: its code was written by an AI assistant (Claude, by Anthropic) from its author's instructions.
+drwxr-xr-x 0/0               0 2026-11-17 18:54 usr
+drwxr-xr-x 0/0               0 2026-11-17 18:54 usr/share
+drwxr-xr-x 0/0               0 2026-11-17 18:54 usr/share/icons
+drwxr-xr-x 0/0               0 2026-11-17 18:54 usr/share/icons/hicolor
+drwxr-xr-x 0/0               0 2026-11-17 18:54 usr/share/icons/hicolor/256x256@2
+drwxr-xr-x 0/0               0 2026-11-17 18:54 usr/share/icons/hicolor/256x256@2/apps
+-rw-r--r-- 0/0           43514 2026-11-17 18:54 usr/share/icons/hicolor/256x256@2/apps/bluemolecule.png
+drwxr-xr-x 0/0               0 2026-11-17 18:54 usr/share/icons/hicolor/32x32
+drwxr-xr-x 0/0               0 2026-11-17 18:54 usr/share/icons/hicolor/32x32/apps
+-rw-r--r-- 0/0            1900 2026-11-17 18:54 usr/share/icons/hicolor/32x32/apps/bluemolecule.png
+drwxr-xr-x 0/0               0 2026-11-17 18:54 usr/share/icons/hicolor/128x128
+drwxr-xr-x 0/0               0 2026-11-17 18:54 usr/share/icons/hicolor/128x128/apps
+-rw-r--r-- 0/0           14247 2026-11-17 18:54 usr/share/icons/hicolor/128x128/apps/bluemolecule.png
+drwxr-xr-x 0/0               0 2026-11-17 18:54 usr/share/mime
+drwxr-xr-x 0/0               0 2026-11-17 18:54 usr/share/mime/packages
+-rw-r--r-- 0/0            2672 2026-11-17 18:54 usr/share/mime/packages/org.bluemolecule.BlueMolecule.xml
+drwxr-xr-x 0/0               0 2026-11-17 18:54 usr/share/applications
+-rw-r--r-- 0/0             508 2026-11-17 18:54 usr/share/applications/BlueMolecule.desktop
+drwxr-xr-x 0/0               0 2026-11-17 18:54 usr/bin
+-rwxr-xr-x 0/0         7860040 2026-11-17 18:54 usr/bin/bluemolecule
+## debx/usr/share/applications/BlueMolecule.desktop
+[Desktop Entry]
+Categories=Education;
+Comment=Viewer and builder for molecules and quantum-chemistry outputs
+Exec=bluemolecule
+StartupWMClass=bluemolecule
+Icon=bluemolecule
+Name=BlueMolecule
+Terminal=false
+Type=Application
+MimeType=chemical/x-xyz;chemical/x-gaussian-cube;chemical/x-gaussian-checkpoint;chemical/x-gaussian-input;chemical/x-molden;chemical/x-mdl-molfile;chemical/x-mdl-sdfile;chemical/x-mol2;chemical/x-pdb;chemical/x-cif;chemical/x-gromacs-gro;chemical/x-cml;chemical/x-cjson;chemical/x-xsf
+total 7712
+drwxr-xr-x   6 runner runner    4096 Nov 17 18:54 .
+drwxr-xr-x   3 runner runner    4096 Nov 17 18:54 ..
+-rw-r--r--   1 runner runner       0 Nov 17 18:50 .cargo-artifact-lock
+-rw-r--r--   1 runner runner       0 Nov 17 18:50 .cargo-build-lock
+-rw-r--r--   1 runner runner       0 Nov 17 18:50 .cargo-lock
+-rwxr-xr-x   2 runner runner 7860040 Nov 17 18:56 bluemolecule
+-rw-r--r--   1 runner runner    1021 Nov 17 18:54 bluemolecule.d
+drwxr-xr-x 362 runner runner   12288 Nov 17 18:50 build
+drwxr-xr-x   4 runner runner    4096 Nov 17 18:56 bundle
+drwxr-xr-x   2 runner runner    4096 Nov 17 18:50 examples
+drwxr-xr-x   2 runner runner    4096 Nov 17 18:50 incremental
