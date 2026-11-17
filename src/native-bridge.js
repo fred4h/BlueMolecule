@@ -400,6 +400,10 @@
         }
       }, true);
     }
+    // errors of the page go to the app's log file (see docs/troubleshooting.md)
+    G.addEventListener('error', e => log('error', String((e && e.message) || e) + (e && e.filename ? ' (' + e.filename.split('/').pop() + ':' + e.lineno + ')' : '')));
+    G.addEventListener('unhandledrejection', e => log('error', 'unhandled: ' + String((e && e.reason && (e.reason.stack || e.reason.message)) || (e && e.reason))));
+    log('info', 'BlueMolecule ' + ((G.BM_TAURI && G.BM_TAURI.version) || '') + ' started on ' + ((G.BM_TAURI && G.BM_TAURI.os) || '?') + ' · ' + ((G.navigator && G.navigator.userAgent) || ''));
     const open = G.open;
     G.open = function (url) {
       if (typeof url === 'string' && /^(https?:|mailto:)/i.test(url)) { invoke('bm_open_url', { url }).catch(err => console.error(err)); return null; }
@@ -410,6 +414,9 @@
    *  downloads, checks the signature, installs and restarts. */
   const updates = kind === 'tauri-app' ? Object.freeze({
     supported: !!(G.BM_TAURI && G.BM_TAURI.updates),
+    /** Linux .deb installations are updated with the new .deb (only the AppImage replaces itself). */
+    selfInstall: !(G.BM_TAURI && G.BM_TAURI.os === 'linux' && !G.BM_TAURI.appImage),
+    openReleases: () => invoke('bm_open_url', { url: 'https://github.com/fred4h/BlueMolecule/releases/latest' }),
     check: () => invoke('bm_update_check'),
     install: () => invoke('bm_update_install')
   }) : null;

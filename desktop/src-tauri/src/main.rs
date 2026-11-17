@@ -531,6 +531,7 @@ fn main() {
             };
             let marker = json!({
                 "version": app.package_info().version.to_string(), "os": std::env::consts::OS,
+                "appImage": std::env::var_os("APPIMAGE").is_some(),
                 "memTotal": total, "memAvailable": avail, "updates": updater_key().is_some(),
                 "selfTest": self_test.is_some(), "selfTestFiles": names
             });

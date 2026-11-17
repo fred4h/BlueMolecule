@@ -70,34 +70,27 @@
 ## Install
 
 Download the latest release from the **[Releases page](https://github.com/fred4h/BlueMolecule/releases)**.
+BlueMolecule is a desktop program of its own on each system, with an installer, **Open with** entries for
+chemistry files and a built-in updater:
 
-**Linux** (the main platform; needs `python3`):
+| System | Download | Install |
+|---|---|---|
+| Ubuntu, Kubuntu, Debian… | `BlueMolecule_VERSION_amd64.deb` | `sudo apt install ./BlueMolecule_VERSION_amd64.deb` |
+| Any 64-bit Linux | `BlueMolecule_VERSION_amd64.AppImage` | `chmod +x` it and run it |
+| Windows 10 and 11 | `BlueMolecule_VERSION_x64-setup.exe` | Run it (no administrator rights needed) |
+| macOS 10.15 or later | `BlueMolecule_VERSION_universal.dmg` | Drag BlueMolecule to Applications |
 
-```bash
-tar xzf BlueMolecule-1.5.0-linux.tar.gz
-cd BlueMolecule-1.5.0-linux
-./install.sh                 # installs for your user in ~/.local; offers to install Qt WebEngine for Python
-bluemolecule calc.log        # or start it from the applications menu, or use "Open With" on a file
-```
-
-**Windows 10 and 11** (experimental, not yet tested on a real PC): extract `BlueMolecule-1.5.0-windows.zip`, then
-double-click **Install BlueMolecule.cmd**. It needs no administrator rights and nothing installed first. It adds
-BlueMolecule to the Start menu and to **Open with** for chemistry files.
-
-**macOS** (experimental, not yet tested on a real Mac): unzip `BlueMolecule-1.5.0-macOS.zip`, then double-click
-**Install BlueMolecule.command**. It needs Apple's free Command Line Tools.
+The installers are not code-signed, so Windows and macOS warn once before the first start;
+[the installation guide](docs/installation.md) says how to go on, and how to remove a 1.x installation first.
 
 **Any computer:** open `BlueMolecule.html` in Chrome, Edge, Firefox or Safari. It works offline, but Open Babel is
 not available.
-
-More detail, options and uninstalling: [docs/installation.md](docs/installation.md).
-Building from source needs only Python 3: `python3 tools/build.py`.
 
 ## Documentation
 
 | | |
 |---|---|
-| [Installation](docs/installation.md) | Linux, Windows, macOS and browser; window types; Open Babel; uninstalling |
+| [Installation](docs/installation.md) | Linux, Windows, macOS and browser; updates; Open Babel; uninstalling |
 | [User guide](docs/user-guide.md) | The window, mouse and keyboard, toolbar, tabs, plots, exporting |
 | [Analysing outputs](docs/analysing-outputs.md) | Contents overview, optimisations, scans and IRC, vibrations, spectra, excited states, NMR, orbitals, charges |
 | [QM/MM and ONIOM](docs/qmmm-oniom.md) | What is read from each program, energies, layer views |
@@ -113,13 +106,14 @@ Building from source needs only Python 3: `python3 tools/build.py`.
 
 ## Status
 
-BlueMolecule 1.5.0 is the current release (1.4.1 was the first public one). The automated test suite has about
-32,000 checks in 33 suites, 22,000 of them from cutting example outputs as a running job would leave them:
+BlueMolecule 2.0.0 is the current release (1.4.1 was the first public one). The automated test suite has about
+32,000 checks in 34 suites, 22,000 of them from cutting example outputs as a running job would leave them:
 - format readers and writers against example files;
 - chemistry routines;
 - the selection language;
 - the launcher;
-- browser tests that drive the real interface.
+- browser tests that drive the real interface;
+- the desktop program, built and started on Linux, Windows and macOS by the cloud builds.
 
 All of these files were written to imitate each program's output, because no real outputs were available while it
 was written. Real outputs can differ in details the examples do not cover.

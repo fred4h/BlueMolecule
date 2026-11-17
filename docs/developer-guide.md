@@ -8,7 +8,9 @@ build step for development: open `src/index.html` in a browser and you are runni
 ## Repository layout
 
 ```text
-src/                 the viewer: index.html, style.css and 22 JavaScript modules
+src/                 the viewer: index.html, style.css and 23 JavaScript modules
+desktop/             the desktop program (Tauri 2): src-tauri/ with the Rust host, configuration, installers' files
+.github/workflows/   cloud builds: desktop.yml (every push), release.yml (published releases)
 launcher/            bluemolecule.py: command line, window selection, local server, Open Babel bridge
 native/linux/        Qt WebEngine window (bluemolecule_qt.py), install.sh / uninstall.sh, desktop file, MIME types
 native/macos/        WKWebView app (BlueMolecule.swift), Info.plist, "Install BlueMolecule.command"
@@ -142,7 +144,8 @@ ideally as a round trip that writes, reads back and compares.
 
 | `kind` | Host | Transport |
 |---|---|---|
-| `linux-app` | `native/linux/bluemolecule_qt.py` (Qt WebEngine) | QWebChannel: `bmHost.post(name, json)` |
+| `tauri-app` | The desktop program, `desktop/src-tauri/src/main.rs` (Tauri 2) | Tauri commands (`bm_save`, `bm_read`…) and `bm-open` events |
+| `linux-app` | `native/linux/bluemolecule_qt.py` (Qt WebEngine, 1.x) | QWebChannel: `bmHost.post(name, json)` |
 | `macos-app` | `native/macos/BlueMolecule.swift` (WKWebView) | `webkit.messageHandlers` |
 | `launcher` | `launcher/bluemolecule.py` serving the page to a browser app window | HTTP on `127.0.0.1` |
 | `launcher` | `native/windows/BlueMolecule.exe`: a copy of the page with the files embedded, opened in an Edge app window | `window.BM_LAUNCH` only: files as `data:` URLs, no ping or Open Babel |
@@ -159,6 +162,13 @@ The messages are:
 
 Replies come back through `BM.native._resolve(id, result)`. Files opened by the host arrive through
 `_receiveFile(name, base64)`, or `_receiveLargeFile(name, size, fileId)` for files of 32 MB and more.
+
+**The desktop program** answers the same requests as Tauri commands, with raw bytes for `bm_read` (16 MB per call)
+instead of base64. Every document it hands to the page, from the command line, **Open with**, a second launch or
+its Open dialog, arrives as `{name, size, fileId}` and is read on demand, so big files are never copied whole. The
+page can read only files the user named. Web links open in the default browser. `BM.native.openDialog` and
+`BM.native.updates` exist only there. `window.BM_TAURI` gives the version, the system, the free memory and whether
+this build can update itself.
 
 **The launcher** chooses the window (Qt, Chromium-family app window or Firefox; see
 [installation](installation.md#its-own-window-the-native-qt-window)). For the browser windows it runs a small
@@ -186,8 +196,39 @@ The build needs only Python 3. Two kinds of generated files are kept in the repo
 - `native/icons/BlueMolecule.ico`, the Windows icon: regenerate it from the PNGs with `python3 tools/make_ico.py`
   (needs Pillow).
 
-The version number lives in `tools/build.py`, `src/app.js`, `launcher/bluemolecule.py` and
-`native/linux/bluemolecule_qt.py`; keep them equal. `native-bridge.js` has its own bridge-protocol version.
+The version number lives in `tools/build.py`, `src/app.js`, `launcher/bluemolecule.py`,
+`native/linux/bluemolecule_qt.py`, `desktop/src-tauri/tauri.conf.json` and `desktop/src-tauri/Cargo.toml`; keep them
+equal (the release workflow refuses a tag that differs). `native-bridge.js` has its own bridge-protocol version.
+
+The desktop program is built with Rust and Node.js; see [desktop/README.md](../desktop/README.md).
+
+### Cloud builds
+
+`.github/workflows/desktop.yml` runs for every push that touches the page or the desktop program. On Linux, Windows
+and macOS it builds the installers and starts the program once with `--self-test`: the page and its WebGL 2 view,
+a small molecule and a 900 MB log opened through the native bridge, a save, and a picture of the view. The
+installers are kept as artifacts of the run (on its Actions page). The reports (build log, self-test results and
+pictures, package contents) are copied to the `ci-reports` branch, `runs/<run id>/`, newest in `latest.txt`.
+
+### Releases
+
+1. Make sure the version is the same everywhere (above) and the changelog is written; merge to `main`.
+2. Publish a release on GitHub with the tag `vX.Y.Z`. `.github/workflows/release.yml` then builds the three systems
+   (macOS as one universal app), signs the update packages, and attaches the installers, `latest.json` (what the
+   updater reads) and `BlueMolecule.html` to the release.
+
+The update key is set up once, by the maintainer:
+
+```bash
+npx @tauri-apps/cli@2 signer generate -w ~/.tauri/bluemolecule.key
+```
+
+- `~/.tauri/bluemolecule.key.pub` goes into the repository as `desktop/updater-key.pub`.
+- The private key `~/.tauri/bluemolecule.key` and its password go into the repository's **Settings → Secrets and
+  variables → Actions** as `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Keep a copy
+  somewhere safe: without it, installed copies can no longer be updated.
+
+The installers are not code-signed for Windows or notarized for macOS (the macOS app is signed ad hoc).
 
 `node tools/docs_screenshots.js`, run after a build, regenerates the screenshots in `docs/images/`.
 
@@ -220,6 +261,7 @@ Each suite can also be run alone, e.g. `node tests/test_parsers.js`.
 | `test_windows_package.py`, `browser_windows_launch_test.js` | The Windows package without Windows: C# 5 and PowerShell 5.1 syntax limits, delimiter balance, registry symmetry of install and uninstall, the icon, and the launch page opened from `file://` in Chromium |
 | `test_renderer.js`, `browser_*.js`, `test_bigfiles.js` | The renderer and the interface in headless Chromium (they save screenshots to `tests/shots/`), injection safety, large files |
 | `browser_ui_test.js` | Interface details: drop-down menus by mouse, drag and keyboard, the calculation-input file names, arrow keys in the lists, right-click deletion, running jobs |
+| `browser_tauri_bridge_test.js` | The page side of the desktop program against a stand-in for Tauri: documents from the command line and later launches, reading on demand, the Open and Save dialogs, Open Babel, the clipboard, web links, the updater dialog, the self-test script |
 | `browser_15_test.js` | Version 1.5: plot zoom (box, buttons, double-click, selection, every plot type, exports), the energy-components plot, the loading dialog and Load other parts for outputs, XYZ, DCD and NetCDF, NetCDF after a prmtop |
 
 **Fixtures.**

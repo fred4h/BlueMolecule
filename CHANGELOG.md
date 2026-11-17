@@ -3,6 +3,29 @@
 BlueMolecule is [vibe-coded](docs/vibe-coding.md). Each version below was written by an AI assistant from the
 author's requests and bug reports.
 
+## 2.0.0 (November 2026): a real program with updates
+
+- **BlueMolecule is a desktop program of its own** ([#11](https://github.com/fred4h/BlueMolecule/issues/11)), built
+  with Tauri 2: a native window with its own name and icon on Linux, Windows and macOS, using each system's web
+  engine. Installers: `.deb` and AppImage for Linux, a per-user `.exe` for Windows (no administrator rights), a
+  `.dmg` with a universal app for macOS. Chemistry files get **Open with → BlueMolecule** (never as the default
+  program for `.log` or `.out`), files open from the command line and from a second launch into the running
+  window, and big files are read on demand through the native bridge, as in the 1.x Qt window. Open Babel, the
+  system Open and Save dialogs and the clipboard work on all three systems; web links open in the default browser.
+- **Built-in updater** ([#12](https://github.com/fred4h/BlueMolecule/issues/12)). **Help → Check for updates…**
+  shows the release notes of a newer version and, if you agree, downloads it, checks its signature against
+  BlueMolecule's own key, installs it and restarts. Checking is BlueMolecule's only use of the network: it happens
+  when you ask, or at start-up only if you tick that box. `.deb` installations are pointed to the new `.deb`.
+- **Cloud builds** ([#13](https://github.com/fred4h/BlueMolecule/issues/13)). Every change is built on Linux,
+  Windows and macOS and started once there with a self-test: the 3D view in each engine, a 900 MB log and a
+  molecule through the native bridge, a save and a picture of the view. Publishing a release builds, signs and
+  attaches the installers and the update files. The installers are not code-signed (macOS: signed ad hoc), so
+  Windows and macOS warn once before the first start.
+- The 1.x packages (the Python launcher and Qt window, and the experimental Windows and macOS packages that
+  compiled a launcher during installation) are no longer released; `BlueMolecule.html` still is.
+- New tests: `tests/browser_tauri_bridge_test.js` (the page side of the desktop program, with a stand-in for
+  Tauri, and the self-test script).
+
 ## 1.5.0 (16 November 2026): big files, trajectories and plots
 
 - **Outputs of several gigabytes open** ([#6](https://github.com/fred4h/BlueMolecule/issues/6)). A QM/MM

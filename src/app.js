@@ -7,7 +7,7 @@
   const HARTREE = { kcal: 627.509474, kj: 2625.49964, ev: 27.211386 };
   const UNIT_LABEL = { kcal: 'kcal/mol', kj: 'kJ/mol', ev: 'eV' };
   const BG = { navy: [0.063, 0.090, 0.133], black: [0, 0, 0], white: [1, 1, 1], gray: [0.91, 0.925, 0.945] };
-  const VERSION = '1.5.0';
+  const VERSION = '2.0.0';
   const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const isNum = v => typeof v === 'number' && isFinite(v);
   const fx = (v, d) => (isNum(v) ? v.toFixed(d) : '—');
@@ -2725,13 +2725,15 @@
     const keep = form => { const c = form.querySelector('[data-upd="auto"]'); if (c) setUpdatesAuto(c.checked); };
     if (r.available) {
       dialog(`BlueMolecule ${esc(r.version)} is available`, `<p>You have version ${esc(r.current)}${r.date ? '; this one was released on ' + esc(String(r.date).slice(0, 10)) : ''}.</p>
-        ${r.notes ? `<div class="upd-notes">${esc(r.notes)}</div>` : ''}${box}`, [
+        ${r.notes ? `<div class="upd-notes">${esc(r.notes)}</div>` : ''}${up.selfInstall === false ? '<p class="note">This is a .deb installation: install the new .deb package from the Releases page to update.</p>' : ''}${box}`, [
         { label: 'Later', onClick: f => { keep(f); } },
-        { label: 'Install and restart', primary: true, onClick: async f => {
-          keep(f);
-          status('Downloading and installing the update…');
-          try { await up.install(); } catch (e) { toast('The update was not installed: ' + ((e && e.message) || e), true); }
-        } }]);
+        up.selfInstall === false
+          ? { label: 'Open the Releases page', primary: true, onClick: f => { keep(f); up.openReleases(); } }
+          : { label: 'Install and restart', primary: true, onClick: async f => {
+            keep(f);
+            status('Downloading and installing the update…');
+            try { await up.install(); } catch (e) { toast('The update was not installed: ' + ((e && e.message) || e), true); }
+          } }]);
     } else {
       const msg = r.error ? 'The check did not succeed: ' + esc(r.error) : `BlueMolecule ${esc(r.current)} is the latest version.`;
       dialog('Updates', `<p>${msg}</p>${box}`, [{ label: 'Close', primary: true, onClick: f => { keep(f); } }]);

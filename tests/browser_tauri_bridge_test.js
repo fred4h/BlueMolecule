@@ -25,7 +25,7 @@ function mockTauri(files, opts) {
     const listeners = {};
     window.__calls = [];
     window.__tauriMock = { listeners, later: f => listeners['bm-open'] && listeners['bm-open']({ payload: doc(f) }) };
-    window.BM_TAURI = Object.freeze({ version: '2.0.0', os: 'linux', memTotal: 16e9, memAvailable: 8e9, updates: !!opts.updates,
+    window.BM_TAURI = Object.freeze({ version: '2.0.0', os: opts.os || 'linux', appImage: opts.appImage !== false, memTotal: 16e9, memAvailable: 8e9, updates: !!opts.updates,
       selfTest: !!opts.selfTest, selfTestFiles: files.map(f => f.name) });
     window.__TAURI__ = {
       core: { invoke: async (cmd, args) => {
@@ -76,7 +76,8 @@ function mockTauri(files, opts) {
   check(st[0][1] === 4 && st[1][2] === 11, 'and are read whole through bm_read');
   const reads = await page.evaluate(() => window.__calls.filter(c => c[0] === 'bm_read').length);
   check(reads >= 2, 'bytes come from bm_read (' + reads + ' calls)');
-  check(await page.evaluate(() => window.__calls[0] && window.__calls[0][0] === 'bm_ready'), 'bm_ready is asked once the "bm-open" listener is in place');
+  check(await page.evaluate(() => { const c = window.__calls.filter(x => x[0] !== 'bm_log'); return c[0] && c[0][0] === 'bm_ready'; }), 'bm_ready is asked once the "bm-open" listener is in place');
+  check(await page.evaluate(() => window.__calls.some(x => x[0] === 'bm_log' && /started on linux/.test(x[1].message))), 'the start goes to the app log');
   // a later launch with a document ("Open with" while running)
   await page.evaluate(f => window.__tauriMock.later(f), { name: 'g16_water_scan.log', b64: b64('g16_water_scan.log') });
   await page.waitForFunction(() => BM.app.state.docs.length === 3, null, { timeout: 10000 });
@@ -112,6 +113,18 @@ function mockTauri(files, opts) {
   await page.click('#dlg .dlg-foot button:has-text("Install and restart")');
   await sleep(150);
   check(await page.evaluate(() => window.__installed === true && localStorage.getItem('bluemolecule.updates.auto') === '1'), 'Install and restart installs; the start-up check is now on');
+  await page.context().close();
+
+  console.log('a .deb installation is updated from the Releases page');
+  page = await open(mockTauri([], { updates: true, appImage: false, update: { supported: true, available: true, current: '2.0.0', version: '2.0.1' } }));
+  await page.click('#btn-help');
+  await page.click('#dlg .dlg-foot button:has-text("Check for updates")');
+  await page.waitForFunction(() => /2\.0\.1 is available/.test(document.querySelector('#dlg .dlg-head').textContent));
+  const debBtns = await page.$$eval('#dlg .dlg-foot button', b => b.map(x => x.textContent));
+  check(debBtns.includes('Open the Releases page') && !debBtns.includes('Install and restart') && /\.deb installation/.test(await page.$eval('#dlg', e => e.textContent)), 'the .deb case: ' + debBtns.join(', '));
+  await page.click('#dlg .dlg-foot button:has-text("Open the Releases page")');
+  await sleep(100);
+  check(await page.evaluate(() => window.__opened) === 'https://github.com/fred4h/BlueMolecule/releases/latest', 'which opens in the browser');
   await page.context().close();
 
   console.log('start-up check and cancelled dialog');

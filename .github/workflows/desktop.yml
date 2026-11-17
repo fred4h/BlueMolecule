@@ -88,9 +88,20 @@ jobs:
           if [ ! -f "$exe" ]; then echo "no executable" > report/selftest-exit.txt; exit 1; fi
           here="$PWD"
           if [ "${{ matrix.name }}" = windows ]; then here=$(cygpath -m "$PWD"); fi   # C:/… for a Windows program
+          # memory of the program and its web engine, every 3 s, while the self-test runs
+          sample() {
+            if [ "${{ matrix.name }}" = windows ]; then
+              powershell -NoProfile -Command "\$p = Get-Process bluemolecule,msedgewebview2 -ErrorAction SilentlyContinue; '{0} {1:N0} MB' -f (Get-Date -Format HH:mm:ss), ((\$p | Measure-Object WorkingSet64 -Sum).Sum / 1MB)"
+            else
+              ps -axo rss=,comm= | awk -v t="$(date +%T)" 'tolower($0) ~ /bluemolecule|webkit|webcontent/ {s += $1} END {printf "%s %d MB\n", t, s / 1024}'
+            fi
+          }
+          ( while true; do sample >> report/memory.txt 2>&1; sleep 3; done ) &
+          monitor=$!
           start=$(date +%s)
           "${run[@]}" "$exe" "--self-test=$here/report/selftest.json" "$here/selftest/cisplatin.xyz" "$here/selftest/big-opt.log" > report/selftest-output.txt 2>&1
           code=$?
+          kill $monitor 2>/dev/null
           echo "exit=$code seconds=$(( $(date +%s) - start ))" > report/selftest-exit.txt
           cat report/selftest-exit.txt
           cat report/selftest.json 2>/dev/null | head -c 6000
