@@ -77,7 +77,7 @@ jobs:
         run: |
           set +e
           mkdir -p selftest
-          python tools/make_big_fixture.py gaussian selftest/big-opt.log --mb 300 > /dev/null
+          python tools/make_big_fixture.py gaussian selftest/big-opt.log --mb 900 > /dev/null
           cp tests/fixtures/cisplatin.xyz selftest/
           case "${{ matrix.name }}" in
             linux)   exe=desktop/src-tauri/target/release/bluemolecule
