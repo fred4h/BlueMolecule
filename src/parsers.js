@@ -165,7 +165,7 @@
   }
 
   // Energy priority used to pick frame.energy from frame.energies ('MM': Gaussian molecular-mechanics "Energy=").
-  const ENERGY_PRIORITY = ['Final', 'CP', 'ONIOM', 'CCSD(T)', 'QCISD(T)', 'CCSD', 'QCISD', 'MP4', 'MP3', 'MP2', 'DH', 'SCF', 'MM'];
+  const ENERGY_PRIORITY = ['Final', 'CP', 'ONIOM', 'CCSD(T)', 'QCISD(T)', 'CCSD', 'QCISD', 'CCD', 'MP5', 'MP4', 'MP4(SDQ)', 'MP4(DQ)', 'MP3', 'MP2', 'DH', 'SCF', 'MM'];
   const sameZ = (a, b) => { if (!a || a.length !== b.length) return false; for (let i = 0; i < b.length; i++) if (a[i] !== b[i]) return false; return true; };
 
   /** Collects geometry frames from program outputs, merging repeated identical geometries
@@ -653,6 +653,7 @@
     let scfMethod = null, stdBasis = null, solventOut = null, routeMB = null, cellVecs = null;
     // Excited-state optimisations / scans / IRCs: the TD total energy is the frame energy of that job.
     let tdGeomJob = false;
+    let ccKind = 'CCSD', lastCorr = null;   // coupled-cluster / QCI: the kind of this job, the last E(Corr) printed
     const tdFrames = new Set();
     const jobsT = new JobTracker(ds);
     let scanCoords = [], paramTable = null, rotLen = null, rotVel = null, nmr = null;
@@ -790,6 +791,8 @@
             const jt = { jobTypes: [], solvent: 'x' };
             applyGaussianRoute(route, jt, false);
             tdGeomJob = jt.jobTypes.indexOf('td') >= 0 && jt.jobTypes.some(x => x === 'opt' || x === 'scan' || x === 'irc');
+            ccKind = /\bqcisd/i.test(route) ? 'QCISD' : /\bccd\b/i.test(route) ? 'CCD' : 'CCSD';
+            lastCorr = null;
             oniomJob = /\boniom\s*\(/i.test(route);
             oniomOpt = oniomJob && jt.jobTypes.indexOf('opt') >= 0;
             if (oniomJob && !oniomRoute) oniomRoute = route;
@@ -848,14 +851,25 @@
       }
       if (t.indexOf('EUMP2') >= 0) { const m = /EUMP2\s*=\s*(\S+)/.exec(t); if (m) E('MP2', num(m[1])); }
       if (t.indexOf('EUMP3') >= 0) { const m = /EUMP3\s*=\s*(\S+)/.exec(t); if (m) E('MP3', num(m[1])); }
-      if (t.startsWith('UMP4(SDTQ)=')) { E('MP4', num(t.split('=')[1])); continue; }
+      // " E4(SDTQ)= -0.3267D-02   UMP4(SDTQ)= -0.75016068D+02": DQ, SDQ and SDTQ in that order, each kept ('MP4' is the full
+      // SDTQ); the best one printed is the energy of an MP4 job
+      if (t.indexOf('UMP4(') >= 0) {
+        const m = /UMP4\((DQ|SDQ|SDTQ)\)\s*=\s*(\S+)/.exec(t);
+        if (m) { E(m[1] === 'SDTQ' ? 'MP4' : 'MP4(' + m[1] + ')', num(m[2])); continue; }
+      }
+      if (t.startsWith('DEMP5')) { const m = /\bMP5\s*=\s*(\S+)/.exec(t); if (m) E('MP5', num(m[1])); continue; }
       if (t.startsWith('CCSD(T)=')) { E('CCSD(T)', num(t.split('=')[1])); continue; }
       if (t.startsWith('QCISD(T)=')) { E('QCISD(T)', num(t.split('=')[1])); continue; }
+      if (t.startsWith('DE(Corr)=')) { const m = /\sE\(CORR\)\s*=\s*(\S+)/i.exec(t); if (m) lastCorr = num(m[1]); continue; }
+      // the converged CCSD / CCD / QCISD energy: G16 "Wavefunction amplitudes converged. E(Corr)= ...", G09 "CI/CC converged
+      // in N iterations" after the last "DE(Corr)= ... E(CORR)= ..." line
       if (t.startsWith('Wavefunction amplitudes converged.')) {
         const m = /E\(Corr\)\s*=\s*(\S+)/i.exec(t);
-        if (m) E('CCSD', num(m[1]));
+        if (m) E(ccKind, num(m[1]));
+        lastCorr = null;
         continue;
       }
+      if (t.startsWith('CI/CC converged')) { if (lastCorr !== null) E(ccKind, lastCorr); lastCorr = null; continue; }
       if (t.startsWith('E2(')) {
         const m = /^E2\(([^)]+)\)\s*=\s*\S+\s+E\(\1\)\s*=\s*(\S+)/.exec(t);
         if (m) E('DH', num(m[2]));
@@ -1598,7 +1612,7 @@
     let absRows = null, tdBlocks = [], tdCur = null, dipAU = null, dipTot = null;
     const jobsT = new JobTracker(ds);
     jobsT.open(null, null);
-    let scanCur = null, cdLen = null, cdVel = null, shield = null;
+    let scanCur = null, cdLen = null, cdVel = null, shield = null, ccHead = -1;
     // QM/MM, QM/QM2 (multiscale): every geometry print is tagged with its step ("epoch"); after the loop each step
     // becomes one frame with the full-system geometry and all of the step's energies (QM-region prints are no steps).
     let qmmm = null, qmmmChecked = false, epoch = 0;
@@ -1639,7 +1653,7 @@
           const s = L[j].trim();
           if (!s || /^-{5,}$/.test(s)) break;
           const m6 = /^(\d+)-(\d+)\S*\s*->\s*(\d+)-(\d+)\S*\s+(.*)$/.exec(s);
-          if (m6) { map.set(int(m6[3]), num(tok(m6[5])[3])); continue; }
+          if (m6) { map.set(int(m6[4]) + ':' + int(m6[3]), num(tok(m6[5])[3])); continue; }   // multiplicity:state, as the states
           const v = tok(s);
           if (v.length >= 4 && isIntTok(v[0])) map.set(int(v[0]), num(v[3])); else break;
         }
@@ -1763,9 +1777,21 @@
       if (t.startsWith('MP2 TOTAL ENERGY:') || t.startsWith('RI-MP2 TOTAL ENERGY:')) {
         sink.energy('MP2', num(tok(t.split(':')[1])[0])); continue;
       }
+      // ADC(2): the ground state (MP2) that the excitation energies are added to
+      if (t.startsWith('Second-order corrected state energy')) { const v = num(last(tok(t))); if (Number.isFinite(v)) sink.energy('MP2', v); continue; }
       if (t.startsWith('E(CCSD')) {
         const m = /^E\((CCSD(?:\(T\))?)\)\s*\.\.\.\s*(\S+)/.exec(t);
         if (m) sink.energy(m[1], num(m[2]));
+        continue;
+      }
+      // "COUPLED CLUSTER ENERGY" ... "E(TOT) ... -380.500397409": the ground-state CCSD (QCISD) energy, which EOM- and
+      // STEOM-CCSD runs print without an "E(CCSD)" line
+      if (t === 'COUPLED CLUSTER ENERGY') { ccHead = i; continue; }
+      if (t.startsWith('E(TOT)') && ccHead >= 0 && i - ccHead < 10) {
+        const m = /^E\(TOT\)\s*\.\.\.\s*(\S+)/.exec(t), inp = input.join('\n');
+        const kind = /\bqcisd/i.test(inp) ? 'QCISD' : /ccsd/i.test(inp) ? 'CCSD' : null;
+        if (m && kind) sink.energy(kind, num(m[1]));
+        ccHead = -1;
         continue;
       }
       if (t.indexOf('|Geometry convergence|') >= 0) {
@@ -1895,7 +1921,10 @@
             continue;
           }
           const v = tok(s);
-          if (v.length >= 4 && isIntTok(v[0])) rows.push({ index: int(v[0]), cm: num(v[1]), nm: num(v[2]), f: num(v[3]) });
+          // ORCA 5 numbers the triplets after the singlets: "6   25241.0   396.2   spin forbidden (mult=3)"
+          const sf = /spin forbidden \(mult=(\d+)\)/.exec(s);
+          if (sf && v.length >= 3 && isIntTok(v[0])) rows.push({ index: int(v[0]), cm: num(v[1]), nm: num(v[2]), f: 0, mult: int(sf[1]), forbidden: true });
+          else if (v.length >= 4 && isIntTok(v[0])) rows.push({ index: int(v[0]), cm: num(v[1]), nm: num(v[2]), f: num(v[3]) });
           else break;
         }
         absRows = rows;
@@ -2091,15 +2120,33 @@
       if (vib.packed) ds.vibrations.modesLoaded = keep.filter(k => vib.packed[k] !== null).length;
     }
     ds.excitedStates = orcaStates(absRows, tdBlocks, meta.multiplicity);
-    if (ds.excitedStates && (cdLen || cdVel)) {
-      const done = new Set();   // singlet rows come first; triplet states reuse the same indices
-      for (const st of ds.excitedStates) {
-        if (done.has(st.index)) continue;
-        done.add(st.index);
-        if (cdLen && cdLen.has(st.index)) st.R = cdLen.get(st.index);
-        if (cdVel && cdVel.has(st.index)) st.Rvel = cdVel.get(st.index);
+    // excited-state methods (TD-DFT, CIS, EOM-CCSD...): ORCA's "FINAL SINGLE POINT ENERGY" is then the total energy of
+    // the state it follows (IROOT). It is the frame's energy only in a job that follows that state (optimisation,
+    // scan, IRC); otherwise it is kept as energies['Excited state'] and the frame's energy is the ground state's, as
+    // for Gaussian TD jobs. Recognised by being a ground-state energy of the frame plus an excitation energy.
+    if (ds.excitedStates && ds.excitedStates.length && !meta.jobTypes.some(x => x === 'opt' || x === 'scan' || x === 'irc')) {
+      const ex = ds.excitedStates.map(st => st.energyEV / HARTREE2EV).filter(Number.isFinite);
+      for (const f of ds.frames) {
+        const en = f.energies;
+        if (!en || en.Final === undefined) continue;
+        const ground = Object.keys(en).filter(k => k !== 'Final' && sink.priority.indexOf(k) >= 0).map(k => en[k]);
+        if (!ground.some(g => ex.some(w => Math.abs(en.Final - g - w) < 5e-5))) continue;
+        en['Excited state'] = en.Final;
+        delete en.Final;
+        f.energy = null;
+        for (const k of sink.priority) if (en[k] !== undefined) { f.energy = en[k]; break; }
       }
     }
+    if (ds.excitedStates && (cdLen || cdVel)) {
+      // CD rows and states share a key: "multiplicity:state" (ORCA 6 rows) or the row number (ORCA 5)
+      for (const st of ds.excitedStates) {
+        const k = st.cdKey;
+        if (k === null || k === undefined) continue;
+        if (cdLen && Number.isFinite(cdLen.get(k))) st.R = cdLen.get(k);
+        if (cdVel && Number.isFinite(cdVel.get(k))) st.Rvel = cdVel.get(k);
+      }
+    }
+    if (ds.excitedStates) for (const st of ds.excitedStates) delete st.cdKey;
     if (shield) {
       const N = last(ds.frames).Z.length;
       const iso = new Array(N).fill(NaN), aniso = new Array(N).fill(NaN);
@@ -2158,16 +2205,26 @@
   function orcaStates(absRows, blocks, groundMult) {
     if (!blocks.length && !absRows) return null;
     const main = blocks.find(b => b.kind === 'SINGLETS' || b.kind === null) || null;
+    const ofMult = m => (m === 3 ? blocks.find(b => b.kind === 'TRIPLETS') : m === 1 ? main : null) || null;
     const out = [];
     const used = new Set();
     if (absRows && absRows.length) {
       for (const r of absRows) {
-        const st = main ? main.states.find(s => s.index === r.index) : null;
-        if (st) used.add(st);
         const ev = Number.isFinite(r.eV) ? r.eV : r.cm * CM2EV;
-        out.push({ index: r.index, energyEV: ev, wavelengthNM: r.cm > 0 ? 1e7 / r.cm : EV2NM / ev, f: r.f,
-          label: orcaStateLabel(main ? main.kind : null, st, r, groundMult), s2: st ? st.s2 : null,
-          transitions: st ? st.transitions : [] });
+        // the row's state in an excited-states block: by its number within its multiplicity (ORCA 6: "0-1A -> 2-3B"),
+        // or by energy for ORCA 5's spin-forbidden rows, which are numbered after the singlets
+        const blk = r.mult ? ofMult(r.mult) : main;
+        let st = null;
+        if (blk) {
+          if (r.mult) {   // (ORCA 6 numbers a triplet block's states 6, 7, ... after the singlets, its table 1-3, 2-3, ...)
+            const near = blk.states.filter(x => !used.has(x) && Math.abs(x.eV - ev) < 2e-3);
+            st = near.find(x => x.index === r.index) || near[0] || null;
+          } else st = blk.states.find(x => x.index === r.index) || null;
+          if (st) used.add(st);
+        }
+        out.push({ index: r.forbidden && st ? st.index : r.index, energyEV: ev, wavelengthNM: r.cm > 0 ? 1e7 / r.cm : EV2NM / ev, f: r.f,
+          label: orcaStateLabel(blk ? blk.kind : null, st, r, groundMult), s2: st ? st.s2 : null,
+          transitions: st ? st.transitions : [], cdKey: r.mult && !r.forbidden ? r.mult + ':' + r.index : r.index });
       }
     }
     for (const b of blocks) {
@@ -2175,7 +2232,7 @@
         if (used.has(st) || (b === main && absRows && absRows.length)) continue;
         out.push({ index: st.index, energyEV: st.eV, wavelengthNM: st.eV > 0 ? EV2NM / st.eV : NaN,
           f: b.kind === 'TRIPLETS' ? 0 : null, label: orcaStateLabel(b.kind, st, null, groundMult), s2: st.s2,
-          transitions: st.transitions });
+          transitions: st.transitions, cdKey: b === main ? st.index : null });
       }
     }
     return out.length ? out : null;
@@ -2198,10 +2255,36 @@
     return /^\s*!\s*\S/m.test(head) &&
       (/^\s*\*\s*(xyz|int|internal|gzmt|xyzfile|gzmtfile|pdbfile)\s+-?\d+\s+\d+/im.test(head) || /^\s*%coords\b/im.test(head));
   }
+  /** ORCA %paras: NAME = value | start, end, steps | [v1 v2 ...] -> {name (lower case): first value}; scans lists
+   *  the parameters that take several values (the geometry shown uses the first). */
+  function orcaParas(L) {
+    const vals = {}, scans = [];
+    for (let i = 0; i < L.length; i++) {
+      if (!/^\s*%paras\b/i.test(L[i])) continue;
+      for (let j = i + 1; j < L.length && !/^\s*end\s*$/i.test(L[j]); j++) {
+        const m = /^\s*(\w+)\s*=\s*(.+?)\s*$/.exec(L[j]);
+        if (!m) continue;
+        const parts = m[2].replace(/[[\]]/g, ' ').split(/[\s,]+/).filter(Boolean);
+        if (!parts.length || !isNumTok(parts[0])) continue;
+        vals[m[1].toLowerCase()] = num(parts[0]);
+        if (parts.length > 1) scans.push(m[1]);
+        i = j;
+      }
+    }
+    return { vals, scans };
+  }
   function parseOrcaInput(text, fileName) {
     const ds = newDataset('orca-input', fileName);
     const meta = ds.meta;
-    const L = splitLines(text).map(s => s.replace(/#.*$/, ''));
+    const paras = orcaParas(splitLines(text).map(s => s.replace(/#.*$/, '')));
+    const unknown = new Set();
+    // coordinates may name %paras values in braces: "C 1 0 0 {B1} 0 0"
+    const sub = s => s.replace(/\{\s*(\w+)\s*\}/g, (all, k) => {
+      const v = paras.vals[k.toLowerCase()];
+      if (v === undefined) { unknown.add(k); return all; }
+      return String(v);
+    });
+    const L = splitLines(text).map(s => s.replace(/#.*$/, '')).map(s => (s.indexOf('{') >= 0 ? sub(s) : s));
     const kw = [];
     let job = 0, bohr = false;
     const addGeom = (Z, xyz, label) => {
@@ -2307,8 +2390,16 @@
         continue;
       }
     }
+    if (unknown.size) {
+      throw err('The coordinates use ' + Array.from(unknown, k => '{' + k + '}').join(', ') + ', which the input does not define in %paras.');
+    }
     if (!ds.frames.length) {
       throw err(ds.warnings.length ? ds.warnings.join(' ') : 'No "* xyz", "* int" or %coords geometry found in this ORCA input.');
+    }
+    if (paras.scans.length) {
+      ds.warnings.push('This input scans ' + paras.scans.join(', ') + ' (%paras); the geometry shown uses the first value' +
+        (paras.scans.length > 1 ? 's.' : '.'));
+      addJobType(meta, 'scan');
     }
     if (kw.length) { meta.route = '! ' + kw.join(' '); meta.keywords = kw.slice(); }
     const lo = kw.map(s => s.toLowerCase());
@@ -2688,6 +2779,12 @@
     const E = D['Total Energy'];
     if (typeof E === 'number') { f.energy = E; f.energies = { Total: E }; }
     if (typeof D['SCF Energy'] === 'number') { f.energies = f.energies || {}; f.energies.SCF = D['SCF Energy']; if (f.energy === null) f.energy = D['SCF Energy']; }
+    // a TD / CIS job: "Total Energy" is the excited state's ("CIS Energy"). As in the log reader, it is the frame's
+    // energy only in a job that follows the state (optimisation, scan, IRC); otherwise the ground state's is.
+    if (typeof D['CIS Energy'] === 'number' && typeof D['SCF Energy'] === 'number') {
+      f.energies = { SCF: D['SCF Energy'], TD: D['CIS Energy'] };
+      f.energy = /opt|scan|irc/i.test(jobType) ? D['CIS Energy'] : D['SCF Energy'];
+    }
     ds.frames.push(f);
     const meta = ds.meta;
     meta.charge = typeof D.Charge === 'number' ? D.Charge : null;
@@ -2699,16 +2796,22 @@
     if (/freq/.test(jt)) addJobType(meta, 'freq');
     if (/scan/.test(jt)) addJobType(meta, 'scan');
     if (/irc/.test(jt)) addJobType(meta, 'irc');
+    if (typeof D['CIS Energy'] === 'number') addJobType(meta, 'td');
     finishJobTypes(meta);
-    ds.program = 'Gaussian (formatted checkpoint)';
+    // Q-Chem and Psi4 write fchk files too (Q-Chem titles them "Jobname.Temp" and adds Dipole_Data)
+    const title1 = (L[0] || '').trim();
+    ds.program = title1 === 'Generated by Psi4' ? 'Psi4 (formatted checkpoint)'
+      : title1 === 'Jobname.Temp' || D.Dipole_Data !== undefined ? 'Q-Chem (formatted checkpoint)' : 'Gaussian (formatted checkpoint)';
     const ch = {};
     [['Mulliken Charges', 'Mulliken'], ['ESP Charges', 'ESP'], ['NPA Charges', 'NPA']].forEach(([k, n]) => {
       if (Array.isArray(D[k]) && D[k].length === nat) ch[n] = D[k];
     });
     if (Object.keys(ch).length) ds.charges = ch;
-    const dm = D['Dipole Moment'];
+    const dm = D['Dipole Moment'], dq = D['Dipole_Data'];   // Gaussian: atomic units; Q-Chem's fchk: Debye
     if (Array.isArray(dm) && dm.length === 3) {
       ds.dipole = { x: dm[0] * AU2DEBYE, y: dm[1] * AU2DEBYE, z: dm[2] * AU2DEBYE, total: Math.hypot(dm[0], dm[1], dm[2]) * AU2DEBYE };
+    } else if (Array.isArray(dq) && dq.length === 3 && dq.every(Number.isFinite)) {
+      ds.dipole = { x: dq[0], y: dq[1], z: dq[2], total: Math.hypot(dq[0], dq[1], dq[2]) };
     }
     const ae = D['Alpha Orbital Energies'], be = D['Beta Orbital Energies'];
     if (Array.isArray(ae) && ae.length) {
@@ -2765,35 +2868,24 @@
     return ds;
   }
 
-  function parseMol(text, fileName) {
-    const ds = newDataset('mol', fileName);
-    const L = splitLines(text);
-    let end = L.findIndex(s => s.startsWith('$$$$'));
-    if (end < 0) end = L.length;
-    else {
-      const more = L.slice(end + 1).filter(s => s.startsWith('$$$$')).length;
-      if (more) ds.warnings.push('This SD file holds ' + (more + 1) + ' records; only the first is shown.');
-    }
-    const rec = L.slice(0, end);
-    if (rec.length < 4) throw err('The molfile header (3 lines) and counts line are missing.');
-    ds.title = rec[0].trim() || stripExt(fileName);
-    ds.program = rec[1].slice(2, 10).trim() || null;
+  /** One V2000 record: {Z, xyz, bonds, energy}. Errors name the record when the file holds several. */
+  function molRecord(rec, ds, nRec) {
+    const where = nRec > 1 ? ' (record ' + nRec + ')' : '';
     const counts = rec[3];
-    if (/V3000/.test(counts)) return parseMolV3000(rec, ds);
     let na = int(counts.slice(0, 3)), nb = int(counts.slice(3, 6));
     if (!(na >= 0) || !(nb >= 0)) { const t = tok(counts); na = int(t[0]); nb = int(t[1]); }
-    if (!(na >= 0) || !(nb >= 0)) throw err('Cannot read the atom/bond counts line.');
+    if (!(na >= 0) || !(nb >= 0)) throw err('Cannot read the atom/bond counts line' + where + '.');
     const Z = [], xyz = [];
     for (let k = 0; k < na; k++) {
       const s = rec[4 + k];
-      if (s === undefined) throw err('The atom block is truncated.');
+      if (s === undefined) throw err('The atom block is truncated' + where + '.');
       let x = num(s.slice(0, 10)), y = num(s.slice(10, 20)), z = num(s.slice(20, 30));
       let sym = s.slice(31, 34).trim();
       if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z) || !sym) {
         const t = tok(s); x = num(t[0]); y = num(t[1]); z = num(t[2]); sym = t[3] || '';
       }
       if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
-        throw err('Atom line ' + (5 + k) + ' has no readable coordinates (the atom block may be truncated).');
+        throw err('Atom line ' + (5 + k) + where + ' has no readable coordinates (the atom block may be truncated).');
       }
       let zz = sym === 'D' || sym === 'T' ? 1 : BM.el.toZ(sym);
       if (zz < 0) { ds.warnings.push('Unknown atom symbol "' + sym + '" read as a dummy atom.'); zz = 0; }
@@ -2807,8 +2899,67 @@
       if (!(a > 0 && b > 0)) { const t = tok(s); a = int(t[0]); b = int(t[1]); o = int(t[2]); }
       if (a > 0 && b > 0 && a <= na && b <= na) bonds.push([a - 1, b - 1, bondOrder(o)]);
     }
-    ds.frames.push(newFrame(Z, xyz));
-    ds.bonds = bonds;
+    // the energy BlueMolecule's own "SDF (all geometries)" stores, in hartree ("> <ENERGY>")
+    let energy = null;
+    if (/BlueMol/.test(rec[1] || '')) {
+      const k = rec.findIndex(s => /^>\s+.*<ENERGY>/.test(s));
+      if (k >= 0 && isNumTok((rec[k + 1] || '').trim())) energy = num(rec[k + 1].trim());
+    }
+    return { Z, xyz, bonds, energy };
+  }
+  function parseMol(text, fileName) {
+    const ds = newDataset('mol', fileName);
+    const L = splitLines(text);
+    // records, separated by "$$$$" lines
+    const recs = [];
+    let st = 0;
+    for (let k = 0; k < L.length; k++) if (L[k].startsWith('$$$$')) { recs.push(L.slice(st, k)); st = k + 1; }
+    const tail = L.slice(st);
+    if (!recs.length || tail.some(s => s.trim())) recs.push(tail);
+    const rec = recs[0];
+    if (rec.length < 4) throw err('The molfile header (3 lines) and counts line are missing.');
+    ds.title = rec[0].trim() || stripExt(fileName);
+    ds.program = rec[1].slice(2, 10).trim() || null;
+    if (/V3000/.test(rec[3])) {
+      parseMolV3000(rec, ds);
+      const Z0 = ds.frames[0].Z;
+      let same = true;
+      for (let r = 1; r < recs.length && same; r++) {
+        let d2 = null;
+        if (recs[r].length >= 4 && /V3000/.test(recs[r][3])) { try { d2 = parseMolV3000(recs[r], newDataset('mol', fileName)); } catch (e) { d2 = null; } }
+        const f2 = d2 && d2.frames[0];
+        if (!f2 || f2.Z.length !== Z0.length || f2.Z.some((z, i) => z !== Z0[i])) { same = false; break; }
+        f2.label = recs[r][0].trim() || null;
+        ds.frames.push(f2);
+      }
+      if (!same) {
+        ds.frames.length = 1;
+        ds.warnings.push('This SD file holds ' + recs.length + ' records of different molecules; only the first is shown.');
+      } else if (ds.frames.length > 1) ds.frames[0].label = rec[0].trim() || null;
+      return ds;
+    }
+    const first = molRecord(rec, ds, recs.length > 1 ? 1 : 0);
+    // several records of the same atoms (conformers, a trajectory, BlueMolecule's "SDF (all geometries)") are the
+    // geometries of one structure; records of different molecules: the first is shown
+    const more = [];
+    let same = recs.length > 1;
+    for (let r = 1; r < recs.length && same; r++) {
+      if (recs[r].length < 4 || /V3000/.test(recs[r][3])) { same = false; break; }
+      let m;
+      try { m = molRecord(recs[r], ds, r + 1); } catch (e) { same = false; break; }
+      if (m.Z.length !== first.Z.length || m.Z.some((z, i) => z !== first.Z[i])) { same = false; break; }
+      m.title = recs[r][0].trim();
+      more.push(m);
+    }
+    const add = (m, label) => { const f = newFrame(m.Z, m.xyz); if (m.energy !== null) f.energy = m.energy; f.label = label || null; ds.frames.push(f); return f; };
+    if (same) {
+      add(first, rec[0].trim() || null);
+      for (const m of more) add(m, m.title || null);
+    } else {
+      if (recs.length > 1) ds.warnings.push('This SD file holds ' + recs.length + ' records of different molecules; only the first is shown.');
+      add(first, null);
+    }
+    ds.bonds = first.bonds;
     return ds;
   }
 
@@ -2998,10 +3149,20 @@
     return s.length >= 44 && isIntTok(s.slice(0, 5).trim()) && /^\s*-?\d+\.\d+$/.test(s.slice(20, 28)) &&
       /^\s*-?\d+\.\d+$/.test(s.slice(28, 36));
   }
+  /** Link 0 lines, a "#" route, a blank line, the title, a blank line and the charge and multiplicity (when the head
+   *  reaches them): a comment line starting with "#" in another format (Psi4, xtb, shell) is not enough. */
   function looksLikeGjf(L) {
     let k = 0;
     while (k < L.length && (!L[k].trim() || L[k].trim()[0] === '%')) k++;
-    return k < L.length && /^\s*#/.test(L[k]);
+    if (!(k < L.length && /^\s*#/.test(L[k]))) return false;
+    while (k < L.length && L[k].trim()) k++;          // the route (one or more lines)
+    while (k < L.length && !L[k].trim()) k++;
+    const t0 = k;
+    while (k < L.length && L[k].trim()) k++;          // the title (a few lines at most)
+    if (k - t0 > 6) return false;
+    while (k < L.length && !L[k].trim()) k++;
+    if (k >= L.length) return true;                    // (the head ends before: as before, a "#" line decides)
+    return /^\s*[-+]?\d+[\s,]+\d+/.test(L[k]);        // charge and multiplicity (ONIOM: several pairs)
   }
   function looksLikeXyz(L) {
     const t0 = tok(L[0] || '');
@@ -3022,10 +3183,10 @@
     if (looksLikeOrcaInp(head)) return 'orca-input';
     const L = head.split(/\r\n|\r|\n/, 12);
     if (L.length >= 4 && /V[23]000\s*$/.test(L[3])) return 'mol';
-    if (/^(ATOM  |HETATM).{24}[ \d.-]{8}/m.test(head)) return 'pdb';
+    if (/^(ATOM  |HETATM).{24}[ \d-]{4}\.\d{3}[ \d-]{4}\.\d{3}/m.test(head)) return 'pdb';   // x and y in columns 31-46 (F8.3)
     if (looksLikeCube(L)) return 'cube';
     if (looksLikeGro(L)) return 'gro';
-    if (looksLikeGjf(L)) return 'gaussian-input';
+    if (looksLikeGjf(head.split(/\r\n|\r|\n/, 80))) return 'gaussian-input';
     if (looksLikeXyz(L)) return 'xyz';
     if (/^M {2}END/m.test(head)) return 'mol';
     return null;
@@ -3119,10 +3280,17 @@
     }
     if (Array.isArray(ds.optSteps)) for (const st of ds.optSteps) if (typeof st.energy === 'number' && !Number.isFinite(st.energy)) st.energy = null;
     const trajOnly = !!(ds.meta && ds.meta.needsTopology);
+    let badZ = 0;
+    const seenZ = new WeakSet();   // frames of a trajectory often share one element list
     for (const f of ds.frames) {
       if (trajOnly && !f.Z) { if (f.xyz.length % 3) throw err('Internal error: coordinate array length is not a multiple of 3.'); continue; }
       if (f.xyz.length !== 3 * f.Z.length) throw err('Internal error: coordinate array length mismatch.');
+      // an element that could not be read (a damaged number) is a dummy atom, never NaN
+      if (seenZ.has(f.Z)) continue;
+      seenZ.add(f.Z);
+      for (let i = 0; i < f.Z.length; i++) if (!(Number.isInteger(f.Z[i]) && f.Z[i] >= 0 && f.Z[i] <= 118)) { f.Z[i] = 0; badZ++; }
     }
+    if (badZ) ds.warnings.push(badZ + ' atom' + (badZ > 1 ? 's have an element' : ' has an element') + ' that could not be read; shown as dummy atoms (X).');
     // overflowing ("1e999") or NaN coordinates never reach the viewer: keep the geometries before the first such
     // one (e.g. an MD run that blew up), as the XYZ reader does for an unreadable frame
     for (let k = 0; k < ds.frames.length; k++) {
@@ -3134,11 +3302,35 @@
       if (k === 0) throw err(what[0].toUpperCase() + what.slice(1) + '.');
       ds.warnings.push('Stopped at ' + what + '; ' + k + ' of ' + ds.frames.length + ' geometries are shown.');
       ds.frames.length = k;
+      // the jobs keep to the geometries that are left
+      if (Array.isArray(ds.jobs)) {
+        ds.jobs = ds.jobs.filter(j => !(j.frameStart >= k));
+        ds.jobs.forEach(j => { if (j.frameEnd >= k) j.frameEnd = k - 1; });
+        if (!ds.jobs.length) ds.jobs = null;
+      }
       break;
     }
     if (ds.vibrations) {
       const v = ds.vibrations;
       if (!ds.frames[v.frameIndex]) v.frameIndex = ds.frames.length - 1;
+    }
+    // a charge table cut while it was written (a job still running) fits no geometry: it is left out until it is whole
+    if (ds.charges && typeof ds.charges === 'object') {
+      const counts = new Set(ds.frames.map(f => (f.Z ? f.Z.length : -1)));
+      for (const k of Object.keys(ds.charges)) {
+        const q = ds.charges[k];
+        if (Array.isArray(q) && !counts.has(q.length)) delete ds.charges[k];
+      }
+      if (!Object.keys(ds.charges).length) ds.charges = null;
+    }
+    // orbital energies that stop before the HOMO (a table cut, or a layout a reader missed): the HOMO, the LUMO and the
+    // level diagram would be wrong, so they are left out
+    if (ds.orbitals && typeof ds.orbitals === 'object') {
+      const short = s => !!s && (!s.energies || !s.energies.length || (Number.isFinite(s.nOcc) && s.nOcc > s.energies.length));
+      if (short(ds.orbitals.alpha) || short(ds.orbitals.beta)) {
+        ds.orbitals = null;
+        ds.warnings.push('The orbital energies in this file are incomplete (fewer than the occupied orbitals), so they are not shown.');
+      }
     }
     return ds;
   }
@@ -3204,6 +3396,14 @@
     return ds;
   }
 
+  /** validate()'s message ("Geometry 1 has a coordinate that is not a finite number") names the file and the reader,
+   *  as the readers' own messages do. */
+  function checked(fn, shown, fmt) {
+    try { return fn(); } catch (e) {
+      const m = (e && e.message) || String(e);
+      throw err(/^Could not read /.test(m) ? m : 'Could not read "' + shown + '" as ' + fmt.name + ': ' + m);
+    }
+  }
   function parseFile(fileName, text) {
     const shown = baseName(fileName) || 'file';
     if (text === null || text === undefined) throw err('"' + shown + '" could not be read (no content).');
@@ -3227,7 +3427,7 @@
       throw err('Could not read "' + shown + '" as ' + fmt.name + ': ' + (e && e.message ? e.message : e));
     }
     if (ds && !ds.format) ds.format = fmt.id;
-    return validate(finishOutput(ds, fmt, partial));
+    return checked(() => validate(finishOutput(ds, fmt, partial)), shown, fmt);
   }
   /**
    * BM.parseLines(fileName, lines) -> Dataset: like parseFile for a file already split into lines
@@ -3271,7 +3471,7 @@
           modes: v ? Object.assign({}, ld.modes, { total: v.freqs.length, loaded: v.modesLoaded === undefined ? v.freqs.length : v.modesLoaded }) : null, bytes: ld.bytes };
       }
     }
-    return validate(finishOutput(ds, fmt, partial));
+    return checked(() => validate(finishOutput(ds, fmt, partial)), shown, fmt);
   }
   /** Binary files (trajectories etc.). Falls back to text parsing when no binary reader claims the extension. */
   function parseFileBinary(fileName, bytes) {

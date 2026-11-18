@@ -1,0 +1,46 @@
+ Entering Gaussian System, Link 0=g16
+ Input=water.gjf
+ Output=water.log
+ Cite this work as:
+ Gaussian 16, Revision A.03,
+ M. J. Frisch, G. W. Trucks, H. B. Schlegel, G. E. Scuseria, et al.
+ 
+ ******************************************
+ Gaussian 16:  ES64L-G16RevA.03  1-Jan-2018
+                 4-Nov-2026 
+ ******************************************
+ --------------
+ #p mp5/sto-3g
+ --------------
+ 1/38=1/1;
+ 99/5=1,9=1/99;
+ -----
+ water MP5
+ -----
+ Symbolic Z-matrix:
+ Charge =  0 Multiplicity = 1
+ O
+ H                    1    0.99 
+ H                    1    0.99     2    106. 
+                          Input orientation:                          
+ ---------------------------------------------------------------------
+ Center     Atomic      Atomic             Coordinates (Angstroms)
+ Number     Number       Type             X           Y           Z
+ ---------------------------------------------------------------------
+      1          8           0        0.000000    0.000000    0.000000
+      2          1           0        0.000000    0.000000    0.990000
+      3          1           0        0.951655    0.000000   -0.272885
+ ---------------------------------------------------------------------
+ SCF Done:  E(RHF) =  -74.9643287913     A.U. after    8 cycles
+ ANorm=    0.1012345678D+01
+ E2 =    -0.3795333610D-01 EUMP2 =    -0.75002282127785D+02
+ E3=       -0.10518803D-01        EUMP3=      -0.75012800931D+02
+ MP4(D)= -0.33926717D-02
+ MP4(S)= -0.11250849D-03
+ E4(DQ)=   -0.31002164D-02        UMP4(DQ)=   -0.75015901147D+02
+ E4(SDQ)=  -0.32127249D-02        UMP4(SDQ)=  -0.75016013656D+02
+ MP4(T)=   -0.54396764D-04
+ E4(SDTQ)= -0.32671217D-02        UMP4(SDTQ)= -0.75016068053D+02
+ EMP5DD         =  -0.12245548745D-02
+ DEMP5 =  -0.11048815700D-02 MP5 =  -0.75017172934D+02
+ Normal termination of Gaussian 16 at Wed Nov  4 21:00:00 2026.

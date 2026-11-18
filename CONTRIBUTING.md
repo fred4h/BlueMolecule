@@ -1,7 +1,7 @@
 # Contributing to BlueMolecule
 
-Thank you for helping. BlueMolecule is a [vibe-coded](docs/vibe-coding.md) project that was tested almost
-entirely on synthetic files, so **reports from real use are the most valuable contribution of all**.
+Thank you for helping. BlueMolecule is a [vibe-coded](docs/vibe-coding.md) project that was tested mostly on
+synthetic files and public example outputs, so **reports from real use are the most valuable contribution of all**.
 
 ## Reporting a file that is read wrongly
 

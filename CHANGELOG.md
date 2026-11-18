@@ -3,6 +3,64 @@
 BlueMolecule is [vibe-coded](docs/vibe-coding.md). Each version below was written by an AI assistant from the
 author's requests and bug reports.
 
+## 2.0.1 (November 2026): checked against real output files
+
+Every reader was run on the public test files of the cclib project (437 outputs of nine programs) and of the
+MDAnalysis project, and compared with cclib's reading of the same files; each file was also read cut at ten places
+and damaged on purpose, and written in every format and read back; and the interface was driven with real files in a
+headless browser. The test files of earlier versions imitated each program's output; the real files showed these
+differences, now fixed:
+
+- **Correlated energies (Gaussian):** MP4 energies were never read, because Gaussian prints them in the middle of a
+  line (`E4(SDTQ)= … UMP4(SDTQ)= …`), so an MP4 or MP5 job showed its MP3 energy. MP4 (SDTQ, SDQ, DQ), MP5 and CCD
+  are now read, and Gaussian 09's CCSD energy, which ends with "CI/CC converged" instead of "Wavefunction amplitudes
+  converged".
+- **ORCA TD-DFT, CIS, ADC(2) and EOM:** ORCA's "FINAL SINGLE POINT ENERGY" is then the energy of an excited state, and
+  it was shown as the energy of the structure; single points now show the ground state, as for Gaussian (MP2 for
+  ADC(2)). With triplets, ORCA 5 listed them twice (once as "singlets" without an oscillator strength), and in
+  ORCA 6 the **ECD rotatory strengths of the singlets were attached to the triplets**, so the ECD spectrum was
+  wrong. The ground-state CCSD energy of EOM-CCSD runs is read.
+- **Jobs still running:** a geometry cut while the program was writing it became a frame with only some of the atoms
+  in GAMESS, NWChem, Psi4, Q-Chem, xtb, MOPAC and CP2K outputs (Gaussian and ORCA were right). A charge table cut the
+  same way is left out until it is whole.
+- **Q-Chem orbital energies:** when Q-Chem prints the orbitals' symmetries (most jobs on molecules with symmetry), only
+  the first 8 orbital energies were read, so the HOMO, LUMO and gap were missing and the **MO energy-level plot
+  stopped with an error** (36 of the 54 public Q-Chem outputs). All are read now, and orbital energies that stop
+  before the HOMO are left out with a note instead of breaking the plot.
+- **Q-Chem inputs of several jobs** (`@@@`) merged the molecules of all jobs into one; the first job's molecule is
+  now shown, with every job's type.
+- **ORCA inputs** whose coordinates use `%paras` values (`{R1}`) could not be opened; they are filled in (a scanned
+  value takes its first value).
+- **More files open:** MOPAC 2012 archives (`FINAL GEOMETRY OBTAINED … CHARGE`), `.mop` inputs without a method
+  keyword, Firefly outputs ("FINAL ENERGY IS": no energies before), GAMESS-US outputs whose population table is
+  printed twice (no charges before), Psi4, Q-Chem and NWChem inputs of big molecules, and ORCA and xtb `.engrad`
+  files (a new reader). A Turbomole `mpshift.out` is no longer mistaken for a PDB file, nor an `.engrad` file for a
+  Gaussian input.
+- **fchk files:** a TD or CIS job showed the excited state's energy as the structure's; Q-Chem's fchk files get
+  their dipole and program name.
+- **NWChem** Mulliken charges are read to 5 decimals when the output has them (2 before), and ab initio MD runs
+  (`task dft qmd`) show every step with its energy and time (only the first geometry was shown).
+- **CP2K inputs** show their charge, multiplicity, functional and job type. Two readers handled CP2K inputs, and
+  the one chosen for `.inp` files skipped these; a `.restart` file's cell given in bohr or nm was read as Å.
+- **MOPAC** IR intensities are squared transition dipoles (D²), but the table and the spectrum called them km/mol
+  and offered ε; they now say D², and the IR spectrum of a MOPAC job is relative. Open-shell (UHF) MOPAC jobs show
+  their alpha and beta orbital energies (none were read).
+- **SD files** whose records hold the same atoms (conformers, or BlueMolecule's own "SDF (all geometries)") open
+  with all their geometries; only the first was shown. Molfiles of more than 999 atoms are written as V3000, as SD
+  files were.
+- **Calculation inputs** for Psi4, Q-Chem, NWChem, GAMESS, MOPAC, xtb and Turbomole ran two coordinates together
+  when one was 1000 Å or more.
+- A damaged element number shows as a dummy atom with a note, instead of breaking the view; messages about
+  unreadable coordinates name the file and the reader; GROMACS files keep atom names that tell the element; an xtb
+  output without coordinates names its input structure.
+- The **Info** tab names the level of a geometry's energy when the job computed several (SCF, MP2, CCSD(T)…) and
+  lists the others below it, such as a TD-DFT job's excited state, so the energy used can be checked.
+- The update dialog shows each release's notes (the release builds now pass them to the update file), as plain text
+  without Markdown marks.
+- Desktop program: a link to a web server on the computer itself (`http://localhost:…`) opens in the web browser,
+  like every other link, instead of replacing BlueMolecule in its window.
+- Linux: the MIME types also cover `.cub`, `.ent`, `.mmcif` and `.axsf`, like the program's Open-with entries.
+
 ## 2.0.0 (November 2026): a real program with updates
 
 - **BlueMolecule is a desktop program of its own** ([#11](https://github.com/fred4h/BlueMolecule/issues/11)), built

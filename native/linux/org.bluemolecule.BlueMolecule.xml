@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Chemistry file types for BlueMolecule (install.sh puts this in share/mime/packages).
+<!-- Chemistry file types for BlueMolecule (the .deb and install.sh put this in share/mime/packages; the same
+     extensions as the desktop program's fileAssociations in desktop/src-tauri/tauri.conf.json).
      Generic extensions such as .log, .out, .com and .txt are deliberately not claimed. -->
 <mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
   <mime-type type="chemical/x-gaussian-cube">
     <comment>Gaussian cube file</comment>
     <sub-class-of type="text/plain"/>
     <glob pattern="*.cube"/>
+    <glob pattern="*.cub"/>
   </mime-type>
   <mime-type type="chemical/x-gaussian-checkpoint">
     <comment>Gaussian formatted checkpoint</comment>
@@ -42,11 +44,13 @@
     <comment>Protein Data Bank file</comment>
     <sub-class-of type="text/plain"/>
     <glob pattern="*.pdb"/>
+    <glob pattern="*.ent"/>
   </mime-type>
   <mime-type type="chemical/x-cif">
     <comment>Crystallographic Information File</comment>
     <sub-class-of type="text/plain"/>
     <glob pattern="*.cif"/>
+    <glob pattern="*.mmcif"/>
   </mime-type>
   <mime-type type="chemical/x-gromacs-gro">
     <comment>GROMACS structure file</comment>
@@ -72,5 +76,6 @@
     <comment>XCrySDen structure file</comment>
     <sub-class-of type="text/plain"/>
     <glob pattern="*.xsf"/>
+    <glob pattern="*.axsf"/>
   </mime-type>
 </mime-info>

@@ -435,9 +435,15 @@
     check(ctx);
     const B = boxed(ctx, true), n = ctx.Z.length, names = atomNamesOf(ctx), nm = v => fx(v / 10, 12, 7);
     const L = [(titleOf(ctx) || 'structure') + (B.note ? ' (' + B.note + ')' : ''), ix(n, 5)];
+    // .gro has no element column: readers take the element from the atom name, so a name that names another element
+    // (a CP2K kind "Wat" read as tungsten) is replaced by the element symbol and a count
+    const own = BM.elementFromAtomName, cnt = {};
     for (let i = 0; i < n; i++) {
       const rid = ctx.resIds && Number.isFinite(+ctx.resIds[i]) ? +ctx.resIds[i] : 1;
       const rn = ctx.resNames && ctx.resNames[i] ? String(ctx.resNames[i]).trim() : 'MOL';
+      const s = sym(ctx.Z[i]);
+      cnt[s] = (cnt[s] || 0) + 1;
+      if (own && ctx.Z[i] > 0 && own(names[i].slice(0, 5), rn.slice(0, 5)) !== s) names[i] = s + cnt[s];
       L.push(ix(((rid % 100000) + 100000) % 100000, 5) + rn.slice(0, 5).padEnd(5) + ix(names[i].slice(0, 5), 5) + ix((i + 1) % 100000, 5) +
         nm(B.xyz[3 * i]) + nm(B.xyz[3 * i + 1]) + nm(B.xyz[3 * i + 2]));
     }

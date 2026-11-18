@@ -30,7 +30,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SRC, DIST, LAUNCHER = ROOT / 'src', ROOT / 'dist', ROOT / 'launcher'
 NATIVE = ROOT / 'native'
-VERSION = '2.0.0'
+VERSION = '2.0.1'
 APP_ID = 'org.bluemolecule.BlueMolecule'
 LINUX_ICON_SIZES = (48, 64, 128, 256, 512)
 ICON_SIZES = (16, 32, 48, 64, 128, 256, 512, 1024)   # native/icons/icon_N.png, rendered from tools/icon.svg
@@ -175,8 +175,9 @@ Options: --tier auto|qt|chromium|firefox (or BLUEMOLECULE_TIER=...), --tab (norm
 
 ABOUT = '''
 About: BlueMolecule is a vibe-coded project -- its code was written by an AI assistant (Claude, by
-Anthropic) from its author's instructions and tested on synthetic files, so check numbers that matter
-against the original output files. Documentation, source code and bug reports:
+Anthropic) from its author's instructions and tested mostly on synthetic files and public example
+outputs, so check numbers that matter against the original output files. Documentation, source code
+and bug reports:
 https://github.com/fred4h/BlueMolecule  (MIT License, see LICENSE).
 '''
 

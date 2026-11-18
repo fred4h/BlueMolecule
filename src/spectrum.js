@@ -34,7 +34,8 @@
     vib.freqs.forEach((f, i) => { if (f > 0 && vib.ir && isFinite(vib.ir[i])) { sx.push(f * o.scale); sy.push(vib.ir[i]); ids.push(i); } });
     const curve = broaden(sx, sy, o);
     let yLabel;
-    if (o.yMode === 'epsilon') { const k = 100 / LN10; for (let i = 0; i < curve.y.length; i++) curve.y[i] *= k; yLabel = 'ε (L mol⁻¹ cm⁻¹)'; }
+    if (o.yMode === 'epsilon' && !vib.irUnit) {   // ε needs intensities in km/mol
+      const k = 100 / LN10; for (let i = 0; i < curve.y.length; i++) curve.y[i] *= k; yLabel = 'ε (L mol⁻¹ cm⁻¹)'; }
     else { const m = maxOf(curve.y) || 1; for (let i = 0; i < curve.y.length; i++) curve.y[i] /= m; yLabel = 'Relative absorbance'; }
     return { curve, sticks: sx.map((x, t) => ({ x, y: sy[t], id: ids[t] })), yLabel };
   }

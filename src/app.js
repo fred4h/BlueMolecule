@@ -7,7 +7,7 @@
   const HARTREE = { kcal: 627.509474, kj: 2625.49964, ev: 27.211386 };
   const UNIT_LABEL = { kcal: 'kcal/mol', kj: 'kJ/mol', ev: 'eV' };
   const BG = { navy: [0.063, 0.090, 0.133], black: [0, 0, 0], white: [1, 1, 1], gray: [0.91, 0.925, 0.945] };
-  const VERSION = '2.0.0';
+  const VERSION = '2.0.1';
   const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const isNum = v => typeof v === 'number' && isFinite(v);
   const fx = (v, d) => (isNum(v) ? v.toFixed(d) : '—');
@@ -1597,8 +1597,15 @@
       ['Charge', isNum(m.charge) ? String(m.charge) : null], ['Multiplicity', isNum(m.multiplicity) ? String(m.multiplicity) : null]])}</div>`;
     // QM/MM and ONIOM: the components of this geometry's total energy (issue #10)
     const parts = m.qmmm && f.energies && isNum(f.energy) ? BM.analysis.energyComponents(data, [f], 1) : [];
+    // the other levels the job computed for this geometry (SCF, MP2, CCSD..., an excited state), and which one is the
+    // geometry's energy (the highest level: docs/analysing-outputs.md)
+    const lev = !m.qmmm && f.energies && isNum(f.energy) ? Object.keys(f.energies).filter(k => isNum(f.energies[k])) : [];
+    const same = k => Math.abs(f.energies[k] - f.energy) < 1e-10;
+    const other = lev.filter(k => !same(k)), used = lev.filter(same).sort((a, b) => (a === 'Final') - (b === 'Final'))[0];
+    const levName = k => (k === 'TD' ? 'Excited state' : BM.analysis.componentLabel(k));   // (Gaussian and fchk call it TD)
     html += sec('Energy', kv([
-      ['This geometry', isNum(f.energy) ? `<span class="mono">${f.energy.toFixed(8)}</span> Eh` : null],
+      ['This geometry', isNum(f.energy) ? `<span class="mono">${f.energy.toFixed(8)}</span> Eh${other.length && used ? ` <span class="dim">(${esc(levName(used))})</span>` : ''}` : null],
+      ...other.map(k => ['<span class="dim">' + esc(levName(k)) + '</span>', `<span class="mono">${f.energies[k].toFixed(8)}</span> Eh`]),
       ...parts.map(cp => ['<span class="dim">' + esc(cp.label) + '</span>', `<span class="mono">${cp.values[0].toFixed(8)}</span> Eh`]),
       ['Final', lastE ? `<span class="mono">${lastE.energy.toFixed(8)}</span> Eh` : null],
       ['Geometries', data.frames.length > 1 ? `${data.frames.length} ${conv || ''}` : null],
@@ -1793,7 +1800,7 @@
         <label class="field"><span>Speed</span><input type="range" data-vib="speed" min="0.2" max="3" step="0.1" value="${state.vib.speed}"><output>${state.vib.speed.toFixed(1)}×</output></label>
         <label class="field"><span>Arrows</span><span><input type="checkbox" data-vib="arrows" ${state.vib.arrows ? 'checked' : ''}> show displacement vectors</span><span></span></label>
       </div>
-      <table class="list" id="vib-table"><tr><th>#</th><th>ν (cm⁻¹)</th>${hasSym ? '<th>Sym.</th>' : ''}${hasIR ? '<th>IR (km/mol)</th>' : ''}${hasR ? '<th>Raman (Å⁴/amu)</th>' : ''}</tr>${rows}</table>
+      <table class="list" id="vib-table"><tr><th>#</th><th>ν (cm⁻¹)</th>${hasSym ? '<th>Sym.</th>' : ''}${hasIR ? '<th>IR (' + esc(v.irUnit || 'km/mol') + ')</th>' : ''}${hasR ? '<th>Raman (Å⁴/amu)</th>' : ''}</tr>${rows}</table>
       <p class="note">Click a mode to animate it, or click a peak in the spectrum below. Imaginary modes are shown in orange.</p>
       </div>
       <div class="sec"><h3>Displace along the selected mode</h3>
@@ -2120,7 +2127,7 @@
     if (t === 'mo') return go + `<label title="Energy window below the HOMO and above the LUMO">Window ± ${numIn('window', s.window, 1, 52)} eV</label><span class="pc-read" id="mo-read">${d.moSel !== null ? esc(moLabel(d, d.moSel)) : '<span class="dim">click a level</span>'}</span>`;
     if (t === 'charges') return go + `<label>Scheme ${selIn('scheme', d.chargeScheme, chargeSchemes(d).map(x => [x, x]))}</label><span class="dim">click a bar to select the atom</span>`;
     let h = go + `<label>${selIn('shape', s.shape, [['lorentzian', 'Lorentzian'], ['gaussian', 'Gaussian']])}</label><label>FWHM ${numIn('fwhm', s.fwhm, 1, 52)}</label><label title="Frequency scaling factor">Scale ${numIn('scale', s.scale, 0.001, 62)}</label>`;
-    if (t === 'ir') h += `<label>${selIn('yMode', s.yMode, [['relative', 'Relative'], ['epsilon', 'ε']])}</label>${chk('invert', s.invert, 'transmittance')}`;
+    if (t === 'ir') h += `${d.data.vibrations.irUnit ? '' : `<label>${selIn('yMode', s.yMode, [['relative', 'Relative'], ['epsilon', 'ε']])}</label>`}${chk('invert', s.invert, 'transmittance')}`;
     else h += `<label>${selIn('yMode', s.yMode, [['activity', 'Activity'], ['intensity', 'Intensity']])}</label>${s.yMode === 'intensity' ? `<label>λ₀ ${numIn('laser', s.laser, 1, 54)} nm</label><label>T ${numIn('temperature', s.temperature, 1, 58)} K</label>` : ''}`;
     h += `<label>Range ${numIn('xmin', s.xmin, 50, 58)}–${numIn('xmax', s.xmax, 50, 58)}</label>${chk('sticks', s.sticks, 'sticks')}${chk('peaks', s.peaks, 'labels')}`;
     return h;
@@ -2184,7 +2191,7 @@
     const s = d.spec[t], r = spectrumData(d), vib = d.data.vibrations, uvLike = t === 'uv' || t === 'ecd';
     const sticks = r.sticks.map(p => Object.assign(p, {
       label: uvLike ? `State ${p.id} · ${(s.unit === 'eV' ? p.x.toFixed(3) + ' eV' : p.x.toFixed(1) + ' nm')} · ${t === 'uv' ? 'f = ' + p.y.toFixed(4) : 'R = ' + p.y.toFixed(3) + ' (10⁻⁴⁰ cgs)'}`
-        : `Mode ${p.id + 1} · ${p.x.toFixed(1)} cm⁻¹ · ${t === 'ir' ? fx(vib.ir[p.id], 2) + ' km/mol' : fx(vib.raman[p.id], 2) + ' Å⁴/amu'}`
+        : `Mode ${p.id + 1} · ${p.x.toFixed(1)} cm⁻¹ · ${t === 'ir' ? fx(vib.ir[p.id], 2) + ' ' + (vib.irUnit || 'km/mol') : fx(vib.raman[p.id], 2) + ' Å⁴/amu'}`
     }));
     let yLabel = r.yLabel, invertY = false;
     if (t === 'ir' && s.invert) { yLabel = yLabel.replace('Relative absorbance', 'Transmittance (rel.)'); invertY = true; }
@@ -2200,11 +2207,11 @@
         const ok = inZ(z);
         const head = t === 'uv' ? `# BlueMolecule UV-Vis spectrum: ${d.name}; Gaussian sigma = ${s.sigma} eV\n${s.unit === 'eV' ? 'energy_eV' : 'wavelength_nm'},epsilon_L_per_mol_cm`
           : t === 'ecd' ? `# BlueMolecule ECD spectrum: ${d.name}; Gaussian sigma = ${s.sigma} eV\n${s.unit === 'eV' ? 'energy_eV' : 'wavelength_nm'},delta_epsilon_L_per_mol_cm`
-            : `# BlueMolecule ${t === 'ir' ? 'IR' : 'Raman'} spectrum: ${d.name}; ${s.shape} FWHM = ${s.fwhm} cm-1; scale = ${s.scale}\nwavenumber_cm-1,${t === 'ir' ? (s.yMode === 'epsilon' ? 'epsilon_L_per_mol_cm' : 'relative_absorbance') : 'relative_' + s.yMode}`;
+            : `# BlueMolecule ${t === 'ir' ? 'IR' : 'Raman'} spectrum: ${d.name}; ${s.shape} FWHM = ${s.fwhm} cm-1; scale = ${s.scale}\nwavenumber_cm-1,${t === 'ir' ? (/^ε/.test(r.yLabel) ? 'epsilon_L_per_mol_cm' : 'relative_absorbance') : 'relative_' + s.yMode}`;
         const rows = [];
         for (let i = 0; i < r.curve.x.length; i++) if (ok(r.curve.x[i])) rows.push(`${r.curve.x[i].toFixed(4)},${r.curve.y[i].toExponential(6)}`);
         return zoomCSV(head + '\n' + rows.join('\n') +
-          '\n\n# sticks\n' + (t === 'uv' ? 'state,x,oscillator_strength\n' : t === 'ecd' ? 'state,x,rotatory_strength_1e-40_cgs\n' : `mode,wavenumber_cm-1,${t === 'ir' ? 'intensity_km_per_mol' : 'raman_' + s.yMode}\n`) +
+          '\n\n# sticks\n' + (t === 'uv' ? 'state,x,oscillator_strength\n' : t === 'ecd' ? 'state,x,rotatory_strength_1e-40_cgs\n' : `mode,wavenumber_cm-1,${t === 'ir' ? (vib.irUnit ? 'intensity_D2' : 'intensity_km_per_mol') : 'raman_' + s.yMode}\n`) +
           r.sticks.filter(p => ok(p.x)).map(p => `${uvLike ? p.id : p.id + 1},${p.x.toFixed(4)},${p.y.toExponential(6)}`).join('\n') + '\n', z, uvLike ? (s.unit === 'eV' ? 'energies (eV)' : 'wavelengths (nm)') : 'wavenumbers (cm-1)');
       }
     };
@@ -2660,7 +2667,7 @@
     const k = (a, b) => `<div><kbd>${a}</kbd></div><div>${b}</div>`;
     const h = t => `<div class="keys-h">${t}</div>`;
     dialog('BlueMolecule ' + VERSION, `
-      <p class="note" style="margin-top:0"><b>A vibe-coded project:</b> BlueMolecule's code was written by an AI assistant (Claude, by Anthropic) from its author's instructions and tested on synthetic files. Check numbers that matter against the original output files. Documentation, source and bug reports: <a href="https://github.com/fred4h/BlueMolecule" target="_blank" rel="noopener">github.com/fred4h/BlueMolecule</a> · MIT License.</p>
+      <p class="note" style="margin-top:0"><b>A vibe-coded project:</b> BlueMolecule's code was written by an AI assistant (Claude, by Anthropic) from its author's instructions and tested mostly on synthetic files and public example outputs. Check numbers that matter against the original output files. Documentation, source and bug reports: <a href="https://github.com/fred4h/BlueMolecule" target="_blank" rel="noopener">github.com/fred4h/BlueMolecule</a> · MIT License.</p>
       ${h('View')}
       <div class="keys cols2">
         ${k('Left drag', 'Rotate')}${k('Right / Shift+drag', 'Move (pan)')}${k('Alt/Option+drag', 'Rotate in the screen plane')}${k('Wheel / pinch', 'Zoom')}
@@ -2705,6 +2712,9 @@
   // ---------------- updates (the desktop app, issue #12) ----------------
   const UPDATES_KEY = 'bluemolecule.updates.auto';
   function updatesAuto() { try { return localStorage.getItem(UPDATES_KEY) === '1'; } catch (e) { return false; } }
+  /** Release notes are the release's Markdown: shown as plain text, without its emphasis, code and link marks. */
+  const plainNotes = s => String(s).replace(/\r\n?/g, '\n').replace(/^#{1,6}\s+/gm, '').replace(/\*\*([^*\n]+)\*\*/g, '$1')
+    .replace(/`([^`\n]+)`/g, '$1').replace(/\[([^\]\n]+)\]\((?:https?:[^)\s]+)\)/g, '$1').replace(/^(\s*)[-*]\s+/gm, '$1• ').trim();
   function setUpdatesAuto(on) { try { localStorage.setItem(UPDATES_KEY, on ? '1' : '0'); } catch (e) { /* ignore */ } }
   /** Help → Check for updates (manual), or the opt-in check at start-up (quiet unless there is a new version). The
    *  check asks GitHub for the latest release; the update is installed only after its signature is checked. */
@@ -2725,7 +2735,7 @@
     const keep = form => { const c = form.querySelector('[data-upd="auto"]'); if (c) setUpdatesAuto(c.checked); };
     if (r.available) {
       dialog(`BlueMolecule ${esc(r.version)} is available`, `<p>You have version ${esc(r.current)}${r.date ? '; this one was released on ' + esc(String(r.date).slice(0, 10)) : ''}.</p>
-        ${r.notes ? `<div class="upd-notes">${esc(r.notes)}</div>` : ''}${up.selfInstall === false ? '<p class="note">This is a .deb installation: install the new .deb package from the Releases page to update.</p>' : ''}${box}`, [
+        ${r.notes ? `<div class="upd-notes">${esc(plainNotes(r.notes))}</div>` : ''}${up.selfInstall === false ? '<p class="note">This is a .deb installation: install the new .deb package from the Releases page to update.</p>' : ''}${box}`, [
         { label: 'Later', onClick: f => { keep(f); } },
         up.selfInstall === false
           ? { label: 'Open the Releases page', primary: true, onClick: f => { keep(f); up.openReleases(); } }

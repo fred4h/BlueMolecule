@@ -12,9 +12,9 @@
 > [!IMPORTANT]
 > **BlueMolecule is a vibe-coded project.** An AI assistant (Claude, made by Anthropic) wrote all of its code, tests
 > and documentation. It worked in conversation with the author, who decided what the program should do, tried it and
-> reported what went wrong. No person has reviewed the code line by line. It has been tested almost entirely on
-> **synthetic** example files rather than real calculations. Use it as a convenient viewer, and **check any number
-> you publish against the original output file.**
+> reported what went wrong. No person has reviewed the code line by line. It was tested mostly on **synthetic**
+> example files and, since 2.0.1, on public collections of real outputs, not on the variety of real calculations.
+> Use it as a convenient viewer, and **check any number you publish against the original output file.**
 > [How it was made and what that means →](docs/vibe-coding.md)
 
 ![BlueMolecule with a Gaussian optimisation and frequency job: vibration table, animated mode with displacement arrows and the IR spectrum](docs/images/vibrations.png)
@@ -106,8 +106,8 @@ not available.
 
 ## Status
 
-BlueMolecule 2.0.0 is the current release (1.4.1 was the first public one). The automated test suite has about
-32,000 checks in 34 suites, 22,000 of them from cutting example outputs as a running job would leave them:
+BlueMolecule 2.0.1 is the current release (1.4.1 was the first public one). The automated test suite has about
+33,600 checks in 35 suites, 22,900 of them from cutting example outputs as a running job would leave them:
 - format readers and writers against example files;
 - chemistry routines;
 - the selection language;
@@ -115,8 +115,10 @@ BlueMolecule 2.0.0 is the current release (1.4.1 was the first public one). The 
 - browser tests that drive the real interface;
 - the desktop program, built and started on Linux, Windows and macOS by the cloud builds.
 
-All of these files were written to imitate each program's output, because no real outputs were available while it
-was written. Real outputs can differ in details the examples do not cover.
+These example files were written to imitate each program's output, because no real outputs were available while
+the program was written. For 2.0.1, every reader was also run on the public test files of the cclib and MDAnalysis
+projects (real outputs of nine quantum-chemistry programs, and real topologies and trajectories) and the differences
+were fixed. Outputs of other versions and job types can still differ in details neither set covers.
 [docs/limitations.md](docs/limitations.md) lists what has and has not been verified. A file that opens wrongly is
 the most useful bug report you can send (see [CONTRIBUTING.md](CONTRIBUTING.md)).
 

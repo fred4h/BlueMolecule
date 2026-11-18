@@ -544,8 +544,9 @@ fn main() {
                 .disable_drag_drop_handler() // files dropped on the window reach the page, as in a browser
                 .initialization_script(&init)
                 .on_navigation(move |url| {
+                    // the page itself: tauri://localhost (macOS, Linux) or http://tauri.localhost (Windows)
                     let local = matches!(url.scheme(), "tauri" | "asset" | "about" | "blob" | "data")
-                        || matches!(url.host_str(), Some("tauri.localhost") | Some("localhost"));
+                        || (matches!(url.scheme(), "http" | "https") && url.host_str() == Some("tauri.localhost"));
                     if !local && matches!(url.scheme(), "http" | "https" | "mailto") {
                         use tauri_plugin_opener::OpenerExt;
                         let _ = nav.opener().open_url(url.as_str(), None::<&str>);

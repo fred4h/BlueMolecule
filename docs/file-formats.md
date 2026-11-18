@@ -1,6 +1,6 @@
 # File formats
 
-BlueMolecule reads **47 file formats** and saves **24**, plus calculation inputs for **10 programs**. With
+BlueMolecule reads **48 file formats** and saves **24**, plus calculation inputs for **10 programs**. With
 [Open Babel](installation.md#open-babel-optional) installed, it can also open and save the many formats Open Babel
 supports.
 
@@ -25,13 +25,14 @@ each program's output ([why that matters](vibe-coding.md#how-the-program-was-che
 | **Gaussian** 09/16 | `.log` `.out` | Every geometry (input and standard orientation), optimisation criteria with thresholds, energies, several jobs (`--Link1--`), vibrations with IR and Raman intensities (also from ROA jobs), thermochemistry, excited states (TD-DFT, CIS) with ECD, relaxed scans, IRC, NMR shieldings, Mulliken/Hirshfeld/CM5/NPA/ESP/APT charges, orbital energies, dipole, ONIOM layers and energies |
 | **ORCA** 4/5/6 | `.out` `.log` | Geometries, optimisation criteria, energies, several jobs (`$new_job`, compound jobs), vibrations with IR and Raman, thermochemistry, excited states (TD-DFT, RPA) with ECD, scans, IRC (including the IRC path summary), NMR, Mulliken/Löwdin/Hirshfeld charges, orbital energies, dipole, QM/MM, QM/XTB and QM/QM2 layers and energies |
 | **GAMESS-US / Firefly** | `.log` `.out` `.gamout` | Geometries, optimisation criteria, energies, vibrations with IR, thermochemistry, charges, orbital energies, dipole |
-| **NWChem** | `.out` `.log` `.nwout` | Geometries, optimisation criteria, energies, vibrations with IR, thermochemistry, TD-DFT excited states, charges, orbital energies, dipole |
+| **NWChem** | `.out` `.log` `.nwout` | Geometries (including ab initio MD steps), optimisation criteria, energies, vibrations with IR, thermochemistry, TD-DFT excited states, charges, orbital energies, dipole |
 | **Q-Chem** | `.out` `.log` `.qcout` | Geometries, optimisation criteria, energies, several jobs, vibrations with IR, thermochemistry, TD-DFT excited states, charges, orbital energies, dipole |
 | **Psi4** | `.out` `.log` | Geometries, optimisation criteria, energies, vibrations with IR, thermochemistry, charges, orbital energies, dipole |
 | **xtb** | `.out` `.log` `.xtbout` | Optimisation cycles, energies, gradient norm, vibrations with IR, thermochemistry, charges, orbital energies, dipole, ONIOM regions |
-| **MOPAC** | `.out` `.arc` `.mopout` | Geometries, optimisation cycles, heats of formation, vibrations with IR, charges, orbital energies, dipole |
+| **MOPAC** | `.out` `.arc` `.mopout` | Geometries, optimisation cycles, heats of formation, vibrations with IR (relative: MOPAC prints squared transition dipoles), charges, orbital energies (alpha and beta for UHF), dipole |
 | **CP2K** | `.out` `.log` | Optimisation cycles and energies, charges, the cell, QM/MM regions and link atoms |
 | **Turbomole** | `gradient` | Every optimisation cycle with energy and gradient |
+| **ORCA / xtb** | `.engrad` | The structure with its energy and gradient |
 | **VASP** | `OUTCAR` | Ionic steps with energies and forces, the cell |
 | **Quantum ESPRESSO** | `.pwo` `.out` | Relaxation steps with energies, the cell |
 
@@ -42,13 +43,13 @@ Opened for their geometry (and charge, multiplicity, route or keywords where pre
 | Program | Files | Notes |
 |---|---|---|
 | Gaussian | `.gjf` `.com` `.gau` `.gjc` | Cartesian and Z-matrix (including variables) geometries; ONIOM layer columns are skipped (layers are read from outputs) |
-| ORCA | `.inp` | `* xyz`, `* int` (internal coordinates) and `* xyzfile` blocks |
+| ORCA | `.inp` | `* xyz`, `* int` (internal coordinates) and `* xyzfile` blocks; `{name}` values from `%paras` (a scanned parameter takes its first value) |
 | GAMESS | `.inp` | `$DATA` with C1 symmetry |
 | NWChem | `.nw` `.nwi` | `geometry` block |
-| Q-Chem | `.in` `.qcin` `.inp` | `$molecule` |
+| Q-Chem | `.in` `.qcin` `.inp` | `$molecule` (of the first job that has one, for inputs of several jobs) |
 | Psi4 | `.dat` `.in` `.psi4` | `molecule { }` block |
 | MOPAC | `.mop` | Cartesian and Z-matrix |
-| CP2K | `.inp` `.restart` | `&COORD` and `&CELL` |
+| CP2K | `.inp` `.restart` | `&COORD` and `&CELL`, with the charge, multiplicity, functional and run type |
 | Quantum ESPRESSO | `.pwi` `.in` | pw.x input: `ibrav` lattices (all except 13) or `CELL_PARAMETERS`; crystal, alat, bohr or angstrom positions |
 | CASTEP | `.cell` | Absolute and fractional positions, lattice |
 | Turbomole | `coord` `.tmol` | `$coord` in Bohr |
@@ -70,7 +71,7 @@ files ([limitations](limitations.md)).
 | Format | Files |
 |---|---|
 | XYZ and extended XYZ, single or multi-frame | `.xyz` `.txt` `.trj` |
-| MDL Molfile / SD file (V2000 and V3000) | `.mol` `.sdf` `.sd` `.mdl` |
+| MDL Molfile / SD file (V2000 and V3000); an SD file whose records hold the same atoms (conformers, the geometries of a job) opens as one structure with several geometries | `.mol` `.sdf` `.sd` `.mdl` |
 | Protein Data Bank, with HELIX/SHEET, chains, B-factors, occupancies, CRYST1 | `.pdb` `.ent` |
 | mmCIF / PDBx, with secondary structure | `.cif` `.mmcif` `.mcif` |
 | CIF (small-molecule crystals, symmetry expanded) | `.cif` |

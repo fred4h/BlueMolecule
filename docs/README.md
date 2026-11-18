@@ -1,8 +1,8 @@
 # BlueMolecule documentation
 
 > **BlueMolecule is a vibe-coded project.** An AI assistant (Claude, by Anthropic) wrote it from its author's
-> instructions, and it was tested mostly on synthetic files. Check numbers that matter against your original output
-> files. [Read more](vibe-coding.md).
+> instructions, and it was tested mostly on synthetic files and public example outputs. Check numbers that matter
+> against your original output files. [Read more](vibe-coding.md).
 
 **Using BlueMolecule**
 

@@ -9,6 +9,7 @@
  *   mopac-out, mopac-input          MOPAC .out / .arc and .mop
  *   cp2k-out, cp2k-input            CP2K output and .inp (&COORD, &CELL)
  *   turbomole-coord, turbomole-gradient   Turbomole coord ($coord, Bohr) and gradient files
+ *   engrad                          ORCA / xtb .engrad (energy, gradient, coordinates in Bohr)
  *
  * Datasets follow parsers.js (Angstrom, Hartree, Debye, cm-1). frame.opt uses the shared keys energyChange,
  * maxForce, rmsForce, maxDisp, rmsDisp plus gradNorm (gradient norm: xtb, MOPAC GNORM, Turbomole |dE/dxyz|),
@@ -177,15 +178,18 @@
     if (ds.vibrations && !ds.frames[ds.vibrations.frameIndex]) ds.vibrations.frameIndex = ds.frames.length - 1;
     return ds;
   }
-  /** Reads a coordinate table: rows parsed by rowFn(tokens) -> [Z, x, y, z] or null (stop). */
+  /** Reads a coordinate table: rows parsed by rowFn(tokens) -> [Z, x, y, z] or null (stop). A table that runs to the
+   *  end of the text (only the empty element after the last line break follows) was cut while the program was still
+   *  writing it, a job still running: it comes back empty, so that no frame with part of the atoms is made. */
   function readTable(L, j, rowFn, scale) {
-    const Z = [], xyz = [];
+    let Z = [], xyz = [];
     scale = scale || 1;
     for (; j < L.length; j++) {
       const r = rowFn(tok(L[j]), L[j]);
       if (!r) break;
       Z.push(r[0]); xyz.push(r[1] * scale, r[2] * scale, r[3] * scale);
     }
+    if (Z.length && (j >= L.length || (j === L.length - 1 && L[j] === ''))) { Z = []; xyz = []; }
     return { Z, xyz, end: j };
   }
   const allNum = (a, i, k) => a.length >= i + k && a.slice(i, i + k).every(isNum);
@@ -304,7 +308,7 @@
         i = g.end - 1;
         continue;
       }
-      if ((m = /^FINAL\s+(\S+)\s+ENERGY IS\s+(\S+)/.exec(t))) { F.energy('SCF', num(m[2])); continue; }
+      if ((m = /^FINAL\s+(?:\S+\s+)?ENERGY IS\s+(\S+)/.exec(t))) { F.energy('SCF', num(m[1])); continue; }   // (Firefly: "FINAL ENERGY IS")
       if ((m = /^E\(MP2\)\s*=\s*(\S+)/.exec(t))) { F.energy('MP2', num(m[1])); continue; }
       if ((m = /NSERCH:?\s*(\d+)\s+E=\s*(\S+)\s+GRAD\.\s*MAX=\s*(\S+)\s+R\.M\.S\.=\s*(\S+)/.exec(t))) {
         const f = F.cur();
@@ -319,11 +323,21 @@
       }
       if (t.indexOf('EQUILIBRIUM GEOMETRY LOCATED') >= 0) { eqPending = true; continue; }
       if (/^TOTAL MULLIKEN AND LOWDIN ATOMIC POPULATIONS/.test(t)) {
+        // Some GAMESS-US builds print the heading twice (the first without the CHARGE columns) and a populations-only
+        // row before each atom's full row: the rows with charges are read, by atom number.
         let j = i + 1;
-        while (j < n && j < i + 4 && !/MULL\.POP\./.test(L[j])) j++;
+        while (j < n && j < i + 8 && !/MULL\.POP\.\s+CHARGE/.test(L[j])) j++;
+        if (!(j < n && j < i + 8)) continue;
         const mu = [], lo = [];
-        for (j++; j < n; j++) { const r = tok(L[j]); if (r.length < 6 || !isInt(r[0])) break; mu.push(num(r[3])); lo.push(num(r[5])); }
-        if (mu.length) { charges.Mulliken = mu; charges.Loewdin = lo; }
+        for (j++; j < n; j++) {
+          const r = tok(L[j]);
+          if (!isInt(r[0] || '')) break;
+          if (r.length >= 6 && isNum(r[3]) && isNum(r[5])) { const k = int(r[0]) - 1; mu[k] = num(r[3]); lo[k] = num(r[5]); }
+          else if (r.length !== 4) break;
+        }
+        let whole = mu.length > 0;
+        for (let k = 0; k < mu.length; k++) if (!Number.isFinite(mu[k]) || !Number.isFinite(lo[k])) whole = false;
+        if (whole) { charges.Mulliken = mu; charges.Loewdin = lo; }
         i = j - 1;
         continue;
       }
@@ -452,7 +466,7 @@
       if (cols && /^(P\.)?Frequency$/.test(tk[0])) { cols.forEach((m, k) => { freqs[m] = num(tk[k + 1]); modes[m] = modes[m] || []; }); continue; }
       if (cols && isInt(tk[0]) && tk.length === cols.length + 1 && allNum(tk, 1, cols.length)) {
         const r = int(tk[0]) - 1;
-        cols.forEach((m, k) => { modes[m][r] = num(tk[k + 1]); });
+        cols.forEach((m, k) => { (modes[m] = modes[m] || [])[r] = num(tk[k + 1]); });
         continue;
       }
       break;
@@ -463,12 +477,25 @@
     const ds = BM.emptyDataset('nwchem-out', name), meta = ds.meta, F = new Frames(ds), L = lines(text), n = L.length;
     const echo = [], charges = {}, thr = { gmax: 4.5e-4, grms: 3e-4, xmax: 1.8e-3, xrms: 1.2e-3 };
     let inEcho = false, convPending = false, normal = null, nm = null, ir = null, thermo = null, S = null, T = null;
-    let states = null, cur = null, orbA = null, orbB = null;
+    let states = null, cur = null, orbA = null, orbB = null, qmd = false, qmdE = null;
     for (let i = 0; i < n; i++) {
       const s = L[i], t = s.trim();
       if (!t) continue;
       let m;
       if (/^=+\s*echo of input deck\s*=+$/.test(t)) { inEcho = true; continue; }
+      if (t === 'NWChem QMD Module') { qmd = true; continue; }
+      // ab initio MD (task dft qmd): each step prints its energy, then its geometry (a.u.) in the gradient table
+      if (qmd && /^(DFT|SCF) ENERGY GRADIENTS$/.test(t)) {
+        let j = i + 1;
+        while (j < n && j < i + 6 && !/^x\s+y\s+z\s+x\s+y\s+z$/.test(L[j].trim())) j++;
+        const g = readTable(L, j + 1, r => (r.length >= 8 && isInt(r[0]) && allNum(r, 2, 6) ? [elZ(r[1].replace(/[\d_].*$/, '')), num(r[2]), num(r[3]), num(r[4])] : null), BOHR);
+        const c = F.cur();
+        if (g.Z.length && c && c.Z.length === g.Z.length) g.Z = c.Z.slice();   // the elements of the input geometry (tags such as "O1")
+        if (g.Z.length) { const f = F.add(g.Z, g.xyz); if (qmdE !== null) F.energy('SCF', qmdE, f); }
+        qmdE = null;
+        i = Math.max(i, g.end - 1);
+        continue;
+      }
       if (inEcho) { if (/^=+$/.test(t)) inEcho = false; else echo.push(t); continue; }
       if ((m = /Northwest Computational Chemistry Package \(NWChem\)\s+(\S+)/.exec(t))) { ds.program = 'NWChem ' + m[1]; continue; }
       if (/^Geometry "[^"]*" -> "[^"]*"/.test(t)) {
@@ -481,7 +508,13 @@
         i = g.end - 1;
         continue;
       }
-      if ((m = /^Total (DFT|SCF) energy\s*=\s*(\S+)/.exec(t))) { F.energy('SCF', num(m[2])); continue; }
+      if ((m = /^Total (DFT|SCF) energy\s*=\s*(\S+)/.exec(t))) { if (qmd) qmdE = num(m[2]); else F.energy('SCF', num(m[2])); continue; }
+      if (qmd && (m = /^Time elapsed \(fs\)\s*:\s*(\S+)/.exec(t))) {   // the step just read (the first is at 0 fs)
+        const f = F.cur(), fr = ds.frames;
+        if (f && !f.label && fr.length > 1) f.label = 't = ' + num(m[1]).toFixed(2) + ' fs';
+        if (fr.length > 1 && !fr[0].label) fr[0].label = 't = 0.00 fs';
+        continue;
+      }
       if ((m = /^Total MP2 energy\s+(\S+)/.exec(t))) { F.energy('MP2', num(m[1])); continue; }
       if ((m = /^Charge\s*:\s*(-?\d+)/.exec(t))) { meta.charge = int(m[1]); continue; }
       if ((m = /^Spin multiplicity\s*:\s*(\d+)/.exec(t))) { meta.multiplicity = int(m[1]); continue; }
@@ -506,6 +539,16 @@
         const q = [];
         for (j++; j < n; j++) { const r = tok(L[j]); if (r.length < 4 || !isInt(r[0]) || !isInt(r[2]) || !isNum(r[3])) break; q.push(int(r[2]) - num(r[3])); }
         if (q.length) charges.Mulliken = q;
+        i = j - 1;
+        continue;
+      }
+      // the same charges to 5 decimals (the table above has 2), printed with the Mulliken overlap analysis
+      if (/^-+\s*Total\s+gross population on atoms\s*-+$/.test(t)) {
+        const q = [];
+        let j = i + 1;
+        while (j < n && !L[j].trim()) j++;
+        for (; j < n; j++) { const r = tok(L[j]); if (r.length !== 4 || !isInt(r[0]) || !isNum(r[2]) || !isNum(r[3])) break; q.push(num(r[2]) - num(r[3])); }
+        if (q.length && (!charges.Mulliken || charges.Mulliken.length === q.length)) charges.Mulliken = q;
         i = j - 1;
         continue;
       }
@@ -634,27 +677,37 @@
 
   // =================================================================== Q-Chem
   const QCHEM_SIG = /Welcome to Q-Chem|Q-Chem, Inc\., Pleasanton/;
-  /** $molecule / $rem from Q-Chem input text (also the "User input:" echo of an output). */
+  /** $molecule / $rem from Q-Chem input text (also the "User input:" echo of an output). An input of several jobs
+   *  (separated by @@@) gives the geometry of the first job that has one, the $rem of the first job (rem) and of each
+   *  job (rems). A $molecule block without its $end (an echo cut while the job runs) gives no atoms. */
   function qchemSections(L) {
-    const out = { charge: null, mult: null, atoms: [], rem: {}, read: false };
+    const out = { charge: null, mult: null, atoms: [], rem: {}, rems: [], read: false };
     for (let i = 0; i < L.length; i++) {
       const t = L[i].replace(/!.*$/, '').trim();
       if (/^\$molecule$/i.test(t)) {
         let j = i + 1;
-        const cm = tok(L[j]);
-        if (cm.length >= 2 && isInt(cm[0]) && isInt(cm[1])) { out.charge = int(cm[0]); out.mult = int(cm[1]); j++; }
+        const cm = tok(L[j]), atoms = [];
+        let charge = null, mult = null, read = false;
+        if (cm.length >= 2 && isInt(cm[0]) && isInt(cm[1])) { charge = int(cm[0]); mult = int(cm[1]); j++; }
         for (; j < L.length && !/^\s*\$end/i.test(L[j]); j++) {
           const r = tok(L[j]);
-          if (/^read$/i.test(r[0] || '')) out.read = true;
-          if (r.length >= 4 && allNum(r, 1, 3)) out.atoms.push([elZ(r[0]), num(r[1]), num(r[2]), num(r[3])]);
+          if (/^read$/i.test(r[0] || '')) read = true;
+          if (r.length >= 4 && allNum(r, 1, 3)) atoms.push([elZ(r[0]), num(r[1]), num(r[2]), num(r[3])]);
+        }
+        if (!out.atoms.length) {
+          if (j < L.length && atoms.length) { out.atoms = atoms; out.charge = charge; out.mult = mult; out.read = false; }
+          else if (read && out.charge === null) { out.read = true; out.charge = charge; out.mult = mult; }
         }
         i = j;
       } else if (/^\$rem$/i.test(t)) {
+        const rem = {};
         let j = i + 1;
         for (; j < L.length && !/^\s*\$end/i.test(L[j]); j++) {
           const m = /^\s*(\w+)\s*(?:=\s*|\s+)(\S+)/.exec(L[j].replace(/!.*$/, ''));
-          if (m) out.rem[m[1].toUpperCase()] = m[2];
+          if (m) rem[m[1].toUpperCase()] = m[2];
         }
+        out.rems.push(rem);
+        if (out.rems.length === 1) out.rem = rem;
         i = j;
       }
     }
@@ -774,6 +827,8 @@
           if (/^--\s*Occupied\s*--/.test(u)) { part = 'occ'; continue; }
           if (/^--\s*Virtual\s*--/.test(u)) { part = 'virt'; continue; }
           if (set && part && /^[-\d.\s*]+$/.test(u)) { set[part].push(...tok(u).map(num)); continue; }
+          // "Orbital Energies (a.u.) and Symmetries": a line of labels ("1 Bu    1 Ag ...") under each line of energies
+          if (set && part && /^(\d+\s+[A-Za-z][\w'"]*\s*)+$/.test(u)) continue;
           break;
         }
         const mk = x => ({ energies: x.occ.concat(x.virt), nOcc: x.occ.length });
@@ -838,7 +893,7 @@
     meta.method = sec.rem.METHOD ? sec.rem.METHOD.toUpperCase() : (sec.rem.EXCHANGE ? sec.rem.EXCHANGE.toUpperCase() : null);
     meta.basis = sec.rem.BASIS || null;
     meta.keywords = Object.keys(sec.rem).map(k => k + ' ' + sec.rem[k]);
-    qchemJobTypes(sec.rem, meta);
+    (sec.rems.length ? sec.rems : [sec.rem]).forEach(rem => qchemJobTypes(rem, meta));
     return finish(ds);
   }
 
@@ -1128,7 +1183,9 @@
       if (/abnormal termination of xtb/.test(t)) normal = false;
     }
     if (!ds.frames.length) {
-      throw new Error('This xtb output has no coordinates (xtb prints them only after an optimisation); open the input structure or xtbopt.xyz.');
+      const cf = /^\s*coordinate file\s*:\s*(\S+)/m.exec(text);
+      throw new Error('This xtb output has no coordinates (xtb prints them only after an optimisation); open the input structure' +
+        (cf ? ' (' + cf[1] + ')' : '') + ' or xtbopt.xyz.');
     }
     const f = F.cur();
     if (fE !== null) F.energy('xTB', fE, f);
@@ -1227,7 +1284,7 @@
     const ds = BM.emptyDataset('mopac-out', name), meta = ds.meta, F = new Frames(ds), L = lines(text), n = L.length;
     const steps = [], charges = {}, vf = [], vt = [], vr = [], vs = [];
     let kwPending = false, kw = null, hof = null, hofFrame = null, gthr = 1, normal = null, conv = false, nFilled = null;
-    let eig = null, modes = null, fi = -1;
+    let eig = null, modes = null, fi = -1, eigB = null, nAlpha = null, nBeta = null;
     for (let i = 0; i < n; i++) {
       const t = L[i].trim();
       if (!t) continue;
@@ -1237,7 +1294,7 @@
       }
       if (/^\*\s+CALCULATION DONE:/.test(t)) { kwPending = true; continue; }
       if (kwPending && /^\*{40,}$/.test(t)) { kwPending = false; if (kw === null) { kw = L[i + 1] || ''; mopacKeywords(kw, meta); ds.title = (L[i + 2] || '').trim() || ds.title; } continue; }
-      if (t === 'FINAL GEOMETRY OBTAINED') {
+      if (/^FINAL GEOMETRY OBTAINED(\s+CHARGE)?$/.test(t)) {   // (MOPAC 2012 adds a CHARGE column to the archive)
         if (kw === null) { kw = L[i + 1] || ''; mopacKeywords(kw, meta); }
         const g = mopacGeom(L, i + 4);
         if (g.Z.length) { const f = F.add(g.Z, g.xyz, 'Final geometry', 1e-4); if (hof !== null && hofFrame === null) { F.energy('HOF', hof / KCAL, f); hofFrame = f; } }
@@ -1265,13 +1322,15 @@
       if (/GRADIENT\s+=\s*\S+\s+IS LESS THAN CUTOFF|GEOMETRY OPTIMISED|HEAT OF FORMATION TEST SATISFIED|GRADIENT TEST PASSED/.test(t)) { conv = true; continue; }
       if ((m = /^(?:FINAL )?HEAT OF FORMATION\s*=\s*(\S+)\s+KCAL/.exec(t))) { hof = num(m[1]); meta.heatOfFormation = hof; hofFrame = null; continue; }
       if ((m = /^NO\. OF FILLED LEVELS\s*=\s*(\d+)/.exec(t))) { nFilled = int(m[1]); continue; }
+      // UHF: "NO. OF ALPHA ELECTRONS = 6" (also after "UHF CALCULATION,"), then ALPHA and BETA EIGENVALUES
+      if ((m = /NO\. OF (ALPHA|BETA)\s+ELECTRONS\s*=\s*(\d+)/.exec(t))) { if (m[1] === 'ALPHA') nAlpha = int(m[2]); else nBeta = int(m[2]); continue; }
       if ((m = /^DIPOLE\s*=\s*(\S+)\s+DEBYE/.exec(t))) { if (!ds.dipole) ds.dipole = { x: null, y: null, z: null, total: num(m[1]) }; continue; }
       if ((m = /^SUM\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)/.exec(t))) { ds.dipole = { x: num(m[1]), y: num(m[2]), z: num(m[3]), total: num(m[4]) }; continue; }
-      if (t === 'EIGENVALUES') {
+      if (t === 'EIGENVALUES' || t === 'ALPHA EIGENVALUES' || t === 'BETA EIGENVALUES') {
         const e = [];
         let j = i + 1;
         for (; j < n; j++) { const r = tok(L[j]); if (!r.length) { if (e.length) break; continue; } if (!r.every(isNum)) break; e.push(...r.map(x => num(x) / HARTREE2EV)); }
-        if (e.length) eig = e;
+        if (e.length) { if (t === 'BETA EIGENVALUES') eigB = e; else { eig = e; if (t === 'EIGENVALUES') eigB = null; } }
         i = j - 1;
         continue;
       }
@@ -1319,12 +1378,13 @@
     meta.normalTermination = normal;
     if (!ds.program) ds.program = 'MOPAC';
     if (Object.keys(charges).length) ds.charges = charges;
-    if (eig) ds.orbitals = { alpha: { energies: eig, nOcc: nFilled === null ? 0 : nFilled }, beta: null };
+    if (eig && eigB && nAlpha !== null && nBeta !== null) ds.orbitals = { alpha: { energies: eig, nOcc: nAlpha }, beta: { energies: eigB, nOcc: nBeta } };
+    else if (eig) ds.orbitals = { alpha: { energies: eig, nOcc: nFilled === null ? 0 : nFilled }, beta: null };
     if (vf.length) {
       ds.vibrations = buildVib(ds, fi < 0 ? ds.frames.length - 1 : fi, vf, modes,
         { ir: vt.map(x => x * x), redMass: vr, sym: vs }, false);
       addJT(meta, 'freq');
-      if (ds.vibrations && ds.vibrations.ir) ds.warnings.push('MOPAC IR intensities are relative (squared transition dipoles, Debye^2).');
+      if (ds.vibrations && ds.vibrations.ir) { ds.vibrations.irUnit = 'D²'; ds.warnings.push('MOPAC IR intensities are squared transition dipoles (D²), not km/mol, so they are relative.'); }
     }
     return finish(ds, 'No CARTESIAN COORDINATES or FINAL GEOMETRY OBTAINED block found in this MOPAC file.');
   }
@@ -1462,29 +1522,36 @@
     return finish(ds, 'No "ATOMIC COORDINATES" block found in this CP2K output.');
   }
   /** CP2K input: &COORD (Angstrom unless UNIT bohr; SCALED with &CELL) and &CELL (ABC or A/B/C vectors). */
+  const CP2K_UNITS = { angstrom: 1, ang: 1, bohr: BOHR, nm: 10, pm: 0.01 };
   function parseCp2kInput(text, name) {
     const ds = BM.emptyDataset('cp2k-input', name), meta = ds.meta, L = lines(text).map(s => s.replace(/[!#].*$/, ''));
-    const Z = [], X = [];
-    let cell = null, unit = 1, scaled = false, inCoord = false, inCell = false, abc = null, ang = [90, 90, 90];
-    const vec = {};
+    const Z = [], X = [], kinds = [];
+    let cell = null, unit = 1, scaled = false, inCoord = false, inCell = false, abc = null, ang = [90, 90, 90], kind = null;
+    const vec = {}, kindEl = {};
     for (const s of L) {
       const t = s.trim();
       if (!t) continue;
+      // &KIND name ... ELEMENT X: a kind named otherwise ("Wat", "O_w") is that element
+      { const km = /^&KIND\s+(\S+)/i.exec(t); if (km) { kind = km[1].toUpperCase(); continue; } }
+      if (kind && /^&END\b/i.test(t)) { kind = null; continue; }
+      if (kind && /^ELEMENT\s+(\S+)/i.test(t)) { kindEl[kind] = /^ELEMENT\s+(\S+)/i.exec(t)[1]; continue; }
       if (/^&COORD\b/i.test(t)) { inCoord = true; continue; }
       if (/^&END\s+COORD\b/i.test(t) || (inCoord && /^&END\s*$/i.test(t))) { inCoord = false; continue; }
       if (/^&CELL\b/i.test(t)) { inCell = true; continue; }
       if (/^&END\s+CELL\b/i.test(t) || (inCell && /^&END\s*$/i.test(t))) { inCell = false; continue; }
       const r = t.split(/\s+/);
       if (inCoord) {
-        if (/^UNIT$/i.test(r[0])) { unit = /^bohr$/i.test(r[1] || '') ? BOHR : 1; continue; }
+        if (/^UNIT$/i.test(r[0])) { unit = CP2K_UNITS[(r[1] || '').toLowerCase()] || 1; continue; }
         if (/^SCALED$/i.test(r[0])) { scaled = !/^(\.?F|\.FALSE\.|FALSE|NO)/i.test(r[1] || 'T'); continue; }
-        if (r.length >= 4 && /^[A-Za-z]/.test(r[0]) && allNum(r, 1, 3)) { Z.push(elZ(r[0].replace(/[_\d].*$/, ''))); X.push(num(r[1]), num(r[2]), num(r[3])); }
+        if (r.length >= 4 && /^[A-Za-z]/.test(r[0]) && allNum(r, 1, 3)) { kinds.push(r[0]); X.push(num(r[1]), num(r[2]), num(r[3])); }
         continue;
       }
       if (inCell) {
-        if (/^ABC$/i.test(r[0]) && allNum(r, r.length > 4 ? 2 : 1, 3)) { const o = r.length > 4 && /^\[/.test(r[1]) ? 2 : 1; abc = r.slice(o, o + 3).map(num); }
-        else if (/^ALPHA_BETA_GAMMA$/i.test(r[0])) ang = r.slice(1, 4).map(num);
-        else if (/^[ABC]$/i.test(r[0]) && allNum(r, 1, 3)) vec[r[0].toUpperCase()] = r.slice(1, 4).map(num);
+        // an optional unit in brackets: ABC [bohr] 18.9 18.9 18.9
+        const u = r.length > 1 && /^\[(\w+)\]$/.exec(r[1]), o = u ? 2 : 1, f = u ? CP2K_UNITS[u[1].toLowerCase()] || 1 : 1;
+        if (/^ABC$/i.test(r[0]) && allNum(r, o, 3)) abc = r.slice(o, o + 3).map(x => num(x) * f);
+        else if (/^ALPHA_BETA_GAMMA$/i.test(r[0]) && allNum(r, o, 3)) ang = r.slice(o, o + 3).map(num);
+        else if (/^[ABC]$/i.test(r[0]) && allNum(r, o, 3)) vec[r[0].toUpperCase()] = r.slice(o, o + 3).map(x => num(x) * f);
       }
     }
     if (vec.A && vec.B && vec.C) cell = [vec.A, vec.B, vec.C];
@@ -1494,6 +1561,7 @@
       cell = [[abc[0], 0, 0], [abc[1] * Math.cos(ga), abc[1] * Math.sin(ga), 0], [abc[2] * cx, abc[2] * cy, abc[2] * Math.sqrt(Math.max(0, 1 - cx * cx - cy * cy))]]
         .map(v => v.map(x => (Math.abs(x) < 1e-9 ? 0 : x)));
     }
+    for (const k of kinds) Z.push(elZ((kindEl[k.toUpperCase()] || k).replace(/[_\d].*$/, '')));
     if (!Z.length) throw new Error('No &COORD section found in this CP2K input (coordinates may come from an external file).');
     const xyz = new Array(X.length);
     for (let a = 0; a < Z.length; a++) {
@@ -1506,7 +1574,8 @@
     const g = /^\s*RUN_TYPE\s+(\S+)/im.exec(L.join('\n'));
     if (g && /GEO_OPT|CELL_OPT/i.test(g[1])) addJT(meta, 'opt');
     if (g && /VIBRATIONAL/i.test(g[1])) addJT(meta, 'freq');
-    const c = /^\s*CHARGE\s+(-?\d+)/im.exec(L.join('\n')), mu = /^\s*MULTIPLICITY\s+(\d+)/im.exec(L.join('\n'));
+    // (whole-number values only: CHARGE lines of force-field sections hold partial charges such as -0.834)
+    const c = /^\s*CHARGE\s+([-+]?\d+)\s*$/im.exec(L.join('\n')), mu = /^\s*MULTIP(?:LICITY)?\s+(\d+)\s*$/im.exec(L.join('\n'));
     if (c) meta.charge = int(c[1]);
     if (mu) meta.multiplicity = int(mu[1]);
     const xc = /&XC_FUNCTIONAL\s+(\w+)/i.exec(L.join('\n'));
@@ -1576,26 +1645,77 @@
     return finish(ds, 'No "cycle = ..." blocks with coordinates and gradients found in this Turbomole gradient file.');
   }
 
+  // =================================================================== ORCA / xtb .engrad
+  /** The energy-and-gradient file of ORCA and xtb: "#"-headed sections with the number of atoms, the energy (Eh),
+   *  the gradient (Eh/Bohr, 3N numbers) and the atomic numbers with coordinates (Bohr). */
+  function parseEngrad(text, name) {
+    const ds = BM.emptyDataset('engrad', name), meta = ds.meta, L = lines(text);
+    const sec = {};
+    let key = null;
+    for (const s of L) {
+      const t = s.trim();
+      if (!t) continue;
+      if (t[0] === '#') {
+        const h = t.replace(/^#+\s*/, '').toLowerCase();
+        if (h) key = /number of atoms/.test(h) ? 'n' : /energy/.test(h) ? 'e' : /gradient/.test(h) ? 'g' : /coordinates/.test(h) ? 'x' : null;
+        continue;
+      }
+      if (key) (sec[key] = sec[key] || []).push(t);
+    }
+    const N = sec.n ? int(sec.n[0]) : NaN;
+    const rows = (sec.x || []).map(tok).filter(r => r.length >= 4 && isInt(r[0]) && allNum(r, 1, 3));
+    if (!(N > 0) || rows.length < N) throw new Error('No atomic numbers and coordinates found in this .engrad file.');
+    const Z = [], xyz = [];
+    rows.slice(0, N).forEach(r => { Z.push(int(r[0])); xyz.push(num(r[1]) * BOHR, num(r[2]) * BOHR, num(r[3]) * BOHR); });
+    const f = mkFrame(Z, xyz);
+    ds.frames.push(f);
+    const E = sec.e ? num(sec.e[0]) : NaN;
+    if (Number.isFinite(E)) { f.energy = E; f.energies = { Total: E }; }
+    const grad = [].concat(...(sec.g || []).map(tok)).map(num).slice(0, 3 * N);
+    if (grad.length === 3 * N && grad.every(Number.isFinite)) {
+      let mx = 0, ss = 0;   // as for Turbomole gradients: the largest Cartesian component, and the RMS of all of them
+      for (const v of grad) { mx = Math.max(mx, Math.abs(v)); ss += v * v; }
+      f.opt = {};
+      setOpt(f.opt, 'maxForce', mx);
+      setOpt(f.opt, 'rmsForce', Math.sqrt(ss / (3 * N)));
+      setOpt(f.opt, 'gradNorm', Math.sqrt(ss));
+      addJT(meta, 'force');
+    }
+    ds.program = null;
+    return finish(ds);
+  }
+
   // =================================================================== registration
-  const mopacInpSniff = h => {
+  // the keyword line of a MOPAC input (often without a method: PM7 is the default)
+  const MOPAC_KW = /^(1SCF|CHARGE=|XYZ|PRECISE|GNORM=|UHF|RHF|SINGLET|DOUBLET|TRIPLET|QUARTET|QUINTET|OPEN\(|LARGE|SYMMETRY|EF|TS|FORCE|THERMO|IRC=|DRC|NOINTER|MMOK|EPS=|BONDS|POLAR|AUX|T=|THREADS=|MOZYME|GEO-OK|LET|SADDLE|NLLSQ|SIGMA|BFGS|LBFGS|CYCLES=|ESP|MULLIK|GRAPHF?|VECTORS|LOCALIZE|PDBOUT|HTML|CUTOFF=|RSOLV=|COSWRT)$/;
+  const mopacInpSniff = (h, nm) => {
     const first = (lines(h).find(s => s.trim() && !/^\s*\*/.test(s)) || '').toUpperCase();
-    return tok(first).some(k => MOPAC_METHOD.test(k) || /^(1SCF|CHARGE=|XYZ|PRECISE|GNORM=)/.test(k)) ? 0.5 : 0;
+    const K = tok(first).map(k => k.replace(/[+&]$/, ''));
+    if (K.some(k => MOPAC_METHOD.test(k) || /^(1SCF|CHARGE=|XYZ|PRECISE|GNORM=)/.test(k))) return 0.5;
+    // .mop is MOPAC's own extension: a keyword line of other MOPAC keywords is enough
+    return /\.mop$/.test(nm || '') && K.length && K.every(k => MOPAC_KW.test(k) || /^[A-Z0-9-]+=\S+$/.test(k) || /^[A-Z]+\(.*\)$/.test(k)) ? 0.4 : 0;
   };
   reg('gamess-out', 'GAMESS-US / Firefly output', ['log', 'out', 'gamout'], 'output', h => (GAMESS_SIG.test(h) ? 0.95 : 0), parseGamess);
   reg('gamess-input', 'GAMESS input', ['inp'], 'structure',
     h => (!GAMESS_SIG.test(h) && /^\s*\$(CONTRL|BASIS|SYSTEM|SCF)\b/im.test(h) && /^\s*\$DATA\b/im.test(h) ? 0.6 : 0), parseGamessInput);
   reg('nwchem-out', 'NWChem output', ['out', 'log', 'nwout'], 'output', h => (NWCHEM_SIG.test(h) ? 0.95 : 0), parseNwchem);
+  // (a big molecule pushes "task" beyond the first 64 KB: in a .nw file, NWChem's start / echo / memory / title
+  // directives also tell)
   reg('nwchem-input', 'NWChem input', ['nw', 'nwi'], 'structure',
-    h => (!NWCHEM_SIG.test(h) && /^\s*geometry\b/im.test(h) && /^\s*task\s+\w+/im.test(h) ? 0.6 : 0), parseNwInput);
+    (h, nm) => (NWCHEM_SIG.test(h) || !/^\s*geometry\b/im.test(h) ? 0 : /^\s*task\s+\w+/im.test(h) ? 0.6
+      : /\.nwi?$/.test(nm || '') && /^\s*(start|restart|echo|memory|title)\b/im.test(h) ? 0.45 : 0), parseNwInput);
   reg('qchem-out', 'Q-Chem output', ['out', 'log', 'qcout'], 'output', h => (QCHEM_SIG.test(h) ? 0.95 : 0), parseQchem);
   reg('qchem-input', 'Q-Chem input', ['in', 'qcin', 'inp'], 'structure',
-    h => (!QCHEM_SIG.test(h) && /^\s*\$molecule\b/im.test(h) && /^\s*\$rem\b/im.test(h) ? 0.6 : 0), parseQchemInput);
+    h => (QCHEM_SIG.test(h) || !/^\s*\$molecule\b/im.test(h) ? 0 : /^\s*\$rem\b/im.test(h) ? 0.6 : 0.45), parseQchemInput);
   reg('psi4-out', 'Psi4 output', ['out', 'log'], 'output', h => (PSI4_SIG.test(h) ? 0.95 : 0), parsePsi4);
+  // (the job call may lie beyond the first 64 KB of a big molecule: Psi4's "molecule {" block is enough with a Psi4 extension)
   reg('psi4-input', 'Psi4 input', ['dat', 'in', 'psi4'], 'structure',
-    h => (!PSI4_SIG.test(h) && /^\s*molecule\s*\w*\s*\{/m.test(h) && /\b(energy|optimize|opt|frequency|frequencies|freq|properties|gradient|hessian)\s*\(/.test(h) ? 0.6 : 0), parsePsi4Input);
+    h => (PSI4_SIG.test(h) || !/^\s*molecule\s*\w*\s*\{/m.test(h) ? 0
+      : /\b(energy|optimize|opt|frequency|frequencies|freq|properties|gradient|hessian)\s*\(/.test(h) ? 0.6
+      : /^\s*(memory\s+\d|set\s+(\w+\s+\S|\{))/m.test(h) ? 0.5 : 0.45), parsePsi4Input);
   reg('xtb-out', 'xtb output', ['out', 'log', 'xtbout'], 'output', h => (XTB_SIG.test(h) ? 0.95 : 0), parseXtb);
   reg('mopac-out', 'MOPAC output / archive', ['out', 'arc', 'mopout'], 'output', h => (MOPAC_SIG.test(h) ? 0.95 : 0), parseMopac);
-  reg('mopac-input', 'MOPAC input', ['mop'], 'structure', h => (MOPAC_SIG.test(h) ? 0 : mopacInpSniff(h)), parseMopacInput);
+  reg('mopac-input', 'MOPAC input', ['mop'], 'structure', (h, nm) => (MOPAC_SIG.test(h) ? 0 : mopacInpSniff(h, nm)), parseMopacInput);
   reg('cp2k-out', 'CP2K output', ['out', 'log'], 'output', h => (CP2K_SIG.test(h) ? 0.95 : 0), parseCp2k);
   reg('cp2k-input', 'CP2K input', ['inp', 'restart'], 'structure',
     h => (!CP2K_SIG.test(h) && /^\s*&(FORCE_EVAL|GLOBAL)\b/im.test(h) ? 0.6 : 0), parseCp2kInput);
@@ -1603,9 +1723,11 @@
     (h, nm) => (/^\s*\$coord\b/m.test(h) && !/^\s*\$grad\b/m.test(h) ? (nm === 'coord' ? 0.9 : 0.8) : 0), parseTmCoord);
   reg('turbomole-gradient', 'Turbomole gradient', ['gradient', 'grad'], 'output',
     h => (/^\s*\$grad\b/m.test(h) && /cycle\s*=/.test(h) ? 0.9 : 0), parseTmGrad);
+  reg('engrad', 'ORCA / xtb energy and gradient (.engrad)', ['engrad'], 'structure',
+    h => (/^\s*#\s*Number of atoms/im.test(h) && /^\s*#.*\b(total )?energy\b/im.test(h) ? 0.9 : 0), parseEngrad);
 
   BM.qcReaders = { gamess: parseGamess, gamessInput: parseGamessInput, nwchem: parseNwchem, nwchemInput: parseNwInput,
     qchem: parseQchem, qchemInput: parseQchemInput, psi4: parsePsi4, psi4Input: parsePsi4Input, xtb: parseXtb,
     mopac: parseMopac, mopacInput: parseMopacInput, cp2k: parseCp2k, cp2kInput: parseCp2kInput,
-    turbomoleCoord: parseTmCoord, turbomoleGradient: parseTmGrad };
+    turbomoleCoord: parseTmCoord, turbomoleGradient: parseTmGrad, engrad: parseEngrad };
 })(typeof window !== 'undefined' ? (window.BM = window.BM || {}) : (globalThis.BM = globalThis.BM || {}));

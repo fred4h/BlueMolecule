@@ -19,18 +19,18 @@ with some AI help":
 
 | The author | The AI assistant |
 |---|---|
-| Set the goals: a free viewer with the everyday functions of desktop quantum-chemistry viewers, plus building tools | Wrote all the code: about 45,000 lines of JavaScript, Python, Swift, C#, PowerShell, HTML and CSS, tests included |
+| Set the goals: a free viewer with the everyday functions of desktop quantum-chemistry viewers, plus building tools | Wrote all the code: about 47,000 lines of JavaScript, Python, Rust, Swift, C#, PowerShell, HTML and CSS, tests included |
 | Chose the features, using public feature lists of programs such as Chemcraft and Avogadro | Designed the architecture, the file readers and writers, the renderer and the interface |
 | Tried each version on their own computers and reported problems, such as "a 600 MB ORCA log opens as empty" or "the ONIOM energy graph jumps back and forth" | Investigated each report, fixed the cause and added a test for it |
-| Decided to publish the project and chose the license | Generated the synthetic example files, wrote about 32,000 automated checks, wrote the documentation and checked the code before publication |
+| Decided to publish the project and chose the license | Generated the synthetic example files, wrote about 33,600 automated checks, wrote the documentation and checked the code before publication |
 
 Claude worked in a sandboxed workspace with an editor, a terminal and a headless browser, so it could run the tests
 and look at screenshots of the interface. The versions from 1.0 to 1.4.1 were made between 4 and 10 November 2026,
-1.4.2 and 1.5.0 on 16 November, and 2.0.0 on 17 November (see the [changelog](../CHANGELOG.md)).
+1.4.2 and 1.5.0 on 16 November, 2.0.0 on 17 November and 2.0.1 on 18 November (see the [changelog](../CHANGELOG.md)).
 
 ## How the program was checked
 
-- **Automated tests.** Every feature came with tests: about 32,000 checks in 34 suites, run with
+- **Automated tests.** Every feature came with tests: about 33,600 checks in 35 suites, run with
   `python3 tests/run_all.py --browser` ([developer guide](developer-guide.md#tests)). They cover:
   - the readers and writers of each format;
   - format detection;
@@ -42,6 +42,13 @@ and look at screenshots of the interface. The versions from 1.0 to 1.4.1 were ma
   was generated to imitate a program's output layout, as that layout is publicly documented and commonly seen.
   This is the **main limitation**. Real files vary in ways the examples may not cover: program versions, print
   levels, keywords, warnings and unusual job types.
+- **Real output files (2.0.1).** Every reader was then run on the public test files of the cclib and MDAnalysis
+  projects: about 900 real files, including 437 outputs of nine quantum-chemistry programs. Geometries, energies,
+  vibrations, excited states, orbitals and charges were compared with cclib's reading of the same files; each file
+  was also read cut at 10 places, damaged on purpose, and saved in every format and read back; and the interface was
+  driven with 23 of them and 31 example files in a headless browser, through every control and 1,900 random
+  actions. This found real bugs that the synthetic files had hidden (listed in the [changelog](../CHANGELOG.md));
+  they were fixed, and their layouts are kept in `tests/test_real_layouts.js`.
 - **Screenshots.** The browser tests save screenshots of the interface. These were inspected during development.
 - **Use by the author.** Problems found while the author used the program led to versions 1.1 to 1.4.
 - **A publication audit** before the first public release. It checked for:

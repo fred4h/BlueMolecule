@@ -1250,14 +1250,19 @@
   function readCp2kIn(text, fileName) {
     const ds = newDs('cp2k-in', fileName, 'CP2K');
     const stack = [], cellK = {}, rows = [], kinds = {};
-    let unitC = 1, scaled = false, kind = null, topo = null;
+    let unitC = 1, scaled = false, kind = null, topo = null, runType = '', method = null;
     const unitTok = (v) => { if (v.length && /^\[.*\]$/.test(v[0])) { const u = v[0].slice(1, -1).toLowerCase(); v.shift(); return CP2K_UNIT[u] !== undefined ? CP2K_UNIT[u] : 1; } return 1; };
     for (const raw of splitLines(text)) {
       const s = raw.replace(/[!#].*$/, '').trim();
       if (!s) continue;
       if (/^&END\b/i.test(s)) { stack.pop(); continue; }
       const m = /^&(\w+)\s*(.*)$/.exec(s);
-      if (m) { const nm = m[1].toUpperCase(); stack.push(nm); if (nm === 'KIND') kind = m[2].trim(); continue; }
+      if (m) {
+        const nm = m[1].toUpperCase(); stack.push(nm);
+        if (nm === 'KIND') kind = m[2].trim();
+        else if (nm === 'XC_FUNCTIONAL' && m[2].trim()) method = m[2].trim().split(/\s+/)[0].toUpperCase();
+        continue;
+      }
       const top = stack[stack.length - 1], parent = stack[stack.length - 2], t = tok(s), key = t[0].toUpperCase();
       if (top === 'CELL' && parent === 'SUBSYS') {
         const v = t.slice(1), u = unitTok(v);
@@ -1270,7 +1275,13 @@
       } else if (top === 'KIND' && key === 'ELEMENT' && kind) kinds[kind.toUpperCase()] = t[1];
       else if (top === 'TOPOLOGY' && key === 'COORD_FILE_NAME') topo = t[1];
       else if (top === 'GLOBAL' && (key === 'PROJECT' || key === 'PROJECT_NAME')) ds.title = t[1] || ds.title;
+      // the calculation, as the CP2K input reader of readers-qc.js reads it (both must agree)
+      else if (top === 'GLOBAL' && key === 'RUN_TYPE') runType = (t[1] || '').toUpperCase();
+      else if (top === 'DFT' && key === 'CHARGE' && /^[-+]?\d+$/.test(t[1] || '')) ds.meta.charge = parseInt(t[1], 10);
+      else if (top === 'DFT' && (key === 'MULTIPLICITY' || key === 'MULTIP') && /^\d+$/.test(t[1] || '')) ds.meta.multiplicity = parseInt(t[1], 10);
     }
+    if (method) ds.meta.method = method;
+    ds.meta.jobTypes.push(/GEO_OPT|CELL_OPT/.test(runType) ? 'opt' : /VIBRATIONAL/.test(runType) ? 'freq' : 'sp');
     let cell = null;
     if (cellK.A && cellK.B && cellK.C) cell = [cellK.A, cellK.B, cellK.C];
     else if (cellK.ABC) { const g = cellK.ang || [90, 90, 90]; cell = cellFromParams(cellK.ABC[0], cellK.ABC[1], cellK.ABC[2], g[0], g[1], g[2]); }

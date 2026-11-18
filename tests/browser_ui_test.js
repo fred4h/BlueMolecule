@@ -454,6 +454,18 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   if (h1) await rightClick(h1[0], h1[1]);
   check((await info()).n === 2, 'right-click deletes an H of a file geometry: ' + (await info()).n);
 
+  // 2.0.1: the Info tab names the level of the geometry's energy and lists the job's other levels apart
+  await openText('triplets.out', fs.readFileSync(path.join(FIX, 'review/orca6_water_tddft_triplets.out'), 'utf8'));
+  await tab('info');
+  const en = await page.$eval('#panel', e => e.textContent.replace(/\s+/g, ' '));
+  check(/This geometry\s*-76\.31794234 Eh \(SCF\)/.test(en) && /Excited state\s*-76\.03570334 Eh/.test(en),
+    'the Info tab names the energy level and shows the excited state apart: ' + (en.match(/Energy.{0,140}/) || [''])[0]);
+  await openText('mp5.log', fs.readFileSync(path.join(FIX, 'review/g16_water_mp5.log'), 'utf8'));
+  await tab('info');
+  const e5 = await page.$eval('#panel', e => e.textContent.replace(/\s+/g, ' '));
+  check(/This geometry\s*-\d+\.\d{8} Eh \(MP5\)/.test(e5) && /SCF\s*-\d+\.\d{8} Eh/.test(e5) && /MP4\s*-\d+\.\d{8} Eh/.test(e5),
+    'an MP5 job: the energy is MP5, with SCF, MP2 to MP4 listed: ' + (e5.match(/Energy.{0,240}/) || [''])[0]);
+
   check(errors.length === 0, 'no page errors: ' + errors.slice(0, 5).join(' | '));
   await browser.close();
   console.log(`UI tests (1.4.2 fixes): ${passes} passed, ${failures} failed`);
