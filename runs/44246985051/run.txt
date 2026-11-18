@@ -1,0 +1,8 @@
+run 44246985051
+commit 995be3006ea4dc04101d7f0bbfc507ee39abc5d4
+branch claude/2.0-audit
+build result success
+url https://github.com/fred4h/BlueMolecule/actions/runs/44246985051
+report-linux: exit=0 seconds=8 peak=1106MB
+report-macos: exit=0 seconds=16 peak=791MB
+report-windows: exit=0 seconds=14 peak=621MB
