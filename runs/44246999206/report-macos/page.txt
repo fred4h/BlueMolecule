@@ -1,0 +1,8 @@
+inlined 24 scripts and 1 stylesheets
+BlueMolecule.html: 2429 KB
+BlueMolecule-2.0.1-linux.tar.gz               917 KB
+BlueMolecule.html                            2429 KB
+total 4864
+drwxr-xr-x  3 runner  staff       96 Nov 18 05:50 .
+drwxr-xr-x  6 runner  staff      192 Nov 18 05:50 ..
+-rw-r--r--  1 runner  staff  2487162 Nov 18 05:50 index.html
