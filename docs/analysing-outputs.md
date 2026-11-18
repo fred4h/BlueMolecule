@@ -39,13 +39,20 @@ Below the overview:
 | File | Name, format, program and version, title, status (normal or error termination, or still running), job types |
 | Route / Keywords | The route section (Gaussian) or keyword lines (ORCA and others) |
 | Molecule | Formula, number of atoms, molecular weight, method, basis set, charge, multiplicity, solvent |
-| Energy | The final energy and the energy of the geometry shown |
+| Energy | The energy of the geometry shown, with its level (SCF, MP2, CCSD(T)...) when the job computed several, the other levels (and a TD-DFT job's excited state) below it, and the final energy |
 | Thermochemistry | ZPE, E + ZPE, enthalpy H and Gibbs energy G, at the temperature of the job |
 | Orbitals | HOMO, LUMO and gap, for α and β separately in open-shell jobs |
 | Dipole moment | Total and components (Debye). **Display settings → Dipole moment arrow** draws it |
 | Atomic charges | The scheme in use, when the file has several |
 | Unit cell | a, b, c, α, β, γ and the volume, for periodic systems |
 | Reader notes | Anything unusual the reader noticed: missing geometries, unfinished jobs, skipped frames, conversions |
+
+**The energy of a geometry** is the highest level the job computed for it: CCSD(T) or QCISD(T), then CCSD, QCISD
+and CCD, MP5, MP4 (SDTQ, else SDQ, else DQ), MP3, MP2, and the SCF energy. In a TD-DFT or CIS single point, it is the
+ground state's (MP2 for ADC(2)): the excited states are in the **States** tab. In such ORCA jobs the "FINAL SINGLE
+POINT ENERGY" is the energy of the followed excited state; it is used only when the job follows that state (an
+excited-state optimisation, scan or IRC), as for Gaussian. (In ORCA's ROCIS jobs it is the ROCIS ground state, and it
+is shown.)
 
 ## Optimisations
 
@@ -104,7 +111,8 @@ every IRC geometry.
 The **Vibrations** tab lists each mode with:
 - its frequency (cm⁻¹), with imaginary frequencies shown in orange as e.g. `523.41i`;
 - its symmetry label, when printed;
-- its IR intensity (km/mol) and Raman activity (Å⁴/amu), when computed.
+- its IR intensity (km/mol; for MOPAC, the squared transition dipole in D²) and Raman activity (Å⁴/amu), when
+  computed.
 
 - **Click a mode**, or a peak in the spectrum, to animate it. **Amplitude** and **Speed** adjust the animation, and
   **Arrows** shows the displacement vectors.
@@ -123,7 +131,8 @@ sticks), PNG or SVG.
 - A frequency **scale factor**.
 - A wavenumber **range**.
 - Sticks and peak labels on or off.
-- Intensity as relative absorbance or molar absorption coefficient **ε**, and an optional transmittance view.
+- Intensity as relative absorbance or molar absorption coefficient **ε** (not for MOPAC, whose intensities are
+  relative), and an optional transmittance view.
 
 **Raman**
 - The same line-shape controls.

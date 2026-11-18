@@ -91,6 +91,18 @@ jobs:
           # same file (done here, not in git, so that a re-run of an older tag gets it too)
           python -c "import json; p = 'desktop/src-tauri/tauri.release.conf.json'; c = json.load(open(p)); c.setdefault('plugins', {}).setdefault('updater', {})['pubkey'] = open('desktop/updater-key.pub').read().strip(); json.dump(c, open(p, 'w'), indent=2); print(open(p).read())"
 
+      # the release's own notes: they keep the release page as it is, and they are what the update dialog shows
+      # ("notes" in latest.json)
+      - name: Release notes
+        id: notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          body=$(gh release view "${{ needs.check.outputs.tag }}" --repo "$GITHUB_REPOSITORY" --json body --jq .body 2>/dev/null || true)
+          name=$(gh release view "${{ needs.check.outputs.tag }}" --repo "$GITHUB_REPOSITORY" --json name --jq .name 2>/dev/null || true)
+          { echo "body<<BM_NOTES_END"; printf '%s\n' "$body"; echo "BM_NOTES_END"; } >> "$GITHUB_OUTPUT"
+          echo "name=${name:-BlueMolecule ${{ needs.check.outputs.tag }}}" >> "$GITHUB_OUTPUT"
+
       - name: Build, sign and attach
         uses: tauri-apps/tauri-action@v0
         env:
@@ -101,7 +113,8 @@ jobs:
           projectPath: desktop
           tauriScript: npx --yes @tauri-apps/cli@2
           tagName: ${{ needs.check.outputs.tag }}
-          releaseName: BlueMolecule ${{ needs.check.outputs.tag }}
+          releaseName: ${{ steps.notes.outputs.name }}
+          releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: false
           includeUpdaterJson: true
           updaterJsonPreferNsis: true

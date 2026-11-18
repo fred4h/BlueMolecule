@@ -68,7 +68,7 @@ function mockTauri(files, opts) {
 
   console.log('documents, reading, dialogs');
   let page = await open(mockTauri(files, { dialogFile: { name: 'water_traj.xyz', b64: b64('water_traj.xyz') }, updates: true,
-    update: { supported: true, available: true, current: '2.0.0', version: '2.0.1', date: '2026-12-01T00:00:00Z', notes: 'Fixes <b>things</b>.\n- one\n- two' } }));
+    update: { supported: true, available: true, current: '2.0.0', version: '2.0.1', date: '2026-12-01T00:00:00Z', notes: 'Fixes <b>things</b>.\n- one\n- **two** in `x.log`, see [the guide](https://example.org/g)' } }));
   check(await page.evaluate(() => BM.native.kind) === 'tauri-app', 'the bridge recognises the desktop app');
   await page.waitForFunction(() => BM.app.state.docs.length === 2 && BM.app.state.docs.every(d => !d.pending), null, { timeout: 15000 });
   let st = await page.evaluate(() => BM.app.state.docs.map(d => [d.name, d.data.frames.length, d.data.frames[0].Z.length]));
@@ -109,6 +109,7 @@ function mockTauri(files, opts) {
   const upd = await page.$eval('#dlg', e => ({ text: e.textContent.replace(/\s+/g, ' '), notesHtml: e.querySelector('.upd-notes').innerHTML }));
   check(/You have version 2\.0\.0; this one was released on 2026-12-01/.test(upd.text) && /Check for updates when BlueMolecule starts/.test(upd.text), 'the update dialog: versions, date, the opt-in box');
   check(upd.notesHtml.includes('&lt;b&gt;things&lt;/b&gt;') && !upd.notesHtml.includes('<b>'), 'release notes are shown as text, never as markup');
+  check(/• one\n• two in x\.log, see the guide$/.test(await page.$eval('#dlg .upd-notes', e => e.textContent)), 'release notes without their Markdown marks: ' + JSON.stringify(await page.$eval('#dlg .upd-notes', e => e.textContent)));
   await page.check('#dlg [data-upd="auto"]');
   await page.click('#dlg .dlg-foot button:has-text("Install and restart")');
   await sleep(150);

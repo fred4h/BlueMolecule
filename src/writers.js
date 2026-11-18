@@ -188,7 +188,7 @@
   /** Composite (-3c), semi-empirical and tight-binding methods carry their own basis. */
   const needsBasis = s => { const h = methodHead(s); return !(SEMIEMPIRICAL.test(h) || XTB_METHOD.test(h) || /-3c$/i.test(h)); };
   const solventKey = s => String(s).toLowerCase().replace(/[\s,_()-]/g, '');
-  const F = v => fx(v, 16, 10);
+  const F = v => fs(v, 16, 10);   // (a coordinate of 1000 Å or more still gets a separating space)
   const jobAtomLine = a => a.s.padEnd(3) + F(a.p[0]) + F(a.p[1]) + F(a.p[2]);
 
   function intOpt(v, def, what) {
@@ -524,7 +524,7 @@
     const j = job(m, '', '');
     const L = ['$coord'];
     for (const a of j.atoms) {
-      L.push(fx(a.p[0] / BOHR, 22, 14) + fx(a.p[1] / BOHR, 22, 14) + fx(a.p[2] / BOHR, 22, 14) + '      ' + a.s.toLowerCase());
+      L.push(fs(a.p[0] / BOHR, 22, 14) + fs(a.p[1] / BOHR, 22, 14) + fs(a.p[2] / BOHR, 22, 14) + '      ' + a.s.toLowerCase());
     }
     if (j.extra) L.push(j.extra);
     L.push('$end');
@@ -683,7 +683,13 @@
   registerSaveFormat({ id: 'xyz', name: 'XYZ', ext: 'xyz', write: c => xyz({ Z: c.Z, xyz: c.xyz, comment: c.title || '' }) });
   registerSaveFormat({ id: 'xyz-traj', name: 'XYZ trajectory (all geometries)', ext: 'xyz', kind: 'trajectory', needs: ['frames'],
     write: c => xyzMulti((c.frames || []).map((f, i) => ({ Z: f.Z, xyz: f.xyz, comment: (c.title || '') + ' geometry ' + (i + 1) + (f.energy !== null && f.energy !== undefined && isFinite(f.energy) ? ' E = ' + f.energy.toFixed(10) : '') }))) });
-  registerSaveFormat({ id: 'mol', name: 'MDL Molfile', ext: 'mol', write: c => mol({ Z: c.Z, xyz: c.xyz, bonds: pairsToBonds(c), title: c.title || '' }) });
+  // more than 999 atoms or bonds: the V3000 record of the SDF writer (one record, without its data items)
+  const molV3000 = c => { const t = BM.structWriters.sdf(Object.assign({}, c, { frames: null })); return t.slice(0, t.indexOf('M  END') + 6) + '\n'; };
+  registerSaveFormat({ id: 'mol', name: 'MDL Molfile', ext: 'mol', write: c => {
+    const bonds = pairsToBonds(c);
+    if ((c.Z.length > 999 || (bonds && bonds.length > 999)) && BM.structWriters && BM.structWriters.sdf) return molV3000(c);
+    return mol({ Z: c.Z, xyz: c.xyz, bonds, title: c.title || '' });
+  } });
   registerSaveFormat({ id: 'pdb', name: 'Protein Data Bank', ext: 'pdb', write: c => pdb({ Z: c.Z, xyz: c.xyz, atomNames: c.atomNames, resNames: c.resNames, resIds: c.resIds, cell: c.cell }) });
   registerSaveFormat({ id: 'turbomole-coord', name: 'Turbomole coord (Bohr)', ext: 'coord', write: c => turbomole({ Z: c.Z, xyz: c.xyz }) });
   BM.saveFormats = SAVE;

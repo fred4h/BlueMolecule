@@ -49,11 +49,11 @@ with `./uninstall.sh` from the unpacked 1.x folder ([details](installation.md#co
 
 ## "Open With BlueMolecule" is missing for a file type
 
-On Linux and macOS, the installer registers `.xyz .cube .fchk .molden .mol .sdf .mol2 .pdb .cif .gro .gjf .cml
-.cjson .xsf`; on Windows, also `.log`, `.out`, `.inp` and the MD formats. On Linux and macOS, outputs such as `.log`
-and `.out` are plain text to the desktop. Open them from inside BlueMolecule, by drag and drop, or
-from the terminal with `bluemolecule file.log`. You can also choose BlueMolecule once in your file manager's
-**Open With → Other application** dialog.
+On Linux and macOS, the installer registers `.xyz .cube .cub .fchk .fch .molden .mol .sdf .mol2 .pdb .ent .cif
+.mmcif .gro .gjf .cml .cjson .xsf .axsf`; on Windows, also `.log`, `.out`, `.inp` and the MD formats. On Linux and
+macOS, outputs such as `.log` and `.out` are plain text to the desktop. Open them from inside BlueMolecule, by drag
+and drop, or from the terminal with `bluemolecule file.log`. You can also choose BlueMolecule once in your file
+manager's **Open With → Other application** dialog.
 
 ## A file does not open, or opens wrongly
 

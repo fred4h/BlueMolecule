@@ -2,26 +2,30 @@
 
 ## How BlueMolecule handles your files
 
-- **Everything runs on your computer.** BlueMolecule never uploads files and makes no network connections beyond
-  its own local launcher.
-- **The launcher** (`launcher/bluemolecule.py`), used for the browser-window types, runs a small web server that:
+- **Everything runs on your computer.** BlueMolecule never uploads files. Its only use of the network is the
+  desktop program's update check, and only when you ask for it (**Help → Check for updates…**, or at start-up if you
+  tick that option): it asks GitHub for the latest release, and installs an update only after checking its signature
+  against BlueMolecule's own key ([Updates](docs/installation.md#updates)).
+- **The desktop program** (2.0 and later):
+  - reads only the files you opened (with the Open dialog, **Open with**, the command line or by dropping them on
+    the window), and saves only where you choose in the Save dialog;
+  - shows only BlueMolecule's own page in its window; links open in your web browser;
+  - installs for your user only on Windows, without administrator rights. On Linux the AppImage needs no
+    installation, and the `.deb` package is installed with your system's package tools, which ask for your password.
+- **Text from files is never treated as markup.** Titles, atom and residue names, labels and file names are escaped
+  before they are displayed. `tests/browser_xss_test.js` checks this with crafted files.
+- **Open Babel** is run as a separate program with an argument list, never through a shell. Format codes are
+  validated, and options that could read or write other files are refused.
+- **The single HTML file** needs no network. **The launcher** of the Linux package (`launcher/bluemolecule.py`),
+  which opens it in a browser window from the command line, runs a small web server that:
   - listens on `127.0.0.1` only, so other computers cannot reach it;
   - puts every address under a random token that changes each session;
   - checks the `Host` header (against DNS rebinding) and the `Origin` of every request that changes something;
   - serves only the viewer and the files you named on the command line;
   - stops when the window closes.
-- **Open Babel** is run as a separate program with an argument list, never through a shell. Format codes are
-  validated, and options that could read or write other files are refused.
-- **The native windows** (the Linux Qt window and the macOS app) let the page read only the files you opened, and
-  save only where you choose in the Save dialog.
-- **On Windows**, there is no server at all. The launcher copies the files you open into a temporary page in your
-  profile, and only reads the registry, to find the browser. The installer writes only to your user profile and
-  to `HKEY_CURRENT_USER`.
-- **Text from files is never treated as markup.** Titles, atom and residue names, labels and file names are escaped
-  before they are displayed. `tests/browser_xss_test.js` checks this with crafted files.
-- **The installers** never ask for administrator rights on their own. The Linux installer offers the command that
-  installs Qt WebEngine and asks before running it with `sudo`. The Windows installer needs no administrator rights
-  at all.
+
+  Its Qt window lets the page read only the files you opened, and save only where you choose. Its install script
+  never runs `sudo` on its own: it offers the command that installs Qt WebEngine and asks first.
 
 ## Reporting a vulnerability
 

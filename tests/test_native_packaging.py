@@ -14,6 +14,7 @@
   * The built packages in dist/ when they exist.
 Usage: python3 tests/test_native_packaging.py
 """
+import json
 import os
 import plistlib
 import re
@@ -310,7 +311,14 @@ try:
     types = {t.get('type'): [g.get('pattern') for g in t.findall('m:glob', ns)] for t in root.findall('m:mime-type', ns)}
     globs = {g[2:] for gl in types.values() for g in gl}
     check(EXTS <= globs and not (globs & GENERIC), 'MIME globs cover the chemistry extensions only: %s' % sorted(globs))
-    check(globs == exts, 'Linux MIME globs and macOS UTIs list the same extensions')
+    check(exts <= globs, 'the macOS UTIs of the 1.x app are among the Linux MIME globs')
+    # the 2.0 desktop program (Tauri) registers the same extensions and MIME types (its .deb installs this XML)
+    tconf = json.loads((ROOT / 'desktop' / 'src-tauri' / 'tauri.conf.json').read_text())
+    tassoc = tconf['bundle']['fileAssociations']
+    text = {e for fa in tassoc for e in fa['ext']}
+    check(globs == text, 'Linux MIME globs and the desktop program file associations list the same extensions (differ: %s)' % sorted(globs ^ text))
+    check(all(fa.get('mimeType') in types and set('*.' + e for e in fa['ext']) <= set(types[fa['mimeType']]) for fa in tassoc),
+          'each desktop file association has its MIME type, with its globs, in the MIME package')
     check(set(filter(None, keys.get('MimeType', '').split(';'))) == set(types), 'desktop MimeType matches the MIME package')
     for f in ('install.sh', 'uninstall.sh'):
         ok, err = bash_ok(LIN / f)
