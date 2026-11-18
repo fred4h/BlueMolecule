@@ -1,0 +1,7 @@
+run 44338864964
+commit d13c4e244d82406ed1b3ee7b5f4126ac311cfc23
+branch main
+build result abandoned
+url https://github.com/fred4h/BlueMolecule/actions/runs/44338864964
+report-linux: exit=0 seconds=11 peak=1182MB
+report-windows: exit=0 seconds=20 peak=761MB
