@@ -144,7 +144,7 @@
   const CRITERIA = [
     ['maxForce', 'Max force', 'Eh/bohr'], ['rmsForce', 'RMS force', 'Eh/bohr'],
     ['maxDisp', 'Max displacement', 'bohr'], ['rmsDisp', 'RMS displacement', 'bohr'],
-    ['energyChange', 'Energy change', 'Eh'], ['gradNorm', 'Gradient norm', 'Eh/bohr']];
+    ['stepNorm', 'Step length', 'bohr'], ['energyChange', 'Energy change', 'Eh'], ['gradNorm', 'Gradient norm', 'Eh/bohr']];
 
   function convergenceSeries(ds, opts) {
     const job = opts ? opts.job : null;
@@ -157,7 +157,7 @@
     let source = 'frames', steps;
     if (os && os.length >= 2 && os.length > nOpt && (optJob || !ds.jobs || ds.jobs.length < 2)) {
       source = 'optSteps';
-      steps = os.map((s, k) => ({ n: isNum(s.step) ? s.step : k + 1, frame: k === os.length - 1 ? b : null, label: 'Cycle ' + (isNum(s.step) ? s.step : k + 1), energy: isNum(s.energy) ? s.energy : null, opt: s.opt || null, converged: false }));
+      steps = os.map((s, k) => ({ n: isNum(s.step) ? s.step : k + 1, frame: k === os.length - 1 ? b : null, label: 'Cycle ' + (isNum(s.step) ? s.step : k + 1), energy: isNum(s.energy) ? s.energy : null, opt: s.opt || null, converged: !!s.converged }));
     } else {
       steps = items.map((s, k) => ({ n: k + 1, frame: s.frame, label: s.label || (s.frame === null ? 'Step ' + (k + 1) : 'Geometry ' + (s.frame + 1)), energy: isNum(s.energy) ? s.energy : null, energies: s.energies || null, opt: s.opt || null, converged: !!s.converged }));
     }
@@ -196,7 +196,8 @@
       out.converged = steps.findIndex(s => s.converged);
     } else {
       const ok = s => s.opt && Object.keys(s.opt).filter(k => /Conv$/.test(k)).length > 0 && Object.keys(s.opt).filter(k => /Conv$/.test(k)).every(k => s.opt[k] === true);
-      for (let k = 0; k < steps.length; k++) if (ok(steps[k])) { out.converged = k; break; }
+      // (a reader may mark the converged cycle itself: Molpro converges on the gradient and either the energy or the step)
+      for (let k = 0; k < steps.length; k++) if (steps[k].converged || ok(steps[k])) { out.converged = k; break; }
     }
     return out;
   }

@@ -1,0 +1,203 @@
+  ========================================================================
+
+ escf (fixture-host) : TURBOMOLE rev. V7.4.1 (2bfdd732) compiled 4 Nov 2019 at 15:12:03
+ Copyright (C) 2019 TURBOMOLE GmbH, Karlsruhe
+
+
+                             e s c f
+
+              +--------------------------------------------------+
+              | Atomic coordinate, charge and isotop information |
+              +--------------------------------------------------+
+
+                    atomic coordinates            atom    charge  isotop
+        0.00000000     0.00000000     0.22626000    o     8.000     0
+        0.00000000     1.43891736    -0.90504001    h     1.000     0
+        0.00000000    -1.43891736    -0.90504001    h     1.000     0
+ 
+       center of nuclear mass  :    0.00000000    0.00000000    0.00000000
+
+   type   atoms  prim   cont   basis
+   ---------------------------------------------------------------------------
+    o        1     27     14   def2-SVP   [3s2p1d|7s4p1d]
+    h        2      7      5   def2-SVP   [2s1p|4s1p]
+   ---------------------------------------------------------------------------
+
+
+
+                         1 singlet b1 excitation
+
+
+ Total energy:                           -76.1479155371218894    
+
+ Excitation energy:                      0.2610377852781126    
+
+ Excitation energy / eV:                  7.103200000000000    
+
+ Excitation energy / nm:                  174.5469619326500    
+
+
+ Oscillator strength:
+
+    velocity representation:             0.0134400000000000    
+
+    length representation:               1.2800000000000001E-02
+
+    mixed representation:                0.0130560000000000    
+
+
+ Rotatory strength:
+
+    velocity representation:             0.1282566570726007E-10
+
+    velocity rep. / 10^(-40)erg*cm^3:    5.0000000000000000E-01
+
+    length representation:               0.1242930160103103E-10
+
+    length rep. / 10^(-40)erg*cm^3:      4.0000000000000002E-01
+
+
+ Dominant contributions:
+
+      occ. orbital   energy / eV   virt. orbital     energy / eV   |coeff.|^2*100
+        5 a1            -7.95           6 a1               1.75       96.5
+ 
+
+ Change of electron number:
+
+             0.000000
+
+
+
+                         2 singlet a2 excitation
+
+
+ Total energy:                           -76.0816859086969117    
+
+ Excitation energy:                      0.3272674137030780    
+
+ Excitation energy / eV:                  8.905400000000000    
+
+ Excitation energy / nm:                  139.2236148853505    
+
+
+ Oscillator strength:
+
+    velocity representation:             0.0000000000000000    
+
+    length representation:               0.0000000000000000E+00
+
+    mixed representation:                0.0000000000000000    
+
+
+ Rotatory strength:
+
+    velocity representation:             0.1282566570726007E-10
+
+    velocity rep. / 10^(-40)erg*cm^3:    1.0000000000000000E+00
+
+    length representation:               0.1242930160103103E-10
+
+    length rep. / 10^(-40)erg*cm^3:      -8.0000000000000004E-01
+
+
+ Dominant contributions:
+
+      occ. orbital   energy / eV   virt. orbital     energy / eV   |coeff.|^2*100
+        5 a1            -7.95           6 a1               1.75       95.5
+ 
+
+ Change of electron number:
+
+             0.000000
+
+
+
+                         3 singlet a1 excitation
+
+
+ Total energy:                           -76.0542856140827439    
+
+ Excitation energy:                      0.3546677083172463    
+
+ Excitation energy / eV:                  9.651000000000000    
+
+ Excitation energy / nm:                  128.4677214796394    
+
+
+ Oscillator strength:
+
+    velocity representation:             0.0791700000000000    
+
+    length representation:               7.5399999999999995E-02
+
+    mixed representation:                0.0769080000000000    
+
+
+ Rotatory strength:
+
+    velocity representation:             0.1282566570726007E-10
+
+    velocity rep. / 10^(-40)erg*cm^3:    1.5000000000000000E+00
+
+    length representation:               0.1242930160103103E-10
+
+    length rep. / 10^(-40)erg*cm^3:      1.2000000000000002E+00
+
+
+ Dominant contributions:
+
+      occ. orbital   energy / eV   virt. orbital     energy / eV   |coeff.|^2*100
+        5 a1            -7.95           6 a1               1.75       94.5
+ 
+
+ Change of electron number:
+
+             0.000000
+
+
+
+                         4 singlet b2 excitation
+
+
+ Total energy:                           -75.9971293933029557    
+
+ Excitation energy:                      0.4118239290970426    
+
+ Excitation energy / eV:                  11.206300000000001    
+
+ Excitation energy / nm:                  110.6379429428089    
+
+
+ Oscillator strength:
+
+    velocity representation:             0.0348600000000000    
+
+    length representation:               3.3200000000000000E-02
+
+    mixed representation:                0.0338640000000000    
+
+
+ Rotatory strength:
+
+    velocity representation:             0.1282566570726007E-10
+
+    velocity rep. / 10^(-40)erg*cm^3:    2.0000000000000000E+00
+
+    length representation:               0.1242930160103103E-10
+
+    length rep. / 10^(-40)erg*cm^3:      -1.6000000000000001E+00
+
+
+ Dominant contributions:
+
+      occ. orbital   energy / eV   virt. orbital     energy / eV   |coeff.|^2*100
+        5 a1            -7.95           6 a1               1.75       93.5
+ 
+
+ Change of electron number:
+
+             0.000000
+
+
+    escf ended normally

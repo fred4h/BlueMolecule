@@ -12,7 +12,8 @@
  *   engrad                          ORCA / xtb .engrad (energy, gradient, coordinates in Bohr)
  *
  * Datasets follow parsers.js (Angstrom, Hartree, Debye, cm-1). frame.opt uses the shared keys energyChange,
- * maxForce, rmsForce, maxDisp, rmsDisp plus gradNorm (gradient norm: xtb, MOPAC GNORM, Turbomole |dE/dxyz|),
+ * maxForce, rmsForce, maxDisp, rmsDisp plus gradNorm (gradient norm: xtb, MOPAC GNORM, Turbomole |dE/dxyz|) and stepNorm
+ * (length of the step: Molpro, Dalton),
  * each optionally with <key>Thr and <key>Conv. Outputs that report optimisation cycles without printing their
  * geometries (xtb, MOPAC, CP2K) put them in ds.optSteps = [{step, energy, opt}].
  * Written from public descriptions of the output layouts; no code from the programs themselves.
@@ -266,6 +267,47 @@
     if (!(z >= 0 && z <= 118)) z = elZ(t[0]);
     return [z, num(t[2]), num(t[3]), num(t[4])];
   }
+  /**
+   * The operations of a GAMESS point group (GROUP and NAXIS of $DATA) in GAMESS's "master frame": the principal axis
+   * is z; the CS plane, and the CNH horizontal plane, are xy; a CNV vertical plane is xz; the DN, DNH and DND C2 axes
+   * include x; the cubic groups have their C2 (T, TH, TD) or C4 (O, OH) axes along x, y and z. Returns 3x3 matrices
+   * (row-major), the identity first, or null for a group it does not know.
+   */
+  function gamessOps(group, naxis) {
+    const G = String(group || '').toUpperCase(), nx = Math.max(1, int(naxis) || 1);
+    const rotZ = a => { const c = Math.cos(a), s = Math.sin(a); return [c, -s, 0, s, c, 0, 0, 0, 1]; };
+    const mul = (A, B) => { const o = new Array(9).fill(0); for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) for (let k = 0; k < 3; k++) o[3 * r + c] += A[3 * r + k] * B[3 * k + c]; return o; };
+    const sigH = [1, 0, 0, 0, 1, 0, 0, 0, -1], sigV = [1, 0, 0, 0, -1, 0, 0, 0, 1], c2x = [1, 0, 0, 0, -1, 0, 0, 0, -1];
+    const inv = [-1, 0, 0, 0, -1, 0, 0, 0, -1], c3 = [0, 0, 1, 1, 0, 0, 0, 1, 0];   // C3 about (1, 1, 1)
+    const cn = rotZ(2 * Math.PI / nx), s2n = mul(sigH, rotZ(Math.PI / nx));
+    const gens = { C1: [], CS: [sigH], CI: [inv], CN: [cn], S2N: [s2n], CNH: [cn, sigH], CNV: [cn, sigV], DN: [cn, c2x],
+      DNH: [cn, c2x, sigH], DND: [s2n, c2x], T: [rotZ(Math.PI), c2x, c3], TH: [rotZ(Math.PI), c2x, c3, inv],
+      TD: [mul(sigH, rotZ(Math.PI / 2)), c2x, c3], O: [rotZ(Math.PI / 2), c3], OH: [rotZ(Math.PI / 2), c3, inv] }[G];
+    if (!gens) return null;
+    const ops = [[1, 0, 0, 0, 1, 0, 0, 0, 1]];
+    const same = (A, B) => A.every((v, k) => Math.abs(v - B[k]) < 1e-9);
+    for (let k = 0; k < ops.length && ops.length <= 48; k++) {
+      for (const g of gens) { const p = mul(g, ops[k]); if (!ops.some(o => same(o, p))) ops.push(p); }
+    }
+    return ops;
+  }
+  /** Symmetry-unique atoms (GAMESS $DATA) and their images: each unique atom followed by its distinct images. An image
+   *  that lands on an atom already there (an input that lists symmetry-equivalent atoms too) is left out: dup counts them. */
+  function gamessExpand(Z, xyz, ops) {
+    const oZ = [], oX = [], from = [];
+    let dup = 0;
+    for (let a = 0; a < Z.length; a++) {
+      const p = [xyz[3 * a], xyz[3 * a + 1], xyz[3 * a + 2]];
+      for (const R of ops) {
+        const q = [R[0] * p[0] + R[1] * p[1] + R[2] * p[2], R[3] * p[0] + R[4] * p[1] + R[5] * p[2], R[6] * p[0] + R[7] * p[1] + R[8] * p[2]];
+        let seen = -1;
+        for (let b = 0; b < oZ.length && seen < 0; b++) if (Math.hypot(oX[3 * b] - q[0], oX[3 * b + 1] - q[1], oX[3 * b + 2] - q[2]) < 1e-2) seen = b;
+        if (seen >= 0) { if (from[seen] !== a) dup++; continue; }
+        oZ.push(Z[a]); oX.push(q[0], q[1], q[2]); from.push(a);
+      }
+    }
+    return { Z: oZ, xyz: oX, from, dup };
+  }
   /** Orbital energies from "EIGENVECTORS" / "MOLECULAR ORBITALS" blocks. */
   function gamessEig(L, j) {
     const e = [];
@@ -455,7 +497,8 @@
     return finish(ds, 'No coordinates found in this GAMESS output.');
   }
 
-  /** GAMESS input: $DATA with C1 symmetry (Cartesian, Angstrom unless UNITS=BOHR). */
+  /** GAMESS input: Cartesian $DATA (Angstrom unless UNITS=BOHR); with a point group and COORD=UNIQUE (the default),
+   *  the symmetry-unique atoms are expanded with the group's operations. */
   function parseGamessInput(text, name) {
     const ds = BM.emptyDataset('gamess-input', name), meta = ds.meta, L = lines(text);
     const opts = {};
@@ -467,16 +510,25 @@
     }
     if (data < 0) throw new Error('No $DATA group found in this GAMESS input.');
     const title = (L[data + 1] || '').trim();
-    const sym = tok(L[data + 2] || '')[0] || '';
-    if (!/^C1$/i.test(sym)) throw new Error('Only $DATA with C1 symmetry is read (this input uses ' + (sym || '?') + '); use C1 or open the output.');
+    const gl = tok(L[data + 2] || ''), sym = gl[0] || '';
+    const coord = opts.COORD || 'UNIQUE', expand = !/^C1$/i.test(sym) && !(/^CN$/i.test(sym) && int(gl[1]) === 1) && coord === 'UNIQUE';
+    const ops = expand ? gamessOps(sym, gl[1]) : null;
+    if (expand && !ops) throw new Error('The point group ' + sym + ' of this $DATA is not supported; use C1 or open the output.');
+    if (expand && tok(L[data + 3] || '').filter(isNum).length >= 6) throw new Error('This $DATA defines its own symmetry frame, which is not read; use C1 or open the output.');
+    if (!/^(UNIQUE|CART|PRINAXIS)$/.test(coord)) throw new Error('Only Cartesian $DATA is read (this input uses COORD=' + coord + '); open the output.');
     const f = /^BOHR/.test(opts.UNITS || '') ? BOHR : 1;
-    const Z = [], xyz = [];
+    let Z = [], xyz = [];
     let j = data + 3;
     for (; j < L.length && !/^\s*\$END\b/i.test(L[j]); j++) {
       const r = gamessRow(tok(L[j].replace(/!.*$/, '')));
       if (r) { Z.push(r[0]); xyz.push(r[1] * f, r[2] * f, r[3] * f); }
     }
     if (!Z.length) throw new Error('The $DATA group has no Cartesian atoms (Z-matrix $DATA is not read).');
+    if (ops) {
+      const ex = gamessExpand(Z, xyz, ops);
+      ({ Z, xyz } = ex);
+      if (ex.dup) ds.warnings.push('Some atoms of $DATA coincide with images of others under the point group ' + sym + ' (GAMESS expects only the symmetry-unique atoms): they are shown once.');
+    }
     const fr = mkFrame(Z, xyz);
     ds.frames.push(fr);
     ds.title = title || ds.title;
@@ -1813,4 +1865,8 @@
     qchem: parseQchem, qchemInput: parseQchemInput, psi4: parsePsi4, psi4Input: parsePsi4Input, xtb: parseXtb,
     mopac: parseMopac, mopacInput: parseMopacInput, cp2k: parseCp2k, cp2kInput: parseCp2kInput,
     turbomoleCoord: parseTmCoord, turbomoleGradient: parseTmGrad, engrad: parseEngrad };
+  // the shared helpers, for the readers in readers-qc2.js (Molpro, Dalton, Turbomole program outputs, GAMESS punch)
+  BM.qcReaders._h = { BOHR, AU2DEBYE, EV2NM, HARTREE2EV, num, int, isNum, isInt, tok, lines, floats, last, cap, elZ, addJT,
+    jobKinds, newThermo, thermoTotals, FOREIGN, mkFrame, sameGeom, Frames, setOpt, Jobs, state, isLinear, buildVib, finish,
+    readTable, allNum, reg, tmRows, gamessOps, gamessExpand };
 })(typeof window !== 'undefined' ? (window.BM = window.BM || {}) : (globalThis.BM = globalThis.BM || {}));

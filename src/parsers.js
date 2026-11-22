@@ -2796,10 +2796,14 @@
     const ds = newDataset('fchk', fileName);
     const L = splitLines(text);
     ds.title = (L[0] || '').trim() || ds.title;
+    // line 2: the job type in 10 columns, then the method and the basis set (Gaussian 16 gives the method 60 columns,
+    // Q-Chem and older versions 30): the basis is the last word after a run of spaces
     const l2 = L[1] || '';
-    let jobType = l2.slice(0, 10).trim(), method = l2.slice(10, 40).trim(), basis = l2.slice(40, 70).trim();
+    let jobType = l2.slice(0, 10).trim(), method = '', basis = '';
+    const mb = /^\s*(.*?\S)\s{2,}(\S+)$/.exec(l2.slice(10).replace(/\s+$/, ''));
+    if (mb) { method = mb[1]; basis = mb[2]; } else method = l2.slice(10).trim();
     if (!method) { const t = tok(l2); jobType = t[0] || ''; method = t[1] || ''; basis = t[2] || ''; }
-    const D = Object.create(null);
+    const D = Object.create(null), coordSets = [];
     for (let i = 2; i < L.length; i++) {
       const s = L[i];
       if (!s || s[0] === ' ') continue;
@@ -2823,7 +2827,16 @@
         if ((type === 'I' || type === 'R') && vals.length !== cnt) {
           ds.warnings.push('fchk array "' + name + '" holds ' + vals.length + ' values but declares ' + cnt + '.');
         }
+        if (type === 'C') {   // text in 12-character words, five to a line (the route, the title): kept as one string
+          const nl = Math.ceil(cnt / 5);
+          let txt = '';
+          for (let k = 0; k < nl && i + 1 + k < L.length; k++) txt += (L[i + 1 + k] || '').padEnd(60).slice(0, 60);
+          D[name] = txt.replace(/\s+/g, ' ').trim();
+          i += nl;
+          continue;
+        }
         D[name] = vals.length > cnt ? vals.slice(0, cnt) : vals;
+        if (name === 'Current cartesian coordinates' && vals.length === cnt) coordSets.push(D[name]);   // (Q-Chem repeats it per step)
         i = j - 1;
       } else D[name] = type === 'I' ? int(m[4]) : type === 'R' ? num(m[4]) : m[4];
     }
@@ -2841,17 +2854,48 @@
       f.energies = { SCF: D['SCF Energy'], TD: D['CIS Energy'] };
       f.energy = /opt|scan|irc/i.test(jobType) ? D['CIS Energy'] : D['SCF Energy'];
     }
-    ds.frames.push(f);
+    // the optimisation history (Gaussian "Opt point N" sections: every geometry of an optimisation, or of each point
+    // of a relaxed scan, with its energy). A checkpoint file keeps the history of an earlier optimisation for later
+    // jobs that read their geometry from it, so it is used only for an optimisation or scan job, and only when its
+    // last geometry is the file's current one.
+    const route = typeof D.Route === 'string' ? D.Route : '';
+    const hist = fchkHistory(D, Zs, nat, C);
+    if (hist && (/opt|scan/i.test(jobType) || /(^|[\s#])opt\b/i.test(route))) {
+      const scan = /scan/i.test(jobType) || hist.points > 1;
+      hist.frames.forEach((h, k) => {
+        const fr = k === hist.frames.length - 1 ? f : h.frame;
+        if (fr !== f && Number.isFinite(h.energy)) { fr.energy = h.energy; fr.energies = { Total: h.energy }; }
+        fr.converged = h.last;
+        fr.label = scan ? 'Scan point ' + h.point + ', step ' + h.step : 'Step ' + h.step;
+        ds.frames.push(fr);
+      });
+    } else if (coordSets.length > 1 && !/freq/i.test(jobType)) {
+      // Q-Chem writes the coordinates again at each step of an optimisation or of a molecular-dynamics run (a
+      // frequency job's sets are displacements, ending with the reference): each set is a frame, the last one the file's
+      const opt = /opt|scan/i.test(jobType);
+      coordSets.forEach((c, k) => {
+        if (c.length !== 3 * nat) return;
+        const fr = k === coordSets.length - 1 ? f : newFrame(Zs.map(z => Math.max(0, z)), c.map(v => v * BOHR));
+        if (k > 0 && k < coordSets.length - 1 && c.every((v, q) => v === coordSets[k - 1][q])) return;
+        fr.label = (opt ? 'Step ' : 'Frame ') + (k + 1);
+        ds.frames.push(fr);
+      });
+    } else ds.frames.push(f);
     const meta = ds.meta;
+    meta.route = route || null;
     meta.charge = typeof D.Charge === 'number' ? D.Charge : null;
     meta.multiplicity = typeof D.Multiplicity === 'number' ? D.Multiplicity : null;
-    meta.method = method ? method.replace(/^(RO|R|U)(?=[A-Z0-9])/, '') : null;
+    meta.method = method && !/^(RO|R|U)$/.test(method) ? method.replace(/^(RO|R|U)(?=[A-Z0-9])/, '') : null;   // (Q-Chem writes only "R")
     meta.basis = basis || null;
     const jt = jobType.toLowerCase();
     if (/opt/.test(jt)) addJobType(meta, 'opt');
     if (/freq/.test(jt)) addJobType(meta, 'freq');
     if (/scan/.test(jt)) addJobType(meta, 'scan');
     if (/irc/.test(jt)) addJobType(meta, 'irc');
+    // excited states: Gaussian's "ETran" arrays (energy, transition dipole... of each state) or Q-Chem's
+    // "Excitation Energies" (Eh) and "Oscillator Strengths"
+    const states = fchkStates(D);
+    if (states) { ds.excitedStates = states; addJobType(meta, 'td'); }
     if (typeof D['CIS Energy'] === 'number') addJobType(meta, 'td');
     finishJobTypes(meta);
     // Q-Chem and Psi4 write fchk files too (Q-Chem titles them "Jobname.Temp" and adds Dipole_Data)
@@ -2889,6 +2933,62 @@
       }
     }
     return ds;
+  }
+
+  /** The "Opt point N" sections of a Gaussian fchk file: [{frame, energy, point, step, last}] in order, or null when
+   *  there are none or their last geometry is not the file's current one (cur, Bohr). */
+  function fchkHistory(D, Zs, nat, cur) {
+    const pts = new Map();
+    for (const k of Object.keys(D)) {
+      const m = /^Opt point\s+(\d+)\s+(Geometries|Results for each geome)/.exec(k);
+      if (!m || !Array.isArray(D[k])) continue;
+      const p = int(m[1]);
+      if (!pts.has(p)) pts.set(p, {});
+      pts.get(p)[m[2] === 'Geometries' ? 'G' : 'R'] = D[k];
+    }
+    if (!pts.size) return null;
+    const per = typeof D['Optimization Num results per geometry'] === 'number' && D['Optimization Num results per geometry'] > 0 ? D['Optimization Num results per geometry'] : 2;
+    const out = [], nums = Array.from(pts.keys()).sort((a, b) => a - b);
+    let points = 0;
+    for (const p of nums) {
+      const { G, R } = pts.get(p), ng = G ? Math.floor(G.length / (3 * nat)) : 0;
+      if (ng) points++;
+      for (let g = 0; g < ng; g++) {
+        const xyz = G.slice(3 * nat * g, 3 * nat * (g + 1));
+        out.push({ frame: newFrame(Zs.map(z => Math.max(0, z)), xyz.map(v => v * BOHR)), xyzBohr: xyz,
+          energy: R && Number.isFinite(R[per * g]) ? R[per * g] : null, point: points, step: g + 1, last: g === ng - 1 });
+      }
+    }
+    if (out.length < 2) return null;
+    const lastG = out[out.length - 1].xyzBohr;
+    for (let q = 0; q < cur.length; q++) if (Math.abs(lastG[q] - cur[q]) > 1e-4) return null;
+    return { frames: out, points };
+  }
+  /** Excited states of an fchk file (Gaussian ETran arrays, Q-Chem excitation arrays), or null. */
+  function fchkStates(D) {
+    const mk = (k, de, f, label) => {
+      const ev = de * HARTREE2EV;
+      return { index: k + 1, energyEV: ev, wavelengthNM: ev > 0 ? EV2NM / ev : NaN, f, label, s2: null, transitions: [] };
+    };
+    const ets = D['ETran scalars'], etv = D['ETran state values'], ref = D['SCF Energy'];
+    if (Array.isArray(ets) && Array.isArray(etv) && ets.length >= 2 && typeof ref === 'number') {
+      // per state: total energy, transition dipole (length), (velocity), magnetic dipole, ... (ets[1] values)
+      const n = ets[0], per = ets[1], spin = D['ETran spin'];
+      if (n > 0 && per >= 4 && etv.length >= n * per) {
+        const out = [];
+        for (let k = 0; k < n; k++) {
+          const de = etv[k * per] - ref, mx = etv[k * per + 1], my = etv[k * per + 2], mz = etv[k * per + 3];
+          const sp = Array.isArray(spin) ? spin[k] : null;   // 0: singlet, 2: triplet
+          out.push(mk(k, de, 2 / 3 * de * (mx * mx + my * my + mz * mz), sp === 0 ? 'Singlet' : sp === 2 ? 'Triplet' : ''));
+        }
+        return out;
+      }
+    }
+    const xe = D['Excitation Energies'], xf = D['Oscillator Strengths'];
+    if (Array.isArray(xe) && xe.length) {
+      return xe.map((e, k) => mk(k, e, Array.isArray(xf) && Number.isFinite(xf[k]) ? xf[k] : null, ''));
+    }
+    return null;
   }
 
   // --------------------------------------------------------------- MOL/SDF

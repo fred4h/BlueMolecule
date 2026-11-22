@@ -3,6 +3,48 @@
 BlueMolecule is [vibe-coded](docs/vibe-coding.md). Each version below was written by an AI assistant from the
 author's requests and bug reports.
 
+## 2.3.0 (November 2026): more programs
+
+New readers, each checked against the public test files of the cclib project (outputs of several versions of each
+program) and compared with cclib's reading of them:
+- **Molpro** (issue #19), 2006 to 2018:
+  - the first and the optimised geometry, with the optimisation table as cycles: energies, largest gradient and
+    step with their thresholds, step length;
+  - the energies of every method (HF, DFT, MP2 to MP4, CCSD, CCSD(T)…), and the method and basis;
+  - vibrations with IR intensities, the zero-point energy, Mulliken charges, orbital energies, the dipole.
+
+  The optimisation log (`.log`) gives every step's geometry and energy. A frequency log shows its reference geometry.
+- **Dalton** (issue #19), 2013 to 2018:
+  - the geometries of an optimisation with its gradient norm and step length;
+  - HF, DFT, MP2 and coupled-cluster energies;
+  - vibrations with IR and Raman intensities, the zero-point energy;
+  - excited states of response runs with oscillator strengths (the components added up);
+  - orbital energies and the dipole.
+
+  A response output that prints no coordinates shows the molecule of its `.mol` echo.
+- **Turbomole program outputs** (issue #34), 5.9 to 7.5:
+  - dscf (and ridft): the structure, energy, functional, basis, charge and multiplicity, dipole;
+  - escf: excited states with oscillator and rotatory strengths (ECD) and orbital contributions;
+  - ricc2: MP2 and CC2 energies, CC2 and ADC(2) states;
+  - aoforce: vibrations with IR intensities and the zero-point energy;
+  - `job.last`: the cycles of an optimisation.
+- **GAMESS punch files** (`.dat`, issue #34): every step of an optimisation with its energy, vibrations of Hessian
+  jobs (imaginary ones included), orbital energies, the dipole. The symmetry-unique atoms are expanded with the point
+  group. The AIMPAC section, when present, gives GAMESS's own atom order. Checked against the GAMESS outputs of the
+  same jobs: the same atoms, geometries, energies, frequencies and normal modes.
+- **GAMESS inputs** with a point group: the symmetry-unique atoms of `$DATA` are expanded (C1 only before).
+
+**fchk files** (issue #33):
+- **Excited states**: Gaussian's ETran arrays (energies, oscillator strengths from the transition dipoles, singlet or
+  triplet) and Q-Chem's excitation arrays. A TD or CIS fchk file shows the States tab and the UV-Vis spectrum.
+- **Optimisation history**: every geometry and energy of a Gaussian optimisation, and of each point of a relaxed scan
+  (Gaussian's "Opt point" sections). Q-Chem fchk files give every step of an optimisation or MD run. A checkpoint
+  file reused by a later single point keeps the old history, so it is used only for optimisations and scans.
+- Fixed: the basis set of Gaussian 16 fchk files was not shown, because Gaussian 16 gives the method 60 columns.
+
+Also: optimisation cycles may carry their converged flag (Molpro converges on the gradient and either the energy
+change or the step), and the step length is a new convergence criterion.
+
 ## 2.2.0 (November 2026): images and scenes
 
 **Saving images** (issue #16):

@@ -1,0 +1,15 @@
+Jobname.Temp
+SP        R                             6-31G*                        
+Number of atoms                            I                3
+Charge                                     I                0
+Multiplicity                               I                1
+Atomic numbers                             I   N=           3
+           8           1           1
+Current cartesian coordinates              R   N=           9
+  0.00000000E+00  0.00000000E+00  2.26260003E-01  0.00000000E+00  1.43891736E+00
+ -9.05040012E-01  0.00000000E+00 -1.43891736E+00 -9.05040012E-01
+Number of Excited States                   I                4
+Excitation Energies                        R   N=           4
+  2.16900000E-01  2.81600000E-01  2.61000000E-01  3.54700000E-01
+Oscillator Strengths                       R   N=           4
+  0.00000000E+00  0.00000000E+00  1.28000000E-02  7.54000000E-02

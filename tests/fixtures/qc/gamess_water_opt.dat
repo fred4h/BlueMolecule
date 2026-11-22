@@ -1,0 +1,58 @@
+ $DATA  
+water C2v optimisation                                                          
+CNV      2
+
+O           8.0      0.0000000000      0.0000000000      0.1175457178
+   N31     6
+        
+H           1.0      0.0000000000      0.7590619908     -0.4701828711
+   N31     6
+        
+ $END      
+-------------------- DATA FROM NSERCH=   0 --------------------
+ COORDINATES OF SYMMETRY UNIQUE ATOMS (ANGS)
+   ATOM   CHARGE       X              Y              Z
+ ------------------------------------------------------------
+ O           8.0      0.0000000000      0.0000000000      0.1175457178
+ H           1.0      0.0000000000      0.7590619908     -0.4701828711
+--- CLOSED SHELL ORBITALS --- GENERATED AT Mon Aug  5 12:54:36 2019
+water C2v optimisation                                                          
+E(R-B3LYP)=      -76.4088068782, E(NUC)=    9.1875811300,   12 ITERS
+ $VEC   
+ 1  1 1.00000000E+00
+ $END   
+-------------------- DATA FROM NSERCH=   1 --------------------
+ COORDINATES OF SYMMETRY UNIQUE ATOMS (ANGS)
+   ATOM   CHARGE       X              Y              Z
+ ------------------------------------------------------------
+ O           8.0      0.0000000000      0.0000000000      0.1191600558
+ H           1.0      0.0000000000      0.7619041065     -0.4766402232
+--- CLOSED SHELL ORBITALS --- GENERATED AT Mon Aug  5 12:54:36 2019
+water C2v optimisation                                                          
+E(R-B3LYP)=      -76.4089481074, E(NUC)=    9.1875811300,   12 ITERS
+ $VEC   
+ 1  1 1.00000000E+00
+ $END   
+-------------------- DATA FROM NSERCH=   2 --------------------
+ COORDINATES OF SYMMETRY UNIQUE ATOMS (ANGS)
+   ATOM   CHARGE       X              Y              Z
+ ------------------------------------------------------------
+ O           8.0      0.0000000000      0.0000000000      0.1197316374
+ H           1.0      0.0000000000      0.7614422731     -0.4789265495
+--- CLOSED SHELL ORBITALS --- GENERATED AT Mon Aug  5 12:54:36 2019
+water C2v optimisation                                                          
+E(R-B3LYP)=      -76.4089533224, E(NUC)=    9.1875811300,   12 ITERS
+ $VEC   
+ 1  1 1.00000000E+00
+ $END   
+----- RESULTS FROM SUCCESSFUL RHF      GEOMETRY SEARCH -----
+----- COORDS, ORBS, GRADIENT, AND APPROX. HESSIAN -----
+ COORDINATES OF SYMMETRY UNIQUE ATOMS (ANGS)
+   ATOM   CHARGE       X              Y              Z
+ ------------------------------------------------------------
+ O           8.0      0.0000000000      0.0000000000      0.1197316374
+ H           1.0      0.0000000000      0.7614422731     -0.4789265495
+--- OPTIMIZED RHF      MO-S --- GENERATED AT Mon Aug  5 12:55:16 2019
+E=      -76.4089533224, E(NUC)=    9.1875811300
+ $VEC   
+ $END   

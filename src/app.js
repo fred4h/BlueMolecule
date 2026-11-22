@@ -17,7 +17,7 @@
     cartoon: { bg: 'white', material: 'flat', ao: 0, outline: 2, dof: 0, shadows: false, floor: false, gradient: false, fog: false }
   };
   const FX_KEYS = ['material', 'ao', 'outline', 'dof', 'shadows', 'floor', 'gradient'];
-  const VERSION = '2.2.0';
+  const VERSION = '2.3.0';
   const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const isNum = v => typeof v === 'number' && isFinite(v);
   const fx = (v, d) => (isNum(v) ? v.toFixed(d) : '—');
@@ -264,7 +264,7 @@
   }
 
   // ---------------- file opening ----------------
-  const FORMAT_SUMMARY = 'QC outputs and inputs (Gaussian, ORCA, GAMESS, NWChem, Q-Chem, Psi4, xtb, MOPAC, CP2K, Turbomole), fchk, Molden, cube; ' +
+  const FORMAT_SUMMARY = 'QC outputs and inputs (Gaussian, ORCA, GAMESS, NWChem, Q-Chem, Psi4, Molpro, Dalton, xtb, MOPAC, CP2K, Turbomole), fchk, Molden, cube; ' +
     'XYZ, MOL/SDF, PDB, mmCIF, CIF, Mol2, CML, CJSON, VASP, Quantum ESPRESSO, CASTEP, XSF, GRO, LAMMPS; prmtop/PSF with inpcrd, Amber NetCDF, DCD, TRR, XTC; .gz';
   const conciseError = msg => String(msg).replace(/Supported: [\s\S]*$/, 'Supported: ' + FORMAT_SUMMARY + '.');
   // Files of BIG bytes or more (and .gz files and streamed launcher files) are read with BM.bigfile.readLines and
@@ -1568,7 +1568,8 @@
     if (a) { const br = box.getBoundingClientRect(), ar = a.getBoundingClientRect(); if (ar.top < br.top) box.scrollTop -= br.top - ar.top + 6; else if (ar.bottom > br.bottom) box.scrollTop += ar.bottom - br.bottom + 6; }
   }
   const FORMAT_SHORT = { 'gaussian-log': 'Gaussian', 'gaussian-input': 'Gaussian input', 'orca-out': 'ORCA', 'orca-input': 'ORCA input', xyz: 'XYZ', cube: 'Cube', molden: 'Molden', fchk: 'fchk', mol: 'MOL', pdb: 'PDB', gro: 'GRO', built: 'Built',
-    'gamess-out': 'GAMESS', 'nwchem-out': 'NWChem', 'qchem-out': 'Q-Chem', 'psi4-out': 'Psi4', 'xtb-out': 'xtb', 'mopac-out': 'MOPAC', 'cp2k-out': 'CP2K', 'turbomole-coord': 'Turbomole', 'turbomole-gradient': 'Turbomole',
+    'gamess-out': 'GAMESS', 'nwchem-out': 'NWChem', 'qchem-out': 'Q-Chem', 'psi4-out': 'Psi4', 'xtb-out': 'xtb', 'mopac-out': 'MOPAC', 'cp2k-out': 'CP2K', 'turbomole-coord': 'Turbomole', 'turbomole-gradient': 'Turbomole', 'turbomole-out': 'Turbomole',
+    'molpro-out': 'Molpro', 'dalton-out': 'Dalton', 'gamess-punch': 'GAMESS punch',
     cif: 'CIF', mmcif: 'mmCIF', mol2: 'Mol2', cml: 'CML', cjson: 'CJSON', poscar: 'VASP', xdatcar: 'XDATCAR', outcar: 'OUTCAR', 'qe-in': 'QE input', 'qe-out': 'QE', 'castep-cell': 'CASTEP', xsf: 'XSF',
     prmtop: 'prmtop', inpcrd: 'inpcrd', psf: 'PSF', dcd: 'DCD', 'lammps-data': 'LAMMPS', 'lammps-dump': 'LAMMPS', trr: 'TRR', xtc: 'XTC' };
   function formatName(data) {
@@ -1831,7 +1832,7 @@
       ${vis.length > 5000 ? `<p class="note">Showing the first 5000 of ${vis.length} geometries; use the slider to reach the rest.</p>` : ''}
       ${opDetails(d)}</div>`;
   }
-  const CRIT_NAMES = { maxForce: 'Max force', rmsForce: 'RMS force', maxDisp: 'Max displacement', rmsDisp: 'RMS displacement', energyChange: 'Energy change', gradNorm: 'Gradient norm' };
+  const CRIT_NAMES = { maxForce: 'Max force', rmsForce: 'RMS force', maxDisp: 'Max displacement', rmsDisp: 'RMS displacement', stepNorm: 'Step length', energyChange: 'Energy change', gradNorm: 'Gradient norm' };
   function opDetails(d) {
     const f = curFrame(d);
     if (!f.opt) return '';
@@ -3362,7 +3363,7 @@
     $('#viewport').style.background = 'rgb(' + (BG[state.view.bg] || BG.navy).map(c => Math.round(c * 255)).join(',') + ')';
     renderPlot();
     ui.setTool('navigate', true);
-    $('#formats').innerHTML = '<b>QC</b> Gaussian, ORCA, GAMESS, NWChem, Q-Chem, Psi4, xtb, MOPAC, CP2K, Turbomole, fchk, Molden, cube<br>' +
+    $('#formats').innerHTML = '<b>QC</b> Gaussian, ORCA, GAMESS, NWChem, Q-Chem, Psi4, Molpro, Dalton, xtb, MOPAC, CP2K, Turbomole, fchk, Molden, cube<br>' +
       '<b>Structures</b> XYZ, MOL/SDF, PDB, mmCIF, CIF, Mol2, CML, CJSON, VASP, QE, CASTEP, XSF, GRO, LAMMPS<br>' +
       '<b>MD</b> prmtop/PSF + inpcrd, DCD, TRR, XTC, Amber NetCDF · .gz · others via Open Babel';
     const mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');

@@ -1,0 +1,160 @@
+ Primary working directories    : /tmp/molpro.fixture
+ Secondary working directories  : /tmp/molpro.fixture
+ Wavefunction directory         : /home/user/wfu/
+ Main file repository           : /tmp/molpro.fixture/
+
+ id        : fixture
+
+ Nodes     nprocs
+ node1        1
+
+ default implementation of scratch files=df  
+
+
+ Variables initialized (930), CPU time= 0.00 sec
+ ***,water optimisation and frequencies
+ basis=cc-pvdz
+ geometry={angstrom;
+  O
+  H1 O 0.96
+  H2 O 0.96 H1 104.5
+ }
+ ks,b3lyp
+ optg
+ {freq;print,hessian}                                                     !harmonic frequencies
+ Commands  initialized (760), CPU time= 0.00 sec, 617 directives.
+ Default parameters read. Elapsed time= 0.03 sec
+
+                                         ***  PROGRAM SYSTEM MOLPRO  ***
+                                       Copyright, TTI GmbH Stuttgart, 2015
+                                    Version 2018.2 linked Nov 10 2018 21:55:55
+
+ THRESHOLDS:
+
+ ZERO    =  1.00D-12  ONEINT  =  1.00D-12  TWOINT  =  1.00D-11  PREFAC  =  1.00D-14  XXXXXX  =  1.00D-09  EORDER  =  1.00D-04
+ ORBITAL =  1.00D-05  CIVEC   =  1.00D-05  COEFF   =  1.00D-04  PRINTCI =  5.00D-02  PUNCHCI =  9.90D+01  OPTGRAD =  3.00D-04
+ OPTENERG=  1.00D-06  OPTSTEP =  3.00D-04  THRGRAD =  1.00D-03  COMPRESS=  1.00D-11  VARMIN  =  1.00D-07  VARMAX  =  1.00D-03
+
+ SETTING BASIS          =    CC-PVDZ
+
+ Point group  C2v 
+
+
+ ATOMIC COORDINATES
+
+ NR  ATOM    CHARGE       X              Y              Z
+
+   1  O       8.00    0.000000000    0.000000000    0.222129214
+   2  H1      1.00    0.000000000    1.434419274   -0.888516855
+   3  H2      1.00    0.000000000   -1.434419274   -0.888516855
+
+ NUCLEAR CHARGE:                   10
+ NUMBER OF CONTRACTIONS:           24   (   11A1  +    4B1  +    7B2  +    2A2  )
+
+ PROGRAM * RKS-SCF (Restricted closed shell Kohn-Sham)     Authors: W. Meyer, H.-J. Werner, P.J. Knowles, 1993
+
+ NUMBER OF ELECTRONS:       5+    5-    SPACE SYMMETRY=1    SPIN SYMMETRY: Singlet 
+
+ !RKS STATE  1.1 Energy              -76.408806878193
+ Nuclear energy                         9.18758113
+ !RKS STATE  1.1 Dipole moment          0.00000000     0.00000000    -0.82560000
+ Dipole moment /Debye                   0.00000000     0.00000000    -2.09841000
+
+
+ ELECTRON ORBITALS
+ =================
+
+  Orbital  Occupation    Energy     Coefficients
+     1.1     2.00000   -19.13798     1 1s    0.70000     2 1s   -0.10000
+                                    3 1s    0.10000
+     2.1     2.00000    -0.99766     1 1s    0.70000     2 1s   -0.10000
+                                    3 1s    0.10000
+     1.3     2.00000    -0.51936     1 1s    0.70000     2 1s   -0.10000
+                                    3 1s    0.10000
+     3.1     2.00000    -0.37203     1 1s    0.70000     2 1s   -0.10000
+                                    3 1s    0.10000
+     1.2     2.00000    -0.29215     1 1s    0.70000     2 1s   -0.10000
+                                    3 1s    0.10000
+     4.1     0.00000     0.06424     1 1s    0.70000     2 1s   -0.10000
+                                    3 1s    0.10000
+     2.3     0.00000     0.14857     1 1s    0.70000     2 1s   -0.10000
+                                    3 1s    0.10000
+
+
+ HOMO      1.2    -0.292150 =     -7.9498eV
+ LUMO      4.1     0.064240 =       1.7481eV
+
+1PROGRAM * POP (Mulliken population analysis)
+
+
+ Density matrix read from record         2100.2  Type=RKS/CHARGE (state 1.1)
+
+ Population analysis by basis function type
+
+ Unique atom        s        p        d        f        g    Total    Charge
+   1  O       3.78100  4.65500  0.01300  0.00000  0.00000  8.44900  - 0.44900
+   2  H       0.77300  0.00250  0.00000  0.00000  0.00000  0.77550  + 0.22450
+   3  H       0.77300  0.00250  0.00000  0.00000  0.00000  0.77550  + 0.22450
+
+
+ Entering Rational Function Geometry Optimization
+
+ ITER.   ENERGY(OLD)    ENERGY(NEW)      DE          GRADMAX     GRADNORM    GRADRMS     STEPMAX     STEPLEN     STEPRMS   CPU-time
+   1   -76.40880688   -76.40894811    -0.00014123  0.01200000  0.01600000  0.00530000  0.01400000  0.01900000  0.00630000      1.20
+ Freezing grid
+   2   -76.40894811   -76.40895332    -0.00000522  0.00024000  0.00031000  0.00010000  0.00026000  0.00034000  0.00011000      2.40
+
+ END OF GEOMETRY OPTIMIZATION.
+
+ Current geometry (xyz format, in Angstrom)
+
+    3
+ KS-SCF000/CC-PVDZ  ENERGY=-76.40895332
+ O         0.0000000000        0.0000000000        0.1197316374
+ H         0.0000000000        0.7614422731       -0.4789265495
+ H         0.0000000000       -0.7614422731       -0.4789265495
+
+ PROGRAM * RKS-SCF (Restricted closed shell Kohn-Sham)     Authors: W. Meyer, H.-J. Werner, P.J. Knowles, 1993
+
+ NUMBER OF ELECTRONS:       5+    5-    SPACE SYMMETRY=1    SPIN SYMMETRY: Singlet 
+
+ !RKS STATE  1.1 Energy              -76.408953322400
+ !RKS STATE  1.1 Dipole moment          0.00000000     0.00000000    -0.82560000
+
+ Normal Modes
+
+                              1 A1        2 A1        3 B2
+ Wavenumbers [cm-1]        1632.14     3832.78     3939.57
+ Intensities [km/mol]       152.48       84.75      153.15
+ Intensities [relative]      99.56      55.34     100.00
+           OX1             -0.00000    -0.00000    -0.00000
+           OY1              0.00000     0.00000    -0.06721
+           OZ1             -0.06706     0.05000    -0.00000
+           HX2             -0.00000    -0.00000    -0.00000
+           HY2              0.42100     0.56469     0.53333
+           HZ2              0.53215    -0.39674    -0.41932
+           HX3              0.00000    -0.00000    -0.00000
+           HY3             -0.42100    -0.56469     0.53333
+           HZ3              0.53215    -0.39674     0.41932
+
+ Normal Modes of low/zero frequencies
+
+                                  1           2           3           4           5           6
+ Wavenumbers [cm-1]            0.00        0.00        0.00        0.00        0.00        0.00
+ Intensities [km/mol]          0.00        0.00        0.00        0.00        0.00        0.00
+           OX1              0.10000     0.10000     0.10000     0.10000     0.10000     0.10000
+           OY1              0.10000     0.10000     0.10000     0.10000     0.10000     0.10000
+           OZ1              0.10000     0.10000     0.10000     0.10000     0.10000     0.10000
+           HX2              0.10000     0.10000     0.10000     0.10000     0.10000     0.10000
+           HY2              0.10000     0.10000     0.10000     0.10000     0.10000     0.10000
+           HZ2              0.10000     0.10000     0.10000     0.10000     0.10000     0.10000
+           HX3              0.10000     0.10000     0.10000     0.10000     0.10000     0.10000
+           HY3              0.10000     0.10000     0.10000     0.10000     0.10000     0.10000
+           HZ3              0.10000     0.10000     0.10000     0.10000     0.10000     0.10000
+
+
+ Zero point energy:  0.02142502 [H]    4702.25 [1/CM]
+
+ B3LYP/cc-pVDZ energy=    -76.408953322400
+
+ Molpro calculation terminated
