@@ -1,0 +1,8 @@
+run 45059397266
+commit 17fbc590869dd17acb99bd0748cc890b96c2430d
+branch claude/2.1-vibrations
+build result success
+url https://github.com/fred4h/BlueMolecule/actions/runs/45059397266
+report-linux: exit=0 seconds=15 peak=1044MB
+report-macos: exit=0 seconds=20 peak=772MB
+report-windows: exit=0 seconds=20 peak=650MB
