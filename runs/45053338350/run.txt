@@ -1,0 +1,8 @@
+run 45053338350
+commit 53f93c7b6e353c662c445c48f6a6e9ac6fac954d
+branch claude/2.0.2-orca-qmmm
+build result success
+url https://github.com/fred4h/BlueMolecule/actions/runs/45053338350
+report-linux: exit=0 seconds=11 peak=1100MB
+report-macos: exit=0 seconds=11 peak=889MB
+report-windows: exit=0 seconds=27 peak=628MB
