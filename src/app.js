@@ -7,7 +7,17 @@
   const HARTREE = { kcal: 627.509474, kj: 2625.49964, ev: 27.211386 };
   const UNIT_LABEL = { kcal: 'kcal/mol', kj: 'kJ/mol', ev: 'eV' };
   const BG = { navy: [0.063, 0.090, 0.133], black: [0, 0, 0], white: [1, 1, 1], gray: [0.91, 0.925, 0.945] };
-  const VERSION = '2.1.0';
+  const BG2 = { navy: [0.16, 0.22, 0.32], black: [0.16, 0.16, 0.19], white: [0.92, 0.94, 0.97], gray: [1, 1, 1] };   // the top of a background gradient
+  // scene presets (issue #15): background, material and effects together
+  const SCENES = {
+    default: { bg: 'navy', material: 'standard', ao: 0, outline: 0, dof: 0, shadows: false, floor: false, gradient: false, fog: true },
+    publication: { bg: 'white', material: 'matte', ao: 0.7, outline: 1, dof: 0, shadows: false, floor: false, gradient: false, fog: false },
+    studio: { bg: 'gray', material: 'glossy', ao: 0.6, outline: 0, dof: 0, shadows: true, floor: true, gradient: true, fog: false },
+    dark: { bg: 'black', material: 'glossy', ao: 0.6, outline: 0, dof: 0, shadows: false, floor: false, gradient: true, fog: true },
+    cartoon: { bg: 'white', material: 'flat', ao: 0, outline: 2, dof: 0, shadows: false, floor: false, gradient: false, fog: false }
+  };
+  const FX_KEYS = ['material', 'ao', 'outline', 'dof', 'shadows', 'floor', 'gradient'];
+  const VERSION = '2.2.0';
   const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const isNum = v => typeof v === 'number' && isFinite(v);
   const fx = (v, d) => (isNum(v) ? v.toFixed(d) : '—');
@@ -17,7 +27,9 @@
 
   const state = {
     docs: [], active: null, nextId: 1,
-    view: { style: 'ballstick', labels: 'none', color: 'element', showH: true, bondLengths: false, perspective: true, fog: true, axes: true, bg: 'navy', atomScale: 0.25, bondRadius: 0.11, vdwScale: 1, tol: 0.4, dummies: true, theme: 'dark', bondOrders: true, hbonds: false, dipole: false, cell: true },
+    view: { style: 'ballstick', labels: 'none', color: 'element', showH: true, bondLengths: false, perspective: true, fog: true, axes: true, bg: 'navy', atomScale: 0.25, bondRadius: 0.11, vdwScale: 1, tol: 0.4, dummies: true, theme: 'dark', bondOrders: true, hbonds: false, dipole: false, cell: true,
+      // scene (issue #15): a preset, or 'custom' once an effect is changed by hand
+      scene: 'default', material: 'standard', ao: 0, outline: 0, dof: 0, shadows: false, floor: false, gradient: false, fxLarge: false },
     anim: { kind: null, raf: 0, last: 0, phase: 0, acc: 0 },
     // amplitude: largest atom shift of the animation and the two ends (Å); arrowLen: length of the longest arrow (Å);
     // ends: show both ends of the selected vibration as translucent structures
@@ -787,11 +799,13 @@
   // ---------------- scene ----------------
   function renderOptions() {
     const v = state.view;
-    return { style: v.style, showH: v.showH, perspective: v.perspective, fog: v.fog, axes: v.axes, bg: BG[v.bg] || BG.navy, atomScale: v.atomScale, bondRadius: v.bondRadius, spacefillScale: v.vdwScale, showDummies: v.dummies };
+    return { style: v.style, showH: v.showH, perspective: v.perspective, fog: v.fog, axes: v.axes, bg: BG[v.bg] || BG.navy, atomScale: v.atomScale, bondRadius: v.bondRadius, spacefillScale: v.vdwScale, showDummies: v.dummies,
+      material: v.material, ao: +v.ao || 0, outline: +v.outline || 0, dof: +v.dof || 0, shadows: !!v.shadows, floor: !!v.floor, gradient: !!v.gradient, bg2: BG2[v.bg] || null, effectsLarge: !!v.fxLarge };
   }
   function refreshScene(keepView) {
     const d = state.active;
     R.setOptions(renderOptions());
+    syncFxNote();
     $('#viewport').style.background = 'rgb(' + (BG[state.view.bg] || BG.navy).map(c => Math.round(c * 255)).join(',') + ')';
     $('#pending').classList.toggle('hidden', !(d && d.pending));
     if (d && d.pending) $('#pending-msg').textContent = `${d.name}: ${d.data.frames[0].Z.length} atoms. Open a coordinate or trajectory file with the same atom count (inpcrd, NetCDF, DCD, TRR, XTC, PDB, GRO…).`;
@@ -2981,6 +2995,24 @@
     setR('#set-atom', v.atomScale); setR('#set-bond', v.bondRadius); setR('#set-vdw', v.vdwScale); setR('#set-tol', v.tol);
     $('#set-dummy').checked = v.dummies;
     $('#set-orders').checked = v.bondOrders; $('#set-hbonds').checked = v.hbonds; $('#set-dipole').checked = v.dipole; $('#set-cell').checked = v.cell;
+    $('#set-scene').value = SCENES[v.scene] ? v.scene : 'custom'; $('#set-material').value = v.material;
+    const setF = (id, val, d) => { const i = $(id); i.value = val; i.nextElementSibling.textContent = +val ? Number(val).toFixed(d) : 'off'; };
+    setF('#set-ao', v.ao, 2); setF('#set-outline', v.outline, 1); setF('#set-dof', v.dof, 2);
+    $('#set-shadows').checked = v.shadows; $('#set-floor').checked = v.floor; $('#set-gradient').checked = v.gradient; $('#set-fxlarge').checked = v.fxLarge;
+    syncFxNote();
+  }
+  /** Says when shadows, ambient occlusion or depth of field wait because the structure is very large. */
+  function syncFxNote() {
+    const v = state.view, d = state.active, n = d && !d.pending ? curFrame(d).Z.length : 0, note = $('#set-fxnote');
+    const wait = n > BM.Renderer.LARGE_SYSTEM && !v.fxLarge && (v.shadows || v.ao > 0 || v.dof > 0);
+    note.textContent = wait ? `Shadows, ambient occlusion and depth of field are paused for this structure (${n.toLocaleString('en-US')} atoms, over ${BM.Renderer.LARGE_SYSTEM.toLocaleString('en-US')}).` : '';
+    note.classList.toggle('hidden', !wait);
+  }
+  /** A scene preset: its background, material and effects. */
+  function applyScene(name) {
+    const s = SCENES[name];
+    if (!s) return;
+    setView(Object.assign({ scene: name }, s));
   }
   function setView(patch, rebuildBonds) {
     Object.assign(state.view, patch);
@@ -3011,11 +3043,13 @@
     $$('#style-seg button').forEach(b => b.onclick = () => setView({ style: b.dataset.style }));
     $('#sel-labels').onchange = e => { setView({ labels: e.target.value }); if (e.target.value === 'charge' && !chargesFor(state.active)) toast('This file has no atomic charges for the current geometry.'); };
     $('#sel-color').onchange = e => { setView({ color: e.target.value }); if (e.target.value === 'charge' && !chargesFor(state.active)) toast('This file has no atomic charges for the current geometry.'); };
-    $('#sel-bg').onchange = e => setView({ bg: e.target.value });
+    // the background and depth cueing are part of a scene: a change that leaves the preset's value keeps the scene
+    const sceneIf = (key, val) => SCENES[state.view.scene] && SCENES[state.view.scene][key] === val ? state.view.scene : 'custom';
+    $('#sel-bg').onchange = e => setView({ bg: e.target.value, scene: sceneIf('bg', e.target.value) });
     $('#tg-h').onclick = () => setView({ showH: !state.view.showH });
     $('#tg-bl').onclick = () => setView({ bondLengths: !state.view.bondLengths });
     $('#tg-persp').onclick = () => setView({ perspective: !state.view.perspective });
-    $('#tg-fog').onclick = () => setView({ fog: !state.view.fog });
+    $('#tg-fog').onclick = () => setView({ fog: !state.view.fog, scene: sceneIf('fog', !state.view.fog) });
     $('#tg-axes').onclick = () => setView({ axes: !state.view.axes });
     const rng = (id, key, rebuild) => { $(id).oninput = e => { e.target.nextElementSibling.textContent = Number(e.target.value).toFixed(2); setView({ [key]: parseFloat(e.target.value) }, rebuild); }; };
     rng('#set-atom', 'atomScale'); rng('#set-bond', 'bondRadius'); rng('#set-vdw', 'vdwScale'); rng('#set-tol', 'tol', true);
@@ -3024,6 +3058,12 @@
     $('#set-hbonds').onchange = e => setView({ hbonds: e.target.checked });
     $('#set-dipole').onchange = e => { setView({ dipole: e.target.checked }); const d = state.active; if (e.target.checked && d && !d.data.dipole) toast('This file has no dipole moment.'); else if (e.target.checked && d && curFrame(d).edited) toast('The dipole arrow is shown for file geometries only.'); };
     $('#set-cell').onchange = e => { setView({ cell: e.target.checked }); const d = state.active; if (e.target.checked && d && !d.data.cell) toast('This file has no unit cell.'); };
+    // scene: a preset, or each effect by hand (which makes the scene "custom")
+    $('#set-scene').onchange = e => { if (SCENES[e.target.value]) applyScene(e.target.value); else setView({ scene: 'custom' }); };
+    $('#set-material').onchange = e => setView({ material: e.target.value, scene: 'custom' });
+    for (const [id, key] of [['#set-ao', 'ao'], ['#set-outline', 'outline'], ['#set-dof', 'dof']]) $(id).oninput = e => setView({ [key]: parseFloat(e.target.value), scene: 'custom' });
+    for (const [id, key] of [['#set-shadows', 'shadows'], ['#set-floor', 'floor'], ['#set-gradient', 'gradient']]) $(id).onchange = e => setView({ [key]: e.target.checked, scene: 'custom' });
+    $('#set-fxlarge').onchange = e => setView({ fxLarge: e.target.checked });
     $('#btn-new').onclick = () => ui.newMolecule();
     $('#btn-new-2').onclick = () => ui.newMolecule();
     const emptySmiles = () => { const t = $('#empty-smiles').value.trim(); if (!t) { toast('Type a SMILES string, e.g. CC(=O)Oc1ccccc1C(=O)O', true); return; } if (ui.insertSmiles(t)) $('#empty-smiles').value = ''; };

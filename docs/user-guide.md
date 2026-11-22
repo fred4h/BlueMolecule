@@ -112,18 +112,51 @@ Press **?** in the window to see this list.
 - **Axes**: the axes indicator.
 - **Bg**: navy, black, white or grey background.
 - **View menu**: reset, look along X, Y or Z, centre on the selection.
-- **Camera icon**: save an image of the view.
+- **Camera icon**: save an image of the view (PNG, JPEG, WebP, TIFF or PDF; see [Saving images](#saving-images)).
 - **Display settings (gear icon)**:
   - sizes: atom size, bond radius, spacefill scale;
   - the bond tolerance used to find bonds;
   - dummy and ghost atoms;
   - bond orders (double, triple and aromatic bonds drawn as such);
-  - hydrogen bonds, the dipole-moment arrow and the unit cell.
+  - hydrogen bonds, the dipole-moment arrow and the unit cell;
+  - the scene: a preset look, the material and the effects (see [Scenes and effects](#scenes-and-effects)).
 - **Sun/moon icon**: light or dark interface.
 - **?**: help and shortcuts.
 
 BlueMolecule remembers these settings between sessions, along with the vibration-animation settings, the build-tool
 options, the panel sizes and your last choices in the Save as and Calculation input dialogs.
+
+### Scenes and effects
+
+![The Studio scene: a background gradient, glossy atoms, ambient occlusion, and a floor with the molecule's shadow](images/scene-studio.png)
+
+The **Scene** menu in the display settings (gear icon) gives the picture a ready-made look. Each scene sets the background, the
+material and the effects together:
+
+| Scene | Background | Material | Effects |
+|---|---|---|---|
+| Default | navy | standard | none (depth cueing on) |
+| Publication | white | matte | ambient occlusion, thin outlines |
+| Studio | grey, lighter at the top | glossy | ambient occlusion, shadows, floor |
+| Dark | black, lighter at the top | glossy | ambient occlusion (depth cueing on) |
+| Cartoon | white | flat | thick outlines |
+
+Every effect can also be set by hand (the scene then shows **Custom**):
+- **Material**: standard, glossy (strong highlights), matte (almost none) or flat (cartoon shading in bands).
+- **Ambient occlusion**: soft shading where atoms crowd each other, in crevices and between neighbouring atoms. It is
+  strongest in spacefill.
+- **Outlines**: dark lines around atoms and bonds, from 0.5 to 4 pixels wide.
+- **Depth of field**: blur in front of and behind the centre of the view (the point the view turns around).
+- **Shadows**: shadows cast by the structure on itself and on the floor. The light then comes from above.
+- **Floor**: a soft round floor under the structure, which follows the view.
+- **Background gradient**: the background colour at the bottom, lighter (or, on white, cooler) at the top.
+
+Saved images have the same scene. The effects are worked out on the screen's pixels (ambient occlusion, outlines
+and depth of field are screen-space approximations): they make a picture look better, but they are not a physical
+rendering.
+
+Above 60,000 atoms, shadows, ambient occlusion and depth of field are paused, because they slow the view down. The
+menu then says so. Tick **Effects on very large systems too** to keep them on.
 
 ## The tabs
 
@@ -229,4 +262,6 @@ never modified.
   does not add colours). **None** writes no profile. CMYK for print is not offered: convert in your layout program.
 - BlueMolecule writes every format itself, so an image is the same file in every browser and in the desktop
   program.
+- The scene and its effects are part of the image (see [Scenes and effects](#scenes-and-effects)); the tiles are
+  drawn with a margin, so ambient occlusion and blur match across their edges.
 

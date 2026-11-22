@@ -1618,6 +1618,19 @@ ijaqVH/i//4/AwjfmJccfToAAAAASUVORK5CYII=">
           <label class="check"><input type="checkbox" id="set-hbonds"> Hydrogen bonds</label>
           <label class="check"><input type="checkbox" id="set-dipole"> Dipole moment arrow</label>
           <label class="check"><input type="checkbox" id="set-cell" checked> Unit cell</label>
+          <hr>
+          <label title="A look for the picture: background, material and effects">Scene <select id="set-scene">
+            <option value="default">Default</option><option value="publication">Publication (white)</option><option value="studio">Studio</option>
+            <option value="dark">Dark</option><option value="cartoon">Cartoon</option><option value="custom">Custom</option></select><span></span></label>
+          <label>Material <select id="set-material"><option value="standard">Standard</option><option value="glossy">Glossy</option><option value="matte">Matte</option><option value="flat">Flat (cartoon)</option></select><span></span></label>
+          <label title="Soft shading where atoms crowd each other">Ambient occlusion <input type="range" id="set-ao" min="0" max="1" step="0.05" value="0"><output></output></label>
+          <label title="Dark lines around atoms and bonds (pixels)">Outlines <input type="range" id="set-outline" min="0" max="4" step="0.5" value="0"><output></output></label>
+          <label title="Blur in front of and behind the centre of the view">Depth of field <input type="range" id="set-dof" min="0" max="1" step="0.05" value="0"><output></output></label>
+          <label class="check"><input type="checkbox" id="set-shadows"> Shadows</label>
+          <label class="check"><input type="checkbox" id="set-floor"> Floor</label>
+          <label class="check"><input type="checkbox" id="set-gradient"> Background gradient</label>
+          <label class="check" title="Shadows, ambient occlusion and depth of field wait to be asked for above 60,000 atoms"><input type="checkbox" id="set-fxlarge"> Effects on very large systems too</label>
+          <p class="note hidden" id="set-fxnote"></p>
         </div>
       </div>
     </div>

@@ -628,6 +628,102 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   check(ip.format === 'pdf' && ip.unit === 'px' && ip.width === 400, 'the dialog remembers the last choices: ' + JSON.stringify(ip));
   await page.evaluate(() => BM.app.setView({ labels: 'none' }));
 
+  // ================================================================ 2.2: scenes and effects (#15)
+  console.log('#15 scenes and effects');
+  await page.evaluate(() => { BM.app.newMolecule(); BM.app.ui().insertSmiles('CC(C)CCCC(C)C1CCC2C1(CCC3C2CC=C4C3(CCC(C4)O)C)C'); });
+  await page.waitForFunction(() => BM.app.curFrame(BM.app.state.active).Z.length > 70, null, { timeout: 30000 });
+  await page.evaluate(() => BM.app.R().fit());   // the whole molecule, large
+  await sleep(400);
+  // numbers about an image of the view: background, structure, rows, edges
+  await page.evaluate(() => {
+    window.__img = async () => {
+      const R = BM.app.R(), W = 720, H = Math.round(720 * R.canvas.clientHeight / R.canvas.clientWidth), im = await R.renderImage({ width: W, height: H }), d = im.data;
+      const lum = i => 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2], bgL = lum(0);
+      let mol = 0, molL = 0, black = 0, hf = 0, bottomMin = 255;
+      const row = y => { let s = 0; for (let x = 0; x < W; x++) s += lum((y * W + x) * 4); return s / W; };
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        const i = (y * W + x) * 4, L = lum(i);
+        if (Math.abs(L - bgL) > 20) { mol++; molL += L; }
+        if (L < 40) black++;
+        if (x > 0) hf += Math.abs(L - lum(i - 4));
+        if (y > H * 0.8 && L < bottomMin) bottomMin = L;
+      }
+      const grid = [];   // 48 x 32 mean luminances, to compare two images
+      for (let gy = 0; gy < 32; gy++) for (let gx = 0; gx < 48; gx++) {
+        let s = 0, c = 0;
+        for (let y = Math.floor(gy * H / 32); y < Math.floor((gy + 1) * H / 32); y++) for (let x = Math.floor(gx * W / 48); x < Math.floor((gx + 1) * W / 48); x++) { s += lum((y * W + x) * 4); c++; }
+        grid.push(s / Math.max(1, c));
+      }
+      return { mol, molL: mol ? molL / mol : 0, black, hf: hf / (W * H), top: row(2), bottom: row(H - 3), bottomMin, grid, gl: R.gl.getError() };
+    };
+  });
+  const scene = async name => { await page.selectOption('#set-scene', name); await sleep(150); return page.evaluate(() => window.__img()); };
+  const setFx = async patch => { await page.evaluate(p => BM.app.setView(p), patch); await sleep(100); return page.evaluate(() => window.__img()); };
+  await page.click('#dd-settings [data-dd]');
+  await sleep(150);
+  const def = await scene('default');
+  ex = await page.evaluate(() => BM.app.R().effectsPlan());
+  check(!ex.post && !ex.shadows && !ex.floor && !ex.gradient && def.gl === 0, 'the Default scene draws no effects: ' + JSON.stringify(ex));
+  const pub = await scene('publication');
+  ex = await page.evaluate(() => (({ scene, bg, material, ao, outline, shadows, floor, gradient, fog }) => ({ scene, bg, material, ao, outline, shadows, floor, gradient, fog }))(BM.app.state.view));
+  check(JSON.stringify(ex) === JSON.stringify({ scene: 'publication', bg: 'white', material: 'matte', ao: 0.7, outline: 1, shadows: false, floor: false, gradient: false, fog: false }), 'the Publication scene sets white, matte, occlusion and thin outlines: ' + JSON.stringify(ex));
+  const pubNoLines = await setFx({ ao: 0.7, outline: 0 }), sfAO = await setFx({ style: 'spacefill' }), sfNoAO = await setFx({ ao: 0 });
+  await setFx({ style: 'ballstick', ao: 0.7, outline: 1 });
+  check(sfAO.molL < sfNoAO.molL - 3, 'ambient occlusion darkens where atoms crowd (spacefill): ' + sfAO.molL.toFixed(1) + ' against ' + sfNoAO.molL.toFixed(1));
+  check(pub.black > pubNoLines.black * 1.5 + 50, 'outlines add dark lines: ' + pub.black + ' dark pixels against ' + pubNoLines.black);
+  await scene('publication');
+  await page.$eval('#set-ao', e => { e.value = '0.3'; e.dispatchEvent(new Event('input', { bubbles: true })); });
+  await sleep(80);
+  check((await page.evaluate(() => BM.app.state.view.scene + ' ' + BM.app.state.view.ao)) === 'custom 0.3' && (await valueOf('#set-scene')) === 'custom', 'changing an effect in the menu makes the scene Custom');
+  // the background and depth cueing belong to the scene: the preset's own value keeps it, another makes it Custom
+  await scene('publication');
+  ex = await page.evaluate(() => {
+    const out = [], bg = document.querySelector('#sel-bg');
+    bg.value = 'white'; bg.onchange({ target: bg }); out.push(BM.app.state.view.scene);
+    document.querySelector('#tg-fog').onclick(); out.push(BM.app.state.view.scene + ' fog=' + BM.app.state.view.fog);
+    return out.join(', ');
+  });
+  check(ex === 'publication, custom fog=true', 'the preset background keeps the scene; switching depth cueing on makes it Custom: ' + ex);
+  const studio = await scene('studio');
+  check(studio.top > studio.bottom + 5, 'Studio: a background gradient, lighter at the top: ' + studio.top.toFixed(1) + ' / ' + studio.bottom.toFixed(1));
+  const noShadow = await setFx({ shadows: false });
+  const darker = studio.grid.filter((v, k) => v < noShadow.grid[k] - 3).length, lighter = studio.grid.filter((v, k) => v > noShadow.grid[k] + 3).length;
+  check(darker > 20 && darker > 4 * lighter, 'Studio: shadows darken parts of the picture (' + darker + ' of 1536 cells darker, ' + lighter + ' lighter)');
+  const cartoon = await scene('cartoon');
+  check(cartoon.black > pubNoLines.black + 200 && cartoon.gl === 0, 'Cartoon: thick outlines: ' + cartoon.black + ' dark pixels');
+  const dark = await scene('dark');
+  check(dark.top > dark.bottom + 5 && dark.bottom < 20, 'Dark: black at the bottom, lighter at the top: ' + dark.top.toFixed(1) + ' / ' + dark.bottom.toFixed(1));
+  const sharp = await setFx({ dof: 0 }), blurred = await setFx({ dof: 1 });
+  check(blurred.hf < sharp.hf * 0.95, 'depth of field blurs: edge strength ' + blurred.hf.toFixed(2) + ' against ' + sharp.hf.toFixed(2));
+  // an image in tiles with the effects matches one drawn in one piece
+  await scene('studio');
+  ex = await page.evaluate(async () => {
+    const R = BM.app.R(), W = 800, H = Math.round(800 * R.canvas.clientHeight / R.canvas.clientWidth);
+    const one = await R.renderImage({ width: W, height: H }), many = await R.renderImage({ width: W, height: H, tile: 256 });
+    let diff = 0; for (let i = 0; i < one.data.length; i++) if (Math.abs(one.data[i] - many.data[i]) > 4) diff++;
+    return { tiles: many.tiles, frac: diff / one.data.length, margin: R.effectsMargin(W / R.canvas.clientWidth, R.canvas.clientHeight) };
+  });
+  check(ex.tiles > 4 && ex.margin > 0 && ex.frac < 0.002, 'a Studio image in ' + ex.tiles + ' tiles (drawn with a margin of ' + ex.margin + ' pixels) matches one drawn in one piece: ' + ex.frac.toFixed(5));
+  // very large systems: the heavy effects wait unless asked for
+  await page.evaluate(() => {
+    const L = ['61500', 'grid'];
+    for (let i = 0; i < 61500; i++) L.push('C ' + (i % 41) * 1.6 + ' ' + (Math.floor(i / 41) % 41) * 1.6 + ' ' + Math.floor(i / 1681) * 1.6);
+    BM.app.openText('grid.xyz', L.join('\n') + '\n');
+  });
+  await page.waitForFunction(() => BM.app.state.active && BM.app.state.active.name === 'grid.xyz', null, { timeout: 60000 });
+  await sleep(300);
+  if (!(await page.$('#dd-settings.open'))) { await page.click('#dd-settings [data-dd]'); await sleep(150); }
+  ex = await page.evaluate(() => { BM.app.R().render(); const p = BM.app.R().effectsPlan(), n = document.querySelector('#set-fxnote'); return { p, note: n.textContent, hidden: n.classList.contains('hidden') }; });
+  check(ex.p.suspended && !ex.p.shadows && ex.p.ao === 0 && ex.p.floor && !ex.hidden && /paused for this structure \(61,500 atoms/.test(ex.note), 'over 60,000 atoms: shadows and occlusion wait, the floor stays, and the menu says so: ' + JSON.stringify(ex));
+  await page.evaluate(() => document.querySelector('#set-fxlarge').click());
+  await sleep(100);
+  ex = await page.evaluate(() => { const p = BM.app.R().effectsPlan(); return { p, hidden: document.querySelector('#set-fxnote').classList.contains('hidden') }; });
+  check(ex.p.shadows && ex.p.ao > 0 && !ex.p.suspended && ex.hidden, '"Effects on very large systems too" brings them back: ' + JSON.stringify(ex.p));
+  await page.evaluate(() => { document.querySelector('#set-fxlarge').click(); BM.app.setView({ scene: 'default', bg: 'navy', material: 'standard', ao: 0, outline: 0, dof: 0, shadows: false, floor: false, gradient: false, fog: true }); });
+  await sleep(200);
+  check((await page.evaluate(() => BM.app.R().gl.getError())) === 0, 'no WebGL errors');
+  await page.keyboard.press('Escape');
+
   check(errors.length === 0, 'no page errors: ' + errors.slice(0, 5).join(' | '));
   await browser.close();
   console.log(`UI tests (1.4.2 fixes): ${passes} passed, ${failures} failed`);

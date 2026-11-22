@@ -3,6 +3,28 @@
 BlueMolecule is [vibe-coded](docs/vibe-coding.md). Each version below was written by an AI assistant from the
 author's requests and bug reports.
 
+## 2.2.0 (November 2026): images and scenes
+
+**Saving images** (issue #16):
+- **Formats**: PNG, JPEG, WebP, TIFF and PDF. BlueMolecule writes every format itself, so an image is the same
+  file in every browser and in the desktop program; WebKit, the engine of the macOS and Linux desktop programs,
+  cannot write WebP otherwise.
+- **Size**: a width in pixels, centimetres or inches at a chosen resolution (DPI), written into the file. PDF makes
+  one page of that size.
+- **Options**: transparent background (PNG, WebP, TIFF, PDF), JPEG quality, compression.
+- **Colour profile**: sRGB (recommended) or Display P3, embedded in the file.
+- **Large images**: drawn in tiles of 2,048 pixels and put together, up to 250 million pixels (posters larger than
+  the graphics card allows in one piece).
+
+**Scenes and effects** (issue #15), in the display settings:
+- **Presets**: Default, Publication (white, matte, ambient occlusion, thin outlines), Studio (gradient, glossy,
+  shadows on a floor), Dark and Cartoon (flat shading, thick outlines).
+- **Each effect on its own**: material (standard, glossy, matte, flat), ambient occlusion, outlines, depth of field,
+  shadows, floor and background gradient.
+- **Large structures**: above 60,000 atoms, shadows, ambient occlusion and depth of field wait until they are asked
+  for.
+- Saved images keep the effects; tiles are drawn with a margin, so they match across their edges.
+
 ## 2.1.0 (November 2026): transition states and frequencies by finite differences
 
 **Transition states** (issue #14): the Vibrations tab now helps to check a transition state.
