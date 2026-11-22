@@ -200,10 +200,33 @@ The **Export** menu offers:
 - **Calculation input…**: an input file for Gaussian, ORCA, Psi4, Q-Chem, NWChem, GAMESS, MOPAC, xtb, Molpro or
   Turbomole, with task, method, basis, charge, multiplicity, implicit solvent, cores and memory. See
   [Building and editing](building-and-editing.md#calculation-inputs).
-- **Image…**: a PNG of the current view, labels included. Choose 1× (screen) to 4× (print) resolution and,
-  optionally, a transparent background. For publications, choose a white background in the toolbar first.
+- **Image…** (or the camera icon): the current view with its labels and legend, in the proportions of the view.
+  For publications, choose a white background in the toolbar first. See [Saving images](#saving-images).
 - **Vibration animation**: the selected mode as a multi-frame XYZ file, which other viewers can play.
 
 Saving opens the system's Save dialog: in the Linux, Windows and macOS versions, and in Chrome or Edge. Firefox and
 Safari save to the downloads folder. Geometries changed in the Build tab are saved as edited. The original file is
 never modified.
+
+### Saving images
+
+| Format | Notes |
+|---|---|
+| PNG | Lossless; transparency; compression from none to best |
+| JPEG | Quality 1 to 100; no transparency (the background of the view is kept); at most 65,535 pixels wide or high |
+| WebP | Lossless; transparency; at most 16,384 pixels wide or high |
+| TIFF | Lossless (Deflate or uncompressed); transparency |
+| PDF | One page of the print size, with the image (lossless, transparency kept); for documents and posters |
+
+- **Size**: a width in pixels, centimetres or inches; the height follows the proportions of the view. For a print
+  size, **Resolution** gives the number of pixels: 8.5 cm at 300 DPI is 1,004 pixels. The resolution is also written
+  into the file, so that other programs show it at that size. The dialog shows the size in pixels, centimetres and
+  inches as you type.
+- **Large images** (posters) are drawn in tiles of 2,048 pixels and put together, so they can be larger than your
+  graphics card allows in one piece. The limit is 250 million pixels, for example 20,000 × 12,500.
+- **Colour profile**: **sRGB** (recommended) tags the file as sRGB, the colours BlueMolecule draws in.
+  **Display P3** stores the same colours as Display P3 values, with the P3 profile, for documents set up in P3 (it
+  does not add colours). **None** writes no profile. CMYK for print is not offered: convert in your layout program.
+- BlueMolecule writes every format itself, so an image is the same file in every browser and in the desktop
+  program.
+

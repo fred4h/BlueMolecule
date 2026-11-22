@@ -555,6 +555,79 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await page.keyboard.press('Escape');
   await sleep(80);
 
+  // ================================================================ 2.2: image export (#16)
+  console.log('#16 image export');
+  await open('g16_sn2_ts_optfreq.log');
+  await page.evaluate(() => { if (BM.app.state.active.vibIndex >= 0) document.querySelector('[data-pb="stop"]').click(); BM.app.setView({ labels: 'symbol' }); });
+  await sleep(200);
+  // tiles: the same image drawn in one piece and in tiles of 160 pixels
+  let ex = await page.evaluate(async () => {
+    const R = BM.app.R(), W = 900, H = Math.round(900 * R.canvas.clientHeight / R.canvas.clientWidth);
+    const one = await R.renderImage({ width: W, height: H }), many = await R.renderImage({ width: W, height: H, tile: 160 });
+    let diff = 0, maxd = 0;
+    for (let i = 0; i < one.data.length; i++) { const d = Math.abs(one.data[i] - many.data[i]); if (d > 2) diff++; if (d > maxd) maxd = d; }
+    let fg = 0; for (let i = 0; i < one.data.length; i += 4) if (Math.abs(one.data[i] - one.data[0]) > 30) fg++;
+    return { W, H, tiles: [one.tiles, many.tiles], diff, maxd, n: one.data.length, fg };
+  });
+  check(ex.tiles[0] === 1 && ex.tiles[1] >= 18 && ex.diff <= ex.n * 0.002 && ex.fg > 1000, 'an image drawn in ' + ex.tiles[1] + ' tiles matches the one drawn in one piece (labels included): ' + JSON.stringify(ex));
+  // the browser's own decoders read BlueMolecule's PNG, WebP and JPEG files
+  ex = await page.evaluate(async () => {
+    const R = BM.app.R(), img = await R.renderImage({ width: 640, height: Math.round(640 * R.canvas.clientHeight / R.canvas.clientWidth) });
+    const out = {};
+    for (const [f, o] of [['png', {}], ['webp', {}], ['jpeg', { quality: 95 }], ['png', { profile: 'p3' }]]) {
+      const bytes = BM.imagex.encode(f, img, o), bmp = await createImageBitmap(new Blob([bytes], { type: 'image/' + f }), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
+      const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
+      const ctx = c.getContext('2d'); ctx.drawImage(bmp, 0, 0);
+      const d = ctx.getImageData(0, 0, c.width, c.height).data, ref = o.profile === 'p3' ? BM.imagex.toP3(img).data : img.data;
+      let diff = 0, se = 0;
+      for (let i = 0; i < d.length; i++) { if (d[i] !== ref[i]) diff++; se += (d[i] - ref[i]) ** 2; }
+      out[f + (o.profile ? '-p3' : '')] = { w: bmp.width, h: bmp.height, diff, psnr: se ? 10 * Math.log10(255 * 255 * d.length / se) : 99 };
+    }
+    return out;
+  });
+  check(ex.png.diff === 0 && ex.webp.diff === 0 && ex['png-p3'].diff === 0, 'Chromium decodes the PNG and lossless WebP files to exactly the same pixels: ' + JSON.stringify(ex));
+  check(ex.jpeg.psnr > 35 && ex.jpeg.w === 640, 'and the JPEG file at quality 95: ' + ex.jpeg.psnr.toFixed(1) + ' dB');
+  // the dialog: formats, print sizes, transparency
+  const magic = { png: [137, 80, 78, 71], jpeg: [255, 216, 255], webp: [82, 73, 70, 70], tiff: [73, 73, 42, 0], pdf: [37, 80, 68, 70] };
+  for (const [fmt, unit, width, transp, ext] of [['png', 'px', '1200', true, 'png'], ['jpeg', 'cm', '8.5', false, 'jpg'], ['webp', 'px', '700', true, 'webp'], ['tiff', 'in', '3', false, 'tif'], ['pdf', 'cm', '12', true, 'pdf']]) {
+    await page.click('#btn-image');
+    await page.waitForSelector('#dlg[open]');
+    await page.selectOption('#dlg [data-i="format"]', fmt);
+    await page.selectOption('#dlg [data-i="unit"]', unit);
+    await page.fill('#dlg [data-i="dpi"]', '300');
+    await page.fill('#dlg [data-i="width"]', width);
+    const st = await page.evaluate(() => ({ dis: document.querySelector('#dlg [data-i="transparent"]').disabled, q: !document.querySelector('#dlg [data-i-row="quality"]').classList.contains('hidden'), btn: document.querySelector('#dlg [data-dbtn="1"]').textContent }));
+    if (!st.dis) { if (transp) await page.check('#dlg [data-i="transparent"]'); else await page.uncheck('#dlg [data-i="transparent"]'); }
+    const note = await page.textContent('#dlg [data-i="size"]');
+    const wantPx = unit === 'px' ? +width : Math.round(unit === 'cm' ? width / 2.54 * 300 : width * 300);
+    check(note.startsWith(wantPx.toLocaleString('en-US') + ' × ') && st.btn === 'Save .' + ext && st.dis === (fmt === 'jpeg') && st.q === (fmt === 'jpeg'),
+      fmt + ': ' + width + ' ' + unit + ' at 300 DPI is ' + wantPx + ' pixels wide; Save .' + ext + '; transparency only where the format has it: ' + note + ' ' + JSON.stringify(st));
+    await page.evaluate(() => { window.__saved.length = 0; });
+    await page.click('#dlg .btn.primary');
+    await page.waitForFunction(() => window.__saved.length > 0, null, { timeout: 60000 });
+    const sv = await page.evaluate(async () => { const x = window.__saved[0]; return { name: x.name, text: x.text.length, head: Array.from(new TextEncoder().encode(x.text.slice(0, 4))) }; });
+    check(sv.name === 'g16_sn2_ts_optfreq.' + ext, fmt + ': saved as ' + sv.name);
+  }
+  // the bytes of the last files: read through the save hook as binary
+  await page.evaluate(() => { window.__savedBin = []; const old = window.__bmSaveHook; window.__bmSaveHook = async (name, blob) => { window.__savedBin.push({ name, type: blob.type, head: Array.from(new Uint8Array(await blob.slice(0, 4).arrayBuffer())) }); return old(name, blob); }; });
+  for (const [fmt, ext] of [['png', 'png'], ['jpeg', 'jpg'], ['webp', 'webp'], ['tiff', 'tif'], ['pdf', 'pdf']]) {
+    await page.click('#btn-image');
+    await page.waitForSelector('#dlg[open]');
+    await page.selectOption('#dlg [data-i="format"]', fmt);
+    await page.selectOption('#dlg [data-i="unit"]', 'px');
+    await page.fill('#dlg [data-i="width"]', '400');
+    await page.click('#dlg .btn.primary');
+    await page.waitForFunction(n => window.__savedBin.some(x => x.name.endsWith(n)), '.' + ext, { timeout: 60000 });
+  }
+  const bins = await page.evaluate(() => window.__savedBin);
+  for (const [fmt, ext, mime] of [['png', 'png', 'image/png'], ['jpeg', 'jpg', 'image/jpeg'], ['webp', 'webp', 'image/webp'], ['tiff', 'tif', 'image/tiff'], ['pdf', 'pdf', 'application/pdf']]) {
+    const b = bins.find(x => x.name.endsWith('.' + ext));
+    check(b && b.type === mime && magic[fmt].every((v, k) => b.head[k] === v), fmt + ': ' + mime + ', starts with the right bytes: ' + JSON.stringify(b));
+  }
+  const ip = await page.evaluate(() => JSON.parse(localStorage.getItem('bluemolecule.image') || '{}'));
+  check(ip.format === 'pdf' && ip.unit === 'px' && ip.width === 400, 'the dialog remembers the last choices: ' + JSON.stringify(ip));
+  await page.evaluate(() => BM.app.setView({ labels: 'none' }));
+
   check(errors.length === 0, 'no page errors: ' + errors.slice(0, 5).join(' | '));
   await browser.close();
   console.log(`UI tests (1.4.2 fixes): ${passes} passed, ${failures} failed`);

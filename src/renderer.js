@@ -1209,10 +1209,19 @@ void main(){
     }
 
     // ---------- drawing ----------
-    _drawScene(wPx, hPx, transparent) {
+    /** Draw the scene into the canvas (wPx x hPx device pixels). view (image export): {cssW, cssH} the view size in
+     *  CSS pixels, tile [x0, y0, x1, y1] the part of the image to draw in normalised device coordinates, pxScale the
+     *  image pixels per CSS pixel (screen-space line widths). Returns the matrices of the whole view. */
+    _drawScene(wPx, hPx, transparent, view) {
       const gl = this.gl, o = this.opt;
-      const cssW = this.canvas.clientWidth || wPx, cssH = this.canvas.clientHeight || hPx;
+      const cssW = view ? view.cssW : this.canvas.clientWidth || wPx, cssH = view ? view.cssH : this.canvas.clientHeight || hPx;
       const m = this._matrices(cssW, cssH);
+      let proj = m.proj;
+      if (view && view.tile) {   // a window of the projection: the tile's rectangle becomes the whole viewport
+        const [x0, y0, x1, y1] = view.tile, sx = 2 / (x1 - x0), sy = 2 / (y1 - y0), tx = -(x1 + x0) / (x1 - x0), ty = -(y1 + y0) / (y1 - y0);
+        proj = Float32Array.from(m.proj);
+        for (let c = 0; c < 4; c++) { const w = m.proj[4 * c + 3]; proj[4 * c] = sx * m.proj[4 * c] + tx * w; proj[4 * c + 1] = sy * m.proj[4 * c + 1] + ty * w; }
+      }
       gl.viewport(0, 0, wPx, hPx);
       const bg = o.bg;
       gl.clearColor(transparent ? 0 : bg[0], transparent ? 0 : bg[1], transparent ? 0 : bg[2], transparent ? 0 : 1);
@@ -1224,7 +1233,7 @@ void main(){
       const fogNear = this.dist - this.radius * 0.3, fogFar = this.dist + this.radius * 1.1;
       const common = (prog, alpha, twoSided) => {
         gl.useProgram(prog.p);
-        gl.uniformMatrix4fv(prog.u.uView, false, m.view); gl.uniformMatrix4fv(prog.u.uProj, false, m.proj);
+        gl.uniformMatrix4fv(prog.u.uView, false, m.view); gl.uniformMatrix4fv(prog.u.uProj, false, proj);
         gl.uniform3fv(prog.u.uLight, light); gl.uniform1f(prog.u.uAmbient, 0.28); gl.uniform1f(prog.u.uSpec, 0.38); gl.uniform1f(prog.u.uShine, 48);
         gl.uniform3fv(prog.u.uFogColor, bg); gl.uniform2f(prog.u.uFogRange, fogNear, fogFar); gl.uniform1f(prog.u.uFogOn, o.fog ? 1 : 0);
         gl.uniform1f(prog.u.uAlpha, alpha); gl.uniform1f(prog.u.uOrtho, o.perspective ? 0 : 1); gl.uniform1f(prog.u.uTwoSided, twoSided ? 1 : 0);
@@ -1257,9 +1266,9 @@ void main(){
       if (this.nLine) {
         const p = this.progLine;
         gl.useProgram(p.p);
-        gl.uniformMatrix4fv(p.u.uView, false, m.view); gl.uniformMatrix4fv(p.u.uProj, false, m.proj);
+        gl.uniformMatrix4fv(p.u.uView, false, m.view); gl.uniformMatrix4fv(p.u.uProj, false, proj);
         gl.uniform2f(p.u.uViewport, wPx / 2, hPx / 2);
-        gl.uniform1f(p.u.uWidth, (o.lineWidth || 1.6) * (wPx / Math.max(1, cssW)));
+        gl.uniform1f(p.u.uWidth, (o.lineWidth || 1.6) * (view && view.pxScale ? view.pxScale : wPx / Math.max(1, cssW)));
         gl.uniform1f(p.u.uNear, o.perspective ? m.near * 1.001 : -1e9);
         gl.uniform3fv(p.u.uFogColor, bg); gl.uniform2f(p.u.uFogRange, fogNear, fogFar); gl.uniform1f(p.u.uFogOn, o.fog ? 1 : 0);
         gl.disable(gl.CULL_FACE);
@@ -1342,7 +1351,7 @@ void main(){
         const p = this.progRing;
         gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); gl.disable(gl.CULL_FACE);
         gl.useProgram(p.p);
-        gl.uniformMatrix4fv(p.u.uView, false, m.view); gl.uniformMatrix4fv(p.u.uProj, false, m.proj);
+        gl.uniformMatrix4fv(p.u.uView, false, m.view); gl.uniformMatrix4fv(p.u.uProj, false, proj);
         gl.uniform1f(p.u.uInner, 0.8); gl.uniform1f(p.u.uDashes, 8); gl.uniform1f(p.u.uAlpha, 0.95);
         gl.uniform3fv(p.u.uFogColor, bg); gl.uniform2f(p.u.uFogRange, fogNear, fogFar); gl.uniform1f(p.u.uFogOn, o.fog ? 1 : 0);
         gl.bindVertexArray(this.markerVAO);
@@ -1353,9 +1362,11 @@ void main(){
       return m;
     }
 
-    _drawOverlay(ctx, m, w, h, scale, noHook) {
+    /** Labels, measurement lines and the legend on the 2D canvas; (ox, oy): the image pixel at the canvas's corner
+     *  (a tile of an exported image). */
+    _drawOverlay(ctx, m, w, h, scale, noHook, ox, oy) {
       ctx.save();
-      ctx.setTransform(scale, 0, 0, scale, 0, 0);
+      ctx.setTransform(scale, 0, 0, scale, -(ox || 0), -(oy || 0));
       ctx.clearRect(0, 0, w, h);
       const light = this._isLightBg();
       const txt = light ? '#111827' : '#f3f6fb', halo = light ? 'rgba(255,255,255,0.85)' : 'rgba(5,10,20,0.75)';
@@ -1450,6 +1461,40 @@ void main(){
       this._resize();
       const m = this._drawScene(this.canvas.width, this.canvas.height, false);
       this._drawOverlay(this.ctx2d, m, this.canvas.clientWidth, this.canvas.clientHeight, this.dpr);
+    }
+
+    /** The view as an image of width x height pixels (the view's proportions), with labels and legend:
+     *  {width, height, data: RGBA bytes (not premultiplied), tiles}. Drawn in tiles of at most opts.tile pixels (and
+     *  what the GPU allows), so images larger than the GPU's limit can be made. opts: width, height, transparent,
+     *  tile (2048), onProgress(done, total) (may return a promise: called between tiles). */
+    async renderImage(opts) {
+      const gl = this.gl, cssW = Math.max(1, this.canvas.clientWidth), cssH = Math.max(1, this.canvas.clientHeight);
+      const W = Math.max(1, Math.round(opts.width)), H = Math.max(1, Math.round(opts.height)), s = W / cssW;
+      const dims = gl.getParameter(gl.MAX_VIEWPORT_DIMS), maxT = Math.max(64, Math.min(opts.tile || 2048, gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) || 4096, dims ? dims[0] : 4096, dims ? dims[1] : 4096));
+      const nx = Math.ceil(W / maxT), ny = Math.ceil(H / maxT), tw = Math.ceil(W / nx), th = Math.ceil(H / ny);
+      const out = new Uint8ClampedArray(W * H * 4), oldW = this.canvas.width, oldH = this.canvas.height;
+      const tc = document.createElement('canvas'), ov = document.createElement('canvas');
+      tc.width = ov.width = tw; tc.height = ov.height = th;
+      const ctx = tc.getContext('2d', { willReadFrequently: true }), octx = ov.getContext('2d');
+      try {
+        for (let ty = 0; ty < ny; ty++) for (let tx = 0; tx < nx; tx++) {
+          const x0 = tx * tw, y0 = ty * th, w = Math.min(tw, W - x0), h = Math.min(th, H - y0);
+          this.canvas.width = w; this.canvas.height = h;
+          const tile = [2 * x0 / W - 1, 1 - 2 * (y0 + h) / H, 2 * (x0 + w) / W - 1, 1 - 2 * y0 / H];   // NDC: y up
+          const m = this._drawScene(w, h, !!opts.transparent, { cssW, cssH, tile, pxScale: s });
+          ctx.clearRect(0, 0, tw, th);
+          ctx.drawImage(this.canvas, 0, 0);
+          this._drawOverlay(octx, m, cssW, cssH, s, true, x0, y0);
+          ctx.drawImage(ov, 0, 0);
+          const px = ctx.getImageData(0, 0, w, h).data;
+          for (let r = 0; r < h; r++) out.set(px.subarray(r * w * 4, (r + 1) * w * 4), ((y0 + r) * W + x0) * 4);
+          if (opts.onProgress) await opts.onProgress(ty * nx + tx + 1, nx * ny);
+        }
+      } finally {
+        this.canvas.width = oldW; this.canvas.height = oldH;
+        this.render();
+      }
+      return { width: W, height: H, data: out, tiles: nx * ny };
     }
 
     /** Render at higher resolution and return a PNG Blob. */

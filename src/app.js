@@ -12,6 +12,7 @@
   const isNum = v => typeof v === 'number' && isFinite(v);
   const fx = (v, d) => (isNum(v) ? v.toFixed(d) : '—');
   const kit = BM.buildUI.kit;
+  BM.version = VERSION;
   const PERCEIVE_MAX = kit.LIMIT.perceive;
 
   const state = {
@@ -2449,8 +2450,7 @@
     for (const z of Z) if (z > 0) e += z;
     return e < mult - 1 || (((e - (mult - 1)) % 2) + 2) % 2 ? 'Check charge and multiplicity: ' + e + ' electrons cannot have multiplicity ' + mult + '.' : '';
   }
-  /** Input files for quantum-chemistry programs (BM.inputPrograms); programId preselects a program. */
-  /** The calculation-input dialog. pair = {Z, minus, plus, amount, mode, freq} writes two inputs instead, for the
+  /** The calculation-input dialog (input files for BM.inputPrograms; programId preselects a program). pair = {Z, minus, plus, amount, mode, freq} writes two inputs instead, for the
    *  geometries displaced along a vibration (forward and reverse optimisations from a transition state, issue #14):
    *  name_minus and name_plus, the Task set to Optimization and a TS route or keyword line turned into an optimisation. */
   function exportCalc(programId, pair) {
@@ -2622,17 +2622,102 @@
   }
   function exportGaussian() { exportCalc('gaussian'); }
   function exportOrca() { exportCalc('orca'); }
+  // ---------------- image export (issue #16) ----------------
+  const IMG_UNITS = { px: 1, cm: 2.54, in: 1 };
+  function loadImagePrefs() {
+    const def = { format: 'png', unit: 'px', width: 0, dpi: 300, transparent: false, quality: 92, level: 6, profile: 'srgb' };
+    try { return Object.assign(def, JSON.parse(localStorage.getItem('bluemolecule.image') || '{}')); } catch (e) { return def; }
+  }
+  function saveImagePrefs(p) { try { localStorage.setItem('bluemolecule.image', JSON.stringify(p)); } catch (e) { /* ignore */ } }
+  const MAX_IMAGE_PIXELS = 250e6;
+  /** Save image: PNG, JPEG, WebP, TIFF or PDF of the current view (labels included) at a size in pixels or a print
+   *  size, with BlueMolecule's own encoders (BM.imagex); large images are drawn in tiles. */
   function exportImage() {
     const d = state.active; if (!d) return toast('Open a file first.', true);
-    const body = `<div class="two"><label class="field"><span>Resolution</span><select data-i="scale"><option value="1">1× (screen)</option><option value="2" selected>2×</option><option value="3">3×</option><option value="4">4× (print)</option></select></label>
-      <label class="field"><span>Background</span><span><input type="checkbox" data-i="transp"> transparent</span></label></div>
-      <p class="note">The image matches the current view, including labels. Choose a white background in the toolbar for publications.</p>`;
+    const cw = Math.max(1, $('#gl').clientWidth), ch = Math.max(1, $('#gl').clientHeight), aspect = ch / cw;
+    const p = loadImagePrefs(), F = BM.imagex.FORMATS;
+    if (!F.some(f => f.id === p.format)) p.format = 'png';
+    if (!IMG_UNITS[p.unit]) p.unit = 'px';
+    const pxOf = (v, unit, dpi) => (unit === 'px' ? v : unit === 'cm' ? v / 2.54 * dpi : v * dpi);
+    const ofPx = (px, unit, dpi) => (unit === 'px' ? px : unit === 'cm' ? px / dpi * 2.54 : px / dpi);
+    const w0 = p.width > 0 ? p.width : ofPx(2 * cw, p.unit, p.dpi);   // the first time: twice the view
+    const num = (v, unit) => (unit === 'px' ? String(Math.round(v)) : String(Math.round(v * 100) / 100));
+    const body = `
+      <div class="two"><label class="field"><span>Format</span><select data-i="format">${F.map(f => `<option value="${f.id}" ${f.id === p.format ? 'selected' : ''}>${esc(f.name)}</option>`).join('')}</select></label>
+        <label class="field"><span>Colour profile</span><select data-i="profile"><option value="srgb" ${p.profile === 'srgb' ? 'selected' : ''}>sRGB (recommended)</option><option value="p3" ${p.profile === 'p3' ? 'selected' : ''}>Display P3</option><option value="" ${!p.profile ? 'selected' : ''}>None</option></select></label></div>
+      <div class="two"><label class="field"><span>Width</span><span class="inline"><input type="number" data-i="width" min="0.01" step="any" value="${num(w0, p.unit)}" style="width:96px">
+          <select data-i="unit"><option value="px" ${p.unit === 'px' ? 'selected' : ''}>pixels</option><option value="cm" ${p.unit === 'cm' ? 'selected' : ''}>cm</option><option value="in" ${p.unit === 'in' ? 'selected' : ''}>inches</option></select></span></label>
+        <label class="field"><span>Resolution</span><span class="inline"><input type="number" data-i="dpi" min="10" max="4800" step="1" value="${p.dpi}" style="width:80px"> DPI</span></label></div>
+      <div class="two"><label class="field"><span>Background</span><span class="inline"><input type="checkbox" data-i="transparent" ${p.transparent ? 'checked' : ''}> transparent</span></label>
+        <label class="field" data-i-row="quality"><span>Quality</span><span class="inline"><input type="range" data-i="quality" min="1" max="100" step="1" value="${p.quality}"><output>${p.quality}</output></span></label>
+        <label class="field" data-i-row="level"><span>Compression</span><select data-i="level"><option value="0" ${p.level === 0 ? 'selected' : ''}>none (fastest)</option><option value="1" ${p.level === 1 ? 'selected' : ''}>fast</option><option value="6" ${p.level === 6 ? 'selected' : ''}>normal</option><option value="9" ${p.level === 9 ? 'selected' : ''}>best (slowest)</option></select></label></div>
+      <p class="note" data-i="size"></p>
+      <p class="note">The image is the current view with its labels and legend, in the proportions of the view (resize the window to change them). Choose a white background in the toolbar for publications.</p>`;
+    let plan = null;
+    const V = (form, k) => $(`[data-i="${k}"]`, form);
+    const update = form => {
+      const f = F.find(x => x.id === V(form, 'format').value) || F[0], unit = V(form, 'unit').value, dpi = Math.max(10, Math.min(4800, parseFloat(V(form, 'dpi').value) || 300));
+      const W = Math.round(pxOf(parseFloat(V(form, 'width').value) || 0, unit, dpi)), H = Math.round(W * aspect);
+      const tr = V(form, 'transparent');
+      tr.disabled = !f.alpha;
+      $('[data-i-row="quality"]', form).classList.toggle('hidden', f.id !== 'jpeg');
+      $('[data-i-row="level"]', form).classList.toggle('hidden', f.id === 'jpeg' || f.id === 'webp');
+      const cmW = W / dpi * 2.54, cmH = H / dpi * 2.54, mp = W * H / 1e6;
+      let err = '';
+      if (!(W >= 16 && H >= 16)) err = 'The image must be at least 16 pixels wide and high.';
+      else if (Math.max(W, H) > f.max) err = `${f.name} images are at most ${f.max.toLocaleString('en-US')} pixels wide and high.`;
+      else if (W * H > MAX_IMAGE_PIXELS) err = `At most ${MAX_IMAGE_PIXELS / 1e6} million pixels (this is ${Math.round(mp)} million).`;
+      const tiles = Math.ceil(W / 2048) * Math.ceil(H / 2048);
+      const el2 = V(form, 'size');
+      el2.textContent = err || `${W.toLocaleString('en-US')} × ${H.toLocaleString('en-US')} pixels (${mp < 10 ? mp.toFixed(1) : Math.round(mp)} megapixels) · ${cmW.toFixed(1)} × ${cmH.toFixed(1)} cm (${(cmW / 2.54).toFixed(2)} × ${(cmH / 2.54).toFixed(2)} in) at ${Math.round(dpi)} DPI${tiles > 1 ? ` · drawn in ${tiles} tiles` : ''}`;
+      el2.classList.toggle('err', !!err);
+      const btn = $('[data-dbtn="1"]', form);
+      if (btn) btn.textContent = 'Save .' + f.ext;
+      plan = err ? null : { f, W, H, dpi, unit, transparent: f.alpha && tr.checked, quality: parseInt(V(form, 'quality').value, 10) || 92, level: parseInt(V(form, 'level').value, 10), profile: V(form, 'profile').value || null };
+    };
     dialog('Save image', body, [{ label: 'Cancel' }, {
-      label: 'Save PNG', primary: true, onClick: async form => {
-        const blob = await R.snapshot(parseFloat($('[data-i=scale]', form).value), $('[data-i=transp]', form).checked);
-        await saveFile(baseName(d) + '.png', blob, 'image/png');
+      label: 'Save', primary: true, onClick: form => {
+        update(form);
+        if (!plan) { toast(V(form, 'size').textContent, true); return true; }
+        const q = plan;
+        saveImagePrefs({ format: q.f.id, unit: q.unit, width: parseFloat(V(form, 'width').value), dpi: q.dpi, transparent: V(form, 'transparent').checked, quality: q.quality, level: q.level, profile: q.profile || '' });
+        renderAndSave(d, q);
+        return false;
       }
-    }]);
+    }], form => {
+      update(form);
+      const body2 = form.querySelector('.dlg-body') || form;
+      body2.addEventListener('input', e => {
+        const k = e.target.dataset.i;
+        if (k === 'quality' && e.target.nextElementSibling) e.target.nextElementSibling.textContent = e.target.value;
+        update(form);
+      });
+      let lastUnit = V(form, 'unit').value;
+      body2.addEventListener('change', e => {
+        const k = e.target.dataset.i;
+        if (k === 'unit') {   // keep the same number of pixels in the new unit
+          const dpi = parseFloat(V(form, 'dpi').value) || 300, px = pxOf(parseFloat(V(form, 'width').value) || 0, lastUnit, dpi), u = V(form, 'unit').value;
+          V(form, 'width').value = num(ofPx(px, u, dpi), u);
+          lastUnit = u;
+        }
+        update(form);
+      });
+    });
+  }
+  /** Draw the view at the planned size and save it in the planned format. */
+  async function renderAndSave(d, q) {
+    const tick = () => new Promise(r => setTimeout(r, 0));
+    try {
+      status(`Drawing the image (${q.W} × ${q.H} pixels)…`);
+      await tick();
+      const img = await R.renderImage({ width: q.W, height: q.H, transparent: q.transparent, onProgress: (k, n) => { if (n > 1) status(`Drawing the image: tile ${k} of ${n}…`); return tick(); } });
+      status(`Writing the ${q.f.name} file…`);
+      await tick();
+      const bytes = BM.imagex.encode(q.f.id, img, { dpi: q.dpi, profile: q.profile, quality: q.quality, level: q.level, alpha: q.transparent, title: d.name });
+      await saveFile(baseName(d) + '.' + q.f.ext, new Blob([bytes], { type: q.f.mime }), q.f.mime);
+    } catch (e) {
+      toast('Could not make the image: ' + (e && e.message ? e.message : e), true);
+    }
   }
   function exportSimple(kind) {
     const d = state.active; if (!d) return toast('Open a file first.', true);
