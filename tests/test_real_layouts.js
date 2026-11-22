@@ -16,7 +16,7 @@
 const fs = require('fs');
 const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
-for (const m of ['elements', 'bigfile', 'parsers', 'condense', 'readers-struct', 'writers', 'readers-qc', 'spectrum']) require(path.join(ROOT, 'src', m + '.js'));
+for (const m of ['elements', 'bigfile', 'parsers', 'condense', 'readers-struct', 'writers', 'readers-qc', 'spectrum', 'geom', 'chem', 'analysis']) require(path.join(ROOT, 'src', m + '.js'));
 const BM = globalThis.BM;
 const FIX = path.join(ROOT, 'tests', 'fixtures');
 const read = f => fs.readFileSync(path.join(FIX, f), 'utf8');
@@ -226,6 +226,34 @@ section('NWChem QMD', () => {
   // a step cut in its gradient table (a job still running) adds no partial geometry
   const cut = qmd.slice(0, qmd.lastIndexOf('   2 H'));
   check(BM.parseFile('qmd.out', cut).frames.length === 2, 'NWChem QMD cut in a gradient table: no partial geometry');
+});
+
+// ------------------------------------------------------------------ ORCA 6 QM/MM: the layout of real outputs
+section('ORCA 6 QM/MM', () => {
+  // Each step prints FINAL SINGLE POINT ENERGY (MM) before its geometry, then the QM region's energy and (QM/MM).
+  // All three were read as one "final" energy, so each step showed the next step's MM energy (about +2 Eh in a real
+  // output) and only the last step the QM/MM total, which made ΔE and the energy plots meaningless.
+  const t = read('review/orca6_qmmm_qmregion_opt.out');
+  const d = BM.parseFile('qmmm.out', t);
+  const E = d.frames.map(f => f.energies || {});
+  check(d.frames.length === 3 && d.frames.every((f, k) => f.energy === E[k]['QM/MM']) && E.every(e => e.Final === undefined),
+    'ORCA 6 QM/MM: every step\'s energy is its QM/MM total: ' + d.frames.map(f => f.energy).join());
+  check(E.map(e => e.MM).join() === '0.0123456789,0.0119876543,0.0117654321' && near(E[0].QM, -437.999999321, 1e-9) && near(E[0]['QM/MM'], E[0].QM + E[0].MM, 1e-9),
+    'ORCA 6 QM/MM: each step keeps its own MM energy (printed before its geometry) and its QM energy: ' + JSON.stringify(E[0]));
+  const c = BM.analysis.convergenceSeries(d), dE = c.series.find(s => s.key === 'dE');
+  check(dE && dE.values.every(v => Math.abs(v) < 2) && near(dE.values[0], (E[0]['QM/MM'] - E[2]['QM/MM']) * 627.5094740631, 1e-6), 'ORCA 6 QM/MM: ΔE vs final in kcal/mol: ' + (dE && dE.values.map(v => v.toFixed(3))));
+  // only the QM region is printed (the full system is 120 atoms): its QM atoms, then the link atom, bonded to S
+  const L = d.layers;
+  check(L && L.subsystemOnly && L.linkAtoms.length === 1 && L.linkAtoms[0].atom === 5 && L.linkAtoms[0].bondedTo === 0 && L.labels.L === 'MM (system.ORCAFF.prms)',
+    'ORCA 6 QM/MM: QM region alone, with its link atom: ' + JSON.stringify(L && { only: L.subsystemOnly, links: L.linkAtoms }));
+  // a job still running, cut after the next step's MM energy and before its geometry: that energy waits for the step
+  const cut = t.slice(0, t.indexOf('FINAL SINGLE POINT ENERGY (MM)        0.011987') + 60);
+  const dc = BM.parseFile('qmmm.out', cut);
+  check(dc.frames.length === 1 && dc.frames[0].energies.MM === 0.0123456789, 'ORCA 6 QM/MM cut before a step\'s geometry: the previous step keeps its own MM energy: ' + JSON.stringify(dc.frames[0].energies));
+  // cut after a step's QM energy, before its (QM/MM) line: the step has no total yet, so no energy
+  const cut2 = t.slice(0, t.indexOf('FINAL SINGLE POINT ENERGY (QM/MM)    -437.98859') - 2);
+  const d2 = BM.parseFile('qmmm.out', cut2);
+  check(d2.frames.length === 2 && d2.frames[1].energy === null && d2.frames[0].energy === E[0]['QM/MM'], 'ORCA 6 QM/MM cut before a step\'s total: that step has no energy yet: ' + d2.frames.map(f => f.energy).join());
 });
 
 // ------------------------------------------------------------------ what the level diagram and the Info tab are given

@@ -6,7 +6,7 @@ been checked, what has not, and what the program does not do yet.
 
 ## What has been checked
 
-- **About 33,600 automated checks in 35 test suites** (22,900 of them cut example outputs as a running job would
+- **About 34,500 automated checks in 35 test suites** (23,700 of them cut example outputs as a running job would
   leave them), all passing for this release
   ([how to run them](developer-guide.md#tests)). They cover:
   - every reader and writer, including format detection and the units and conventions of each program;
@@ -44,7 +44,8 @@ been checked, what has not, and what the program does not do yet.
 - **Real output files beyond those collections.** Most example files were generated to imitate each program's
   output. Real outputs from other versions, print levels, keywords and unusual job types may contain layouts the
   readers do not handle. In particular, these have not been checked against real files:
-  - ORCA QM/MM output, whose wording differs between versions;
+  - ORCA QM/MM outputs other than ORCA 6.1 optimisations (one real ORCA 6.1 output was checked for 2.0.2), as
+    their wording differs between versions;
   - Gaussian ONIOM microiterations;
   - CP2K QM/MM;
   - xtb ONIOM.
