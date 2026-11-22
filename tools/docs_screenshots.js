@@ -65,6 +65,20 @@ const OUT = path.join(ROOT, 'docs', 'images');
   await shot('vibrations');
   await closeAll();
 
+  // 3b. a transition state: both ends of the imaginary mode, the bonds that form and break, the TS search
+  await open('g16_sn2_ts_optfreq.log');
+  await tab('vib');
+  await ev(() => {
+    const a = document.querySelector('[data-vib="arrows"]'), c = document.querySelector('[data-vib="ends"]');
+    if (a && a.checked) a.click();
+    if (c && !c.checked) c.click();
+    const R = BM.app.R(); R.dist *= 0.72; R.requestRender();
+  });
+  await plot('opt:negEig');
+  await settle(500);
+  await shot('transition-state');
+  await closeAll();
+
   // 4. excited states and the UV-Vis spectrum
   await open('orca5_water_tddft.out');
   await tab('states');

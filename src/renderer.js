@@ -3,8 +3,8 @@
  * Per-atom representations: setRepresentation({style: Uint8Array (Renderer.STYLE codes), scale, alpha, colors, extent})
  * draws each atom (and each half of every bond) in its own style — ball-and-stick, sticks, wire, spacefill, screen-space
  * lines (cheap enough for 300k atoms), translucent ghosts (separate depth-pre-pass blend) or hidden; null restores the
- * single toolbar style. setOverlays([mesh]) adds vertex-coloured meshes (cartoons, rings, SNFG symbols),
- * setPickProxies(indices, r) makes hidden atoms under a cartoon pickable, setRepMarkers and setLegend add markers and a
+ * single toolbar style. setOverlays([mesh]) adds vertex-coloured meshes (cartoons, rings, SNFG symbols), setVibEnds
+ * the translucent ends of a vibration, setPickProxies(indices, r) makes hidden atoms under a cartoon pickable, setRepMarkers and setLegend add markers and a
  * legend box. Sphere and cylinder detail drop with the number of drawn instances. */
 (function (BM) {
   'use strict';
@@ -357,7 +357,7 @@ void main(){
       this.markers = []; this.markerColor = DEFAULT_MARKER; this.highlightedBond = -1; this.highlightColor = null;
       this.overlayHook = null; this._tool = null; this._cursor = '';
       // per-atom representations, overlay meshes, pick proxies, representation markers, legend
-      this.rep = null; this.overlays = []; this._proxy = null; this._proxySet = null; this.repMarkers = []; this.legend = null;
+      this.rep = null; this.overlays = []; this.vibEnds = []; this._proxy = null; this._proxySet = null; this.repMarkers = []; this.legend = null;
       this._dirty = false; this._raf = 0; this._lod = -1; this._cylLod = -1;
       this._initGL();
       this._initInput();
@@ -547,10 +547,13 @@ void main(){
      *  `defer` stores it for the next setScene without rebuilding now. */
     setRepresentation(rep, defer) { this.rep = rep || null; if (defer) return; this._rebuild(); this.requestRender(); }
     /** Vertex-coloured triangle meshes drawn with the molecule: [{positions, normals, colors, indices (Uint32Array), opacity?, twoSided?}]. */
-    setOverlays(list) {
-      const gl = this.gl;
-      for (const s of this.overlays) { gl.deleteVertexArray(s._vao); for (const b of s._bufs) gl.deleteBuffer(b); }
-      this.overlays = [];
+    setOverlays(list) { this.overlays = this._uploadMeshes(this.overlays, list); this.requestRender(); }
+    /** Meshes of the two ends of a vibration (same form as setOverlays; usually translucent). Kept apart from the
+     *  overlays, which are rebuilt on every frame of an animation, so they are uploaded once. */
+    setVibEnds(list) { this.vibEnds = this._uploadMeshes(this.vibEnds, list); this.requestRender(); }
+    _uploadMeshes(old, list) {
+      const gl = this.gl, out = [];
+      for (const s of old || []) { gl.deleteVertexArray(s._vao); for (const b of s._bufs) gl.deleteBuffer(b); }
       for (const m of list || []) {
         if (!m || !m.indices || !m.indices.length) continue;
         const vao = gl.createVertexArray(), bufs = [];
@@ -561,9 +564,9 @@ void main(){
         });
         const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, m.indices instanceof Uint32Array ? m.indices : Uint32Array.from(m.indices), gl.STATIC_DRAW); bufs.push(ib);
         gl.bindVertexArray(null);
-        this.overlays.push({ _vao: vao, _bufs: bufs, _count: m.indices.length, opacity: m.opacity === undefined ? 1 : +m.opacity, twoSided: !!m.twoSided, vertices: m.positions.length / 3 });
+        out.push({ _vao: vao, _bufs: bufs, _count: m.indices.length, opacity: m.opacity === undefined ? 1 : +m.opacity, twoSided: !!m.twoSided, vertices: m.positions.length / 3 });
       }
-      this.requestRender();
+      return out;
     }
     /** Hidden atoms that stay pickable (and show selection halos) within `radius` Å, e.g. CA atoms under a cartoon. */
     setPickProxies(indices, radius) {
@@ -1270,7 +1273,8 @@ void main(){
         if (ov.twoSided) gl.disable(gl.CULL_FACE); else gl.enable(gl.CULL_FACE);
         gl.bindVertexArray(ov._vao); gl.drawElements(gl.TRIANGLES, ov._count, gl.UNSIGNED_INT, 0);
       };
-      for (const ov of this.overlays) if (ov.opacity >= 0.999) meshDraw(ov, 1);
+      const allMeshes = this.vibEnds.length ? this.overlays.concat(this.vibEnds) : this.overlays;
+      for (const ov of allMeshes) if (ov.opacity >= 0.999) meshDraw(ov, 1);
       gl.enable(gl.CULL_FACE);
       // surfaces
       const surfs = this.surfaces.filter(s => s._vao && s.visible !== false);
@@ -1297,7 +1301,7 @@ void main(){
         gl.depthMask(true); gl.disable(gl.BLEND);
       }
       // translucent overlay meshes, same scheme
-      const tov = this.overlays.filter(ov => ov.opacity < 0.999);
+      const tov = allMeshes.filter(ov => ov.opacity < 0.999);
       if (tov.length) {
         gl.colorMask(false, false, false, false); for (const ov of tov) meshDraw(ov, 1); gl.colorMask(true, true, true, true);
         gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);

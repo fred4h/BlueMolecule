@@ -32,8 +32,8 @@ NU_CONST = math.sqrt(100.0 / 1.66053906660e-27) / (2 * math.pi * 2.99792458e10)
 IR_CONST = 974.8801                              # (e/amu^0.5)^2 -> km/mol
 EXPECT = {}
 
-SYM = {0: 'X', 1: 'H', 6: 'C', 7: 'N', 8: 'O', 11: 'Na', 17: 'Cl', 30: 'Zn', 78: 'Pt'}
-MASS = {1: 1.00783, 6: 12.0, 7: 14.00307, 8: 15.99491, 17: 34.96885, 78: 194.96479}
+SYM = {0: 'X', 1: 'H', 6: 'C', 7: 'N', 8: 'O', 9: 'F', 11: 'Na', 17: 'Cl', 30: 'Zn', 78: 'Pt'}
+MASS = {1: 1.00783, 6: 12.0, 7: 14.00307, 8: 15.99491, 9: 18.99840, 17: 34.96885, 78: 194.96479}
 
 
 def write(name, text):
@@ -658,6 +658,202 @@ def make_gaussian_scan():
     L += g_end()
     write('g16_water_scan.log', '\n'.join(L) + '\n')
     EXPECT['g16_scan'] = dict(energies=[r4(e, 10) for e in energies], labels=labels)
+
+
+# ------------------------------------------------- transition state (issue #14)
+# [F-CH3-F]-, the transition state of the identity SN2 reaction F- + CH3F, D3h with the C3 axis along z.
+# A valence force field with a negative off-diagonal-dominated C-F stretch block gives one imaginary mode
+# (the antisymmetric F-C-F stretch with the CH3 umbrella, A2"); the optimisation steps keep D3h, as a real
+# TS optimisation of this structure does, and each prints a Hessian with one negative eigenvalue.
+TS_Z = [6, 9, 9, 1, 1, 1]
+TS_E0 = -239.4361527745
+TS_Q = [0.21, -0.755, -0.755, 0.1, 0.1, 0.1]     # charges for the IR intensities (total -1)
+
+
+def ts_geom(r_cf, r_ch, umb=0.0):
+    """C at the origin, F on +-z, H in (or, with umb, just off) the xy plane, one H on the y axis."""
+    X = [[0.0, 0.0, 0.0], [0.0, 0.0, r_cf], [0.0, 0.0, -r_cf]]
+    for k in range(3):
+        a = math.radians(90 + 120 * k)
+        X.append([r_ch * math.cos(a), r_ch * math.sin(a), umb])
+    return np.array(X)
+
+
+def ts_internals(X):
+    """C-F1, C-F2, three C-H, three H-C-H, six F-C-H (redundant internal coordinates)."""
+    def r(i, j):
+        return np.linalg.norm(X[j] - X[i])
+
+    def ang(i, j, k):
+        a, b = X[i] - X[j], X[k] - X[j]
+        return math.acos(max(-1.0, min(1.0, np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))))
+    q = [r(0, 1), r(0, 2), r(0, 3), r(0, 4), r(0, 5), ang(3, 0, 4), ang(4, 0, 5), ang(3, 0, 5)]
+    for f in (1, 2):
+        for h in (3, 4, 5):
+            q.append(ang(f, 0, h))
+    return np.array(q)
+
+
+def ts_force_field():
+    F = np.zeros((14, 14))
+    F[0, 0] = F[1, 1] = 0.30                  # mdyn/A: sym. stretch 0.30 + 1.05, antisym. 0.30 - 1.05 < 0
+    F[0, 1] = F[1, 0] = 1.05
+    for i in (2, 3, 4):
+        F[i, i] = 5.60
+    for i in (5, 6, 7):
+        F[i, i] = 0.52                        # mdyn A / rad^2
+    for i in range(8, 14):
+        F[i, i] = 0.42
+    return F
+
+
+def ts_bmatrix(X, h=1e-6):
+    x, n = X.flatten(), len(ts_internals(X))
+    B = np.zeros((n, x.size))
+    for k in range(x.size):
+        xp, xm = x.copy(), x.copy()
+        xp[k] += h
+        xm[k] -= h
+        B[:, k] = (ts_internals(xp.reshape(-1, 3)) - ts_internals(xm.reshape(-1, 3))) / (2 * h)
+    return B
+
+
+def ts_symmetry(d, X):
+    """D3h label of a non-degenerate mode, or (sigma_h character, None) for a degenerate one."""
+    perm_c2 = [0, 2, 1, 3, 5, 4]             # C2 about y (through H1): F1<->F2, H2<->H3
+    def apply(dd, perm, mat):
+        out = np.zeros_like(dd)
+        for a, b in enumerate(perm):
+            out[b] = mat @ dd[a]
+        return out
+    sh = float(np.sum(d * apply(d, [0, 2, 1, 3, 4, 5], np.diag([1, 1, -1])))) / float(np.sum(d * d))   # sigma_h: F1<->F2
+    c2 = float(np.sum(d * apply(d, perm_c2, np.diag([-1, 1, -1])))) / float(np.sum(d * d))
+    return sh, c2
+
+
+def ts_modes(X):
+    B = ts_bmatrix(X)
+    H = B.T @ ts_force_field() @ B
+    m = np.repeat([MASS[z] for z in TS_Z], 3)
+    w, V = np.linalg.eigh(H / np.sqrt(np.outer(m, m)))
+    keep = sorted(np.argsort(np.abs(w))[6:], key=lambda i: w[i])     # drop translations and rotations
+    modes = []
+    for i in keep:
+        lam, L = w[i], V[:, i]
+        lc = L / np.sqrt(m)
+        mu = 1.0 / np.sum(lc ** 2)
+        d = lc * math.sqrt(mu)
+        big = np.argmax(np.abs(d))
+        if d[big] < 0:
+            d, lc = -d, -lc
+        dmu = np.zeros(3)
+        for a in range(6):
+            dmu += TS_Q[a] * lc[3 * a:3 * a + 3]
+        nu = NU_CONST * math.sqrt(abs(lam)) * (1 if lam > 0 else -1)
+        modes.append(dict(freq=nu, mu=mu, k=lam * mu, ir=IR_CONST * float(dmu @ dmu), disp=d.reshape(6, 3)))
+    # symmetry labels: degenerate pairs are E' / E'' by their sigma_h character
+    labels = [None] * len(modes)
+    for i, md in enumerate(modes):
+        deg = any(j != i and abs(modes[j]['freq'] - md['freq']) < 1e-3 for j in range(len(modes)))
+        sh, c2 = ts_symmetry(md['disp'], X)
+        if deg:
+            labels[i] = "E'" if sh > 0 else 'E"'
+        else:
+            labels[i] = ('A1' if c2 > 0 else 'A2') + ("'" if sh > 0 else '"')
+    return modes, labels, H
+
+
+def ts_berny(step, maxstep=100):
+    return [' GradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGrad',
+            ' Berny optimization.', ' Search for a saddle point of order  1.',
+            ' Step number %3d out of a maximum of %4d' % (step, maxstep),
+            ' All quantities printed in internal units (Hartrees-Bohrs-Radians).']
+
+
+def make_gaussian_ts():
+    Xts = ts_geom(1.8500, 1.0720)
+    F = ts_force_field()
+    q0 = ts_internals(Xts)
+    steps = [(1.9500, 1.0900), (1.8720, 1.0760), (1.8522, 1.07245), (1.85005, 1.07202)]
+    geoms = [ts_geom(a, b) for a, b in steps]
+
+    def energy(X):
+        dq = ts_internals(X) - q0
+        return TS_E0 + 0.5 * dq @ F @ dq * MDYNA_TO_EH
+
+    def gradient(X):
+        dq = ts_internals(X) - q0
+        return (ts_bmatrix(X).T @ (F @ dq)) * MDYN_TO_EH_BOHR
+    energies = [energy(X) for X in geoms]
+    route = '#p opt=(ts,calcfc,noeigentest) freq b3lyp/6-31+g(d)'
+    title = 'SN2 transition state F- + CH3F'
+    L = g_banner('16', 'C.01')
+    L += g_job_head(['%nprocshared=4', '%mem=4GB', '%chk=sn2_ts.chk'], [route], title, -1, 1, TS_Z, geoms[0])
+    L += [' GradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGrad',
+          ' Berny optimization.', ' Initialization pass.']
+    Hc = ts_modes(Xts)[2]
+    ev = np.sort(np.linalg.eigvalsh(Hc))
+    ev = ev[np.argsort(np.abs(ev))[6:]]                       # 12 internal-coordinate curvatures
+    ev = np.sort(ev) * MDYNA_TO_EH * BOHR ** 2                 # mdyn/A -> Hartree/Bohr^2
+    opts, negs = [], []
+    for k, X in enumerate(geoms):
+        L += g_orient('Input', TS_Z, X)
+        L += [' Stoichiometry    CH3F2(1-)', ' Full point group                 D3H     NOp  12']
+        L += g_orient('Standard', TS_Z, X)
+        L += [' Rotational constants (GHZ):    150.4512340      8.1023456      8.1023456']
+        if k == 0:
+            L += [' Standard basis: 6-31+G(d) (6D, 7F)',
+                  '    61 basis functions,   112 primitive gaussians,    61 cartesian basis functions',
+                  '    14 alpha electrons       14 beta electrons',
+                  '       nuclear repulsion energy        84.5129036418 Hartrees.']
+        L += g_scf('RB3LYP', energies[k], 14 if k == 0 else 9)
+        g = gradient(X)
+        dx = (geoms[k + 1] - X).flatten() / BOHR if k + 1 < len(geoms) else np.array([0.000011, -0.000008, 0.000004])
+        vals = [float(np.max(np.abs(g))), float(np.sqrt(np.mean(g ** 2))), float(np.max(np.abs(dx))), float(np.sqrt(np.mean(dx ** 2)))]
+        if k == len(geoms) - 1:
+            vals = [max(min(v, 1e-5), 1e-6) for v in vals]
+        opts.append([r4(v, 6) for v in vals])
+        L += ts_berny(k + 1)
+        L += [' Update second derivatives using D2CorX and points    %d' % (k + 1) if k else ' Second derivative matrix not updated -- analytic derivatives used.']
+        L.append(' ITU=  0' if k == 0 else ' ITU=  ' + '  '.join(['1'] * k) + '  0')
+        if k == 2:
+            L.append(' Use linear search instead of GDIIS.')
+        e_k = ev * (1 + 0.04 * (len(geoms) - 1 - k))          # the Hessian changes a little from step to step
+        for b in range(0, len(e_k), 5):
+            L.append('     Eigenvalues --- ' + ''.join('%10.5f' % v for v in e_k[b:b + 5]))
+        negs.append(int(np.sum(e_k < 0)))
+        L.append(' RFO step:  Lambda0=%s Lambda=%s.' % (fd(e_k[0], 9), fd(-1.2e-6 * (len(geoms) - k), 8)))
+        L += g_conv(vals, -(energies[k] - energies[min(k + 1, len(geoms) - 1)]) - 1e-9)
+        if k < len(geoms) - 1:
+            L.append(' GradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGradGrad')
+    final = geoms[-1]
+    q = ts_internals(final)
+    L += g_completed([('R1', 'R(1,2)', q[0]), ('R2', 'R(1,3)', q[1]), ('R3', 'R(1,4)', q[2]), ('A1', 'A(4,1,5)', math.degrees(q[5])),
+                      ('A2', 'A(2,1,4)', math.degrees(q[8]))])
+    L += g_orient('Input', TS_Z, final) + g_orient('Standard', TS_Z, final)
+    L += g_atom_table('Mulliken charges:', TS_Z, [[0.214512, -0.757301, -0.757301, 0.100030, 0.100030, 0.100030]],
+                      sum_label='Mulliken charges')
+    L += g_end(link1=True)
+    # ---- job 2: frequencies at the transition state
+    L += g_box(['#P Geom=AllCheck Guess=TCheck SCRF=Check GenChk RB3LYP/6-31+G(d) Freq'])
+    L += [' 1/10=4,29=7,30=1,38=1,40=1/1,3;', ' 2/12=2,40=1/2;', ' 99//99;', ' Structure from the checkpoint file:  "sn2_ts.chk"']
+    L += g_box([title])
+    L += [' Charge = -1 Multiplicity = 1', ' Redundant internal coordinates found in file.  (old form).']
+    L += g_orient('Input', TS_Z, final) + g_orient('Standard', TS_Z, final)
+    L += g_scf('RB3LYP', energies[-1], 1)
+    modes, syms, _ = ts_modes(final)
+    L += [' Full mass-weighted force constant matrix:',
+          ' Low frequencies --- %9.4f   -0.0011    0.0008    0.0010    9.8765   12.3456' % modes[0]['freq'],
+          ' Low frequencies --- ' + ' '.join('%9.4f' % m['freq'] for m in modes[1:4]),
+          ' ****** 1 imaginary frequencies (negative Signs) ******']
+    L += g_freq_regular(modes, syms, TS_Z)
+    th = thermo_from([m['freq'] for m in modes if m['freq'] > 0], energies[-1])
+    L += [x.replace('18.01056', '53.03218') for x in g_thermo(TS_Z, th)]
+    L += g_end()
+    write('g16_sn2_ts_optfreq.log', '\n'.join(L) + '\n')
+    EXPECT['g16_sn2_ts'] = dict(freqs=[r4(m['freq'], 4) for m in modes], sym=syms, negEig=negs,
+                                energies=[r4(x, 10) for x in energies], route=route,
+                                final=[r4(clean(v, 5e-7), 6) for v in final.flatten()])
 
 
 # ----------------------------------------------------------------- ORCA pieces
@@ -1327,6 +1523,7 @@ def main():
     make_gaussian_td()
     make_gaussian_g09_cisplatin()
     make_gaussian_scan()
+    make_gaussian_ts()
     omodes, ofinal, oenergy = make_orca5_water()
     make_orca4_ir()
     make_orca_td('5.0.4')

@@ -115,7 +115,7 @@
     palette: ['#1d4ed8', '#ea580c', '#15803d', '#a21caf', '#b45309', '#0e7490', '#be123c', '#475569'] };
 
   /** Canvas plot of spectra, profiles and bar/level charts. spec (all optional):
-   *   xRange [a,b], reverseX, integerX, xLabel, yLabel, yRange, logY, invertY, xFormat(x), empty (message)
+   *   xRange [a,b], reverseX, integerX, integerY, xLabel, yLabel, yRange, logY, invertY, xFormat(x), empty (message)
    *   series [{x, y, fill, color, width}]         curves (spectra)
    *   sticks [{x, y, id, label}], showSticks, peakLabels, peakFormat(x), selected
    *   points [{x, y, id, mark, label}]             one profile with markers (energy vs geometry)
@@ -385,7 +385,9 @@
         const a = Math.ceil(Math.log10(L.y0) - 1e-9), b = Math.floor(Math.log10(L.y1) + 1e-9), n = b - a + 1, step = Math.max(1, Math.ceil(n / Math.max(2, Math.floor(L.ph / 26))));
         for (let k = a; k <= b; k += step) yt.push([Math.pow(10, k), decade(k)]);
       } else {
-        const t = ticks(L.y0, L.y1, Math.max(2, Math.floor(L.ph / 45))), st = t.length > 1 ? Math.abs(t[1] - t[0]) : 1;
+        let t = ticks(L.y0, L.y1, Math.max(2, Math.floor(L.ph / 45)));
+        if (s.integerY) { t = t.filter(v => Math.abs(v - Math.round(v)) < 1e-9); if (t.length < 2) t = ticks(Math.ceil(Math.min(L.y0, L.y1)), Math.floor(Math.max(L.y0, L.y1)), 2).map(Math.round).filter((v, i, a) => a.indexOf(v) === i); }
+        const st = t.length > 1 ? Math.abs(t[1] - t[0]) : 1;
         for (const v of t) yt.push([v, fmt(v, st)]);
       }
       for (const [v, lab] of yt) { const y = L.Y(v); if (!isFinite(y)) continue; P.line(m.l, y, m.l + L.pw, y, th.grid, 1); P.text(lab, m.l - 8, y + 4, th.fg, 11, 'right'); }

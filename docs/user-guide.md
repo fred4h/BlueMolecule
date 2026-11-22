@@ -132,7 +132,7 @@ options, the panel sizes and your last choices in the Save as and Calculation in
 | **Info** | Always | A **Contents** overview of everything in the file (click an item to open its tab or plot), the file and program, route or keywords, the molecule (formula, atoms, weight, method, basis, charge, multiplicity, solvent), energies, thermochemistry, orbitals, dipole, charges, unit cell, layer and macromolecule counts, reader notes. See [Analysing outputs](analysing-outputs.md#the-info-tab) |
 | **Display** | Always | Display rows: which atoms are shown, how and in what colour. Presets, selections and colour schemes. See [Representations](representations.md) |
 | **Steps** | More than one geometry | Every geometry with its energy and ΔE, the convergence criteria of the current one, and a job selector |
-| **Vibrations** | Frequencies in the file | Frequencies, symmetries and intensities; animation, arrows, displacing along a mode |
+| **Vibrations** | Frequencies in the file | Frequencies, symmetries and intensities; minimum or transition state; animation, arrows, both ends of a mode, bonds that form and break, displacing along a mode, forward and reverse inputs |
 | **States** | Excited states in the file | Energies, wavelengths, oscillator strengths and the orbital transitions of each state |
 | **Surfaces** | Volumetric data (cube, XSF grid) | Isosurfaces: isovalue, opacity, colours of the positive and negative lobes |
 | **Build** | Always | Building and editing tools. See [Building and editing](building-and-editing.md) |

@@ -19,6 +19,7 @@ const ROOT = path.resolve(__dirname, '..');
 for (const m of ['elements', 'bigfile', 'parsers', 'condense', 'readers-struct', 'writers', 'readers-qc', 'spectrum', 'geom', 'chem', 'analysis']) require(path.join(ROOT, 'src', m + '.js'));
 const BM = globalThis.BM;
 const FIX = path.join(ROOT, 'tests', 'fixtures');
+const last = a => a[a.length - 1];
 const read = f => fs.readFileSync(path.join(FIX, f), 'utf8');
 
 let passes = 0, failures = 0;
@@ -254,6 +255,48 @@ section('ORCA 6 QM/MM', () => {
   const cut2 = t.slice(0, t.indexOf('FINAL SINGLE POINT ENERGY (QM/MM)    -437.98859') - 2);
   const d2 = BM.parseFile('qmmm.out', cut2);
   check(d2.frames.length === 2 && d2.frames[1].energy === null && d2.frames[0].energy === E[0]['QM/MM'], 'ORCA 6 QM/MM cut before a step\'s total: that step has no energy yet: ' + d2.frames.map(f => f.energy).join());
+});
+
+// ------------------------------------------------------------------ frequencies by finite differences (#32)
+section('finite-difference frequencies', () => {
+  // Psi4 FINDIF: one computation per displaced geometry, the reference first (Psi4 1.4+); they were all steps, and the
+  // vibrations went to the last displaced geometry
+  const ps = read('qc/psi4_water_optfreq.out');
+  const hv = ps.indexOf('  ==> Harmonic Vibrational Analysis <==');
+  const B = 0.529177210903, ref = [[8, 0, 0, 0.119018], [1, 0, 0.759242, -0.475927], [1, 0, -0.759242, -0.475927]];
+  const comp = (dz, dy, E, mu) => '    Geometry (in Bohr), charge = 0, multiplicity = 1:\n\n       Center              X                  Y                   Z       \n    ------------   -----------------  -----------------  -----------------\n' +
+    ref.map((a, k) => '         ' + ['O', 'H', 'H'][k] + '   ' + [a[1], a[2] + (k === 1 ? dy : 0), a[3] + (k === 0 ? dz : 0)].map(v => (v / B).toFixed(12).padStart(19)).join('')).join('\n') +
+    '\n\n  @DF-RKS Final Energy:   ' + E + '\n\n Dipole X            :          0.0000000            0.0000000            0.0000000\n' +
+    ' Dipole Y            :          0.0000000            0.0000000            0.0000000\n Dipole Z            :         -0.1594632            0.9832395            ' + mu + '\n\n';
+  const findif = ps.slice(0, ps.indexOf('    Geometry (in Angstrom)')) + '    Number of geometries (including reference) is 5.\n\n  //    FiniteDifference Computations  //\n\n' +
+    comp(0, 0, '-76.40987172299999', '0.8237763') + comp(0.004, 0, '-76.40986501234567', '0.8251000') + comp(-0.004, 0, '-76.40986412345678', '0.8224000') +
+    comp(0, 0.004, '-76.40986623456789', '0.8239000') + comp(0, -0.004, '-76.40986634567891', '0.8236000') +
+    '  //      FiniteDifference Results     //\n\n  5 gradients passed in, including the reference geometry.\n\n' + ps.slice(hv);
+  const df = BM.parseFile('fd.out', findif);
+  check(df.frames.length === 1 && df.frames[0].energy === -76.40987172299999 && df.vibrations && df.vibrations.frameIndex === 0,
+    'Psi4 FINDIF: the displaced geometries are no steps; the reference keeps its energy and the vibrations: ' + df.frames.length + ' frames, energy ' + df.frames.map(f => f.energy));
+  check(df.dipole && near(df.dipole.z, 0.8237763 * 2.541746473, 1e-5), 'Psi4 FINDIF: the dipole is the reference geometry\'s, not the last displacement\'s: ' + JSON.stringify(df.dipole));
+  // an optimisation, then finite differences from the optimised geometry: the steps stay, the displacements go
+  const opt = ps.slice(0, hv) + '    Number of geometries (including reference) is 5.\n\n' + comp(0, 0, '-76.40987172299999', '0.8237763') +
+    comp(0.004, 0, '-76.40986501234567', '0.8251000') + comp(-0.004, 0, '-76.40986412345678', '0.8224000') + '  3 gradients passed in, including the reference geometry.\n\n' + ps.slice(hv);
+  const n0 = BM.parseFile('w.out', ps).frames.length, dop = BM.parseFile('opt.out', opt);
+  check(dop.frames.length === n0 && dop.vibrations.frameIndex === n0 - 1, 'Psi4 optimisation + FINDIF: the optimisation steps stay (' + n0 + '), no displaced geometry is added: ' + dop.frames.length);
+  // a job still running, in its displacements: the reference only
+  check(BM.parseFile('fd.out', findif.slice(0, findif.indexOf('  //      FiniteDifference Results'))).frames.length === 1, 'Psi4 FINDIF still running: only the reference geometry');
+
+  // Q-Chem anharmonic (VPT2): displaced geometries after "Starting finite difference calculation", then the reference
+  // printed again before the anharmonic analysis
+  const qc = read('qc/qchem_water_optfreq.out');
+  const geo = (dz, E) => ' ----------------------------------------------------------------\n             Standard Nuclear Orientation (Angstroms)\n    I     Atom           X                Y                Z\n ----------------------------------------------------------------\n' +
+    ref.map((a, k) => '    ' + (k + 1) + '      ' + ['O', 'H', 'H'][k] + '   ' + [a[1], a[2], a[3] + (k === 0 ? dz : 0)].map(v => v.toFixed(10).padStart(17)).join('')).join('\n') +
+    '\n ----------------------------------------------------------------\n' + (E ? ' Total energy in the final basis set =      ' + E + '\n' : '');
+  const end = qc.lastIndexOf(' --------------------------------------------------------------\n \n        *');
+  const anh = qc.slice(0, end) + ' =====================================================\n = Starting finite difference calculation for ANHAR  =\n Finite diff step size:  9.99854e-02 a.u.\n\n' +
+    geo(0.05, '-76.4091234567') + geo(-0.05, '-76.4090123456') + geo(0.1, '-76.4070123456') + geo(-0.1, '-76.4068123456') +
+    '      ANHARMONIC CUBIC & QUARTIC FORCE FIELD (CM**-1)\n Eta[1,1,1]=-12.3456\n' + geo(0, null) + '                    VIBRATIONAL ANHARMONIC ANALYSIS\n' + qc.slice(end);
+  const qa = BM.parseFile('qchem.out', qc), da = BM.parseFile('anh.out', anh);
+  check(da.frames.length === qa.frames.length && last(da.frames).energy === last(qa.frames).energy && da.vibrations.frameIndex === qa.vibrations.frameIndex,
+    'Q-Chem anharmonic: the displaced geometries and the reference printed again are no steps: ' + da.frames.length + ' vs ' + qa.frames.length + ' frames');
 });
 
 // ------------------------------------------------------------------ what the level diagram and the Info tab are given

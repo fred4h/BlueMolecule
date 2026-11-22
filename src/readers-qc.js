@@ -126,6 +126,45 @@
     else j.frameStart = j.frameEnd = j.m >= 0 ? j.m : Math.max(0, n - 1);
     delete j.n0; delete j.m; delete j.g;
   };
+  /**
+   * Frequencies by finite differences print one geometry per displacement: frames [s, e) are those geometries. They
+   * are no steps of the job, so only the reference geometry stays: the centre of the displacements (the frame before
+   * s when the program computed it first, as Q-Chem and older Psi4 do). Returns old frame index -> new index, and
+   * remaps the jobs.
+   */
+  function dropDisplaced(ds, s, e) {
+    const F = ds.frames, n = F.length;
+    if (!(s >= 0 && e <= n && e - s >= 1)) return k => k;
+    const rmsd = (a, b) => {
+      if (!a.xyz || !b.xyz || a.Z.length !== b.Z.length) return Infinity;
+      let q = 0;
+      for (let i = 0; i < a.xyz.length; i++) q += (a.xyz[i] - b.xyz[i]) ** 2;
+      return Math.sqrt(q / a.Z.length);
+    };
+    const spread = c => { let m = 0; for (let k = s; k < e; k++) if (k !== c) m = Math.max(m, rmsd(F[c], F[k])); return m; };
+    let ref = -1, best = Infinity;
+    for (let k = s; k < e; k++) { const v = spread(k); if (v < best) { best = v; ref = k; } }
+    if (s > 0 && spread(s - 1) <= best + 1e-5) ref = s - 1;
+    const keepIn = ref >= s;
+    ds.frames = F.slice(0, s).concat(keepIn ? [F[ref]] : [], F.slice(e));
+    const refNew = keepIn ? s : s - 1, shift = (e - s) - (keepIn ? 1 : 0);
+    // the reference printed again after the displacements (Q-Chem, before its anharmonic analysis) is the same step
+    const R = ds.frames[refNew], G = ds.frames[refNew + 1];
+    const dup = !!(R && G && rmsd(R, G) < 1e-4);
+    if (dup) {
+      if (G.energies) R.energies = Object.assign({}, G.energies, R.energies || {});
+      if (R.energy === null || R.energy === undefined) R.energy = G.energy;
+      ds.frames.splice(refNew + 1, 1);
+    }
+    const map = k => {
+      if (k < s) return k;
+      if (k < e) return refNew;
+      const j = k - shift;
+      return dup && j > refNew ? j - 1 : j;
+    };
+    if (ds.jobs) for (const j of ds.jobs) { j.frameStart = map(j.frameStart); j.frameEnd = map(j.frameEnd); }
+    return map;
+  }
   function state(index, eV, f, label) {
     return { index, energyEV: eV, wavelengthNM: eV > 0 ? EV2NM / eV : NaN, f: Number.isFinite(f) ? f : null,
       label: label || '', s2: null, transitions: [] };
@@ -729,10 +768,16 @@
     const jobs = new Jobs(ds), charges = {};
     let normal = null, thermo = null, S = null, states = null, cur = null, nOccA = null, nOccB = null, orb = null;
     let vib = null, firstInput = null;
+    const fd = [];   // finite-difference sections (anharmonic force fields, frequencies from gradients): [first, end)
+    let negEig = null;   // negative eigenvalues of the optimiser's Hessian in this step (1 in a transition-state search)
     for (let i = 0; i < n; i++) {
       const s = L[i], t = s.trim();
       if (!t) continue;
       let m;
+      if (/^=?\s*Starting finite difference calculation/.test(t)) { fd.push([ds.frames.length, -1]); continue; }
+      if (fd.length && last(fd)[1] < 0 && (/ANHARMONIC CUBIC & QUARTIC FORCE FIELD|VIBRATIONAL ANHARMONIC ANALYSIS|^\*\*\s+VIBRATIONAL ANALYSIS\s+\*\*$/.test(t) || t === 'User input:')) {
+        last(fd)[1] = ds.frames.length;
+      }
       if (t === 'User input:') {
         let j = i + 1;
         while (j < n && /^-+$/.test(L[j].trim())) j++;
@@ -760,8 +805,21 @@
       if ((m = /^Total energy in the final basis set\s*=\s*(\S+)/.exec(t))) { F.energy('SCF', num(m[1])); continue; }
       if ((m = /^(?:RI-)?MP2\s+total energy\s*=\s*(\S+)/i.exec(t))) { F.energy('MP2', num(m[1])); continue; }
       if ((m = /^Optimization Cycle:\s*(\d+)/.exec(t))) { const f = F.cur(); if (f && !f.label) f.label = 'Cycle ' + m[1]; continue; }
+      if (t === 'Hessian Eigenvalues:') {   // printed before the convergence table of each optimisation step
+        let neg = 0, seen = false, j = i + 1;
+        for (; j < n; j++) {
+          const r = tok(L[j]);
+          if (!r.length || !r.every(isNum)) break;
+          seen = true;
+          for (const x of r) if (num(x) < 0) neg++;
+        }
+        if (seen) negEig = neg;
+        i = j - 1;
+        continue;
+      }
       if (/^Maximum\s+Tolerance\s+Cnvgd\?/.test(t)) {
         const f = F.cur(), o = f ? (f.opt = f.opt || {}) : null;
+        if (o && negEig !== null) { o.negEig = negEig; negEig = null; }
         for (let j = i + 1; j < Math.min(n, i + 5); j++) {
           const q = /^\s*(Gradient|Displacement|Energy change)\s+(\S+)\s+(\S+)\s+(YES|NO)/.exec(L[j]);
           if (!q) break;
@@ -865,6 +923,10 @@
     meta.normalTermination = normal;
     if (!ds.program) ds.program = 'Q-Chem';
     if (jobs.list.length) ds.jobs = jobs.list;
+    for (let k = fd.length - 1; k >= 0; k--) {   // the displaced geometries are no steps
+      const map = dropDisplaced(ds, fd[k][0], fd[k][1] < 0 ? ds.frames.length : fd[k][1]);
+      if (vib) vib.fi = map(vib.fi);
+    }
     if (Object.keys(charges).length) ds.charges = charges;
     if (orb) { orb.alpha.nOcc = nOccA !== null ? nOccA : orb.alpha.nOcc; ds.orbitals = orb; }
     if (states && states.length) ds.excitedStates = states;
@@ -907,10 +969,17 @@
     const ds = BM.emptyDataset('psi4-out', name), meta = ds.meta, F = new Frames(ds), L = lines(text), n = L.length;
     const input = [], charges = {};
     let normal = null, thermo = null, orb = null, vib = null, basisOut = null, funcOut = null, dip = null;
+    const fd = [];   // finite-difference sections (FINDIF): [first frame, end frame)
+    const dipOf = new Map();   // the dipole printed for each geometry (each displacement prints its own)
     for (let i = 0; i < n; i++) {
       const s = L[i], t = s.trim();
       if (!t) continue;
       let m;
+      if (/^Number of geometries \(including reference\) is \d+/.test(t)) { fd.push([ds.frames.length, -1]); continue; }
+      if (fd.length && last(fd)[1] < 0 && (/FiniteDifference Results/.test(t) || /^\d+ (gradients|energies) passed in/.test(t) || t === '==> Harmonic Vibrational Analysis <==')) {
+        last(fd)[1] = ds.frames.length;
+        continue;
+      }
       if (t === '==> Input File <==') {
         let j = i + 1;
         while (j < n && !/^-{20,}$/.test(L[j].trim())) j++;
@@ -964,6 +1033,7 @@
       }
       if (/Optimization is complete!/.test(t)) { const f = F.cur(); if (f) f.converged = true; addJT(meta, 'opt'); continue; }
       if (/^Vibration\s+\d/.test(t)) {
+        if (fd.length && last(fd)[1] < 0) last(fd)[1] = ds.frames.length;
         if (!vib) vib = { fi: ds.frames.length - 1, freqs: [], modes: [], ir: [], redMass: [], forceConst: [], sym: [] };
         const idx = tok(t).slice(1).map(x => int(x) - 1);
         const put = (arr, rest, f) => tok(rest).forEach((x, k) => { if (idx[k] !== undefined) arr[idx[k]] = f(x); });
@@ -1010,9 +1080,14 @@
         i = j - 1;
         continue;
       }
-      if ((m = /^Dipole ([XYZ])\s+:\s+(\S+)\s+(\S+)\s+(\S+)/.exec(t))) { dip = dip || [0, 0, 0]; dip['XYZ'.indexOf(m[1])] = num(m[4]) * AU2DEBYE; continue; }
+      if ((m = /^Dipole ([XYZ])\s+:\s+(\S+)\s+(\S+)\s+(\S+)/.exec(t))) {
+        dip = dip || [0, 0, 0]; dip['XYZ'.indexOf(m[1])] = num(m[4]) * AU2DEBYE;
+        if (F.cur()) dipOf.set(F.cur(), { x: dip[0], y: dip[1], z: dip[2], total: Math.hypot(...dip) });
+        continue;
+      }
       if ((m = /^X:\s+(\S+)\s+Y:\s+(\S+)\s+Z:\s+(\S+)\s+Total:\s+(\S+)/.exec(t)) && /Dipole Moment: \[D\]/.test(L[i - 1] || '')) {
         ds.dipole = { x: num(m[1]), y: num(m[2]), z: num(m[3]), total: num(m[4]) }; dip = null;
+        if (F.cur()) dipOf.set(F.cur(), ds.dipole);
         continue;
       }
       if (t === 'Orbital Energies [Eh]') {
@@ -1058,6 +1133,14 @@
     if (dip) ds.dipole = { x: dip[0], y: dip[1], z: dip[2], total: Math.hypot(...dip) };
     if (Object.keys(charges).length) ds.charges = charges;
     ds.orbitals = orb;
+    for (let k = fd.length - 1; k >= 0; k--) {   // the displaced geometries are no steps (the last first: indices stay valid)
+      const map = dropDisplaced(ds, fd[k][0], fd[k][1] < 0 ? ds.frames.length : fd[k][1]);
+      if (vib) vib.fi = map(vib.fi);
+    }
+    if (fd.length) {   // the dipole of the geometry shown, not of the last displacement
+      const g = ds.frames[vib ? vib.fi : ds.frames.length - 1];
+      if (g && dipOf.has(g)) { ds.dipole = dipOf.get(g); dip = null; }
+    }
     if (vib && vib.freqs.length) ds.vibrations = buildVib(ds, vib.fi, vib.freqs, vib.modes, vib, false);
     if (thermo) {
       const vf = ds.frames[ds.vibrations ? ds.vibrations.frameIndex : ds.frames.length - 1];

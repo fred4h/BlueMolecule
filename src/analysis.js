@@ -179,6 +179,10 @@
       series.push({ key, label: key === 'energyChange' ? '|Energy change|' : label, unit: mopac && key === 'gradNorm' ? 'kcal/mol/Å' : unit, values: vals, threshold: thr, log: true });
       if (thr) ratios.push({ key, label, values: vals.map(v => (isNum(v) ? v / thr : null)) });
     }
+    // the number of negative Hessian eigenvalues (Gaussian prints them each step): 1 throughout a good TS search
+    const neg = steps.map(s => (s.opt && isNum(s.opt.negEig) ? s.opt.negEig : null));
+    const tsJob = jobKinds.indexOf('ts') >= 0 || ((ds.meta && ds.meta.jobTypes) || []).indexOf('ts') >= 0;
+    if (neg.some(isNum) && (tsJob || neg.some(v => v > 0))) series.push({ key: 'negEig', label: 'Negative Hessian eigenvalues', unit: '', values: neg, threshold: null, log: false, integer: true });
     out.isOpt = optJob || series.some(s => s.log);
     out.components = energyComponents(ds, steps);
     if (source === 'frames') {

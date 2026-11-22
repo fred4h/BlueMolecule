@@ -6,7 +6,7 @@ been checked, what has not, and what the program does not do yet.
 
 ## What has been checked
 
-- **About 34,500 automated checks in 35 test suites** (23,700 of them cut example outputs as a running job would
+- **About 35,500 automated checks in 36 test suites** (24,500 of them cut example outputs as a running job would
   leave them), all passing for this release
   ([how to run them](developer-guide.md#tests)). They cover:
   - every reader and writer, including format detection and the units and conventions of each program;
@@ -72,7 +72,7 @@ been checked, what has not, and what the program does not do yet.
 | Trajectories | Amber NetCDF 4 files (HDF5 inside) and text (ASCII) `mdcrd` trajectories are not read; convert them to NetCDF 3. The loading dialog appears from 1 GB; smaller long trajectories are thinned automatically when they would need more than about 512 MB |
 | Huge outputs | Condensed reading (only what the readers use) covers Gaussian and ORCA outputs and XYZ trajectories. Huge outputs of other programs are read whole, within the JavaScript engine's limit of about 4 GB |
 | Readers | No readers for Molpro or Dalton outputs (Molpro inputs can be written), GAMESS punch files (`.dat`) or Turbomole's program outputs (`dscf.out`, `escf.out`, `ricc2.out`...; its `coord` and `gradient` files are read) |
-| Frequencies by finite differences | Psi4 frequency jobs computed from displaced geometries, and Q-Chem anharmonic jobs, show every displaced geometry as a step |
+| Negative Hessian eigenvalues | Counted from Gaussian and Q-Chem optimisation steps only; ORCA, Psi4 and the other programs do not get this plot |
 | fchk files | The last geometry only (not the optimisation history) and no excited states |
 | Gaussian inputs | ONIOM layer columns in `.gjf` files are skipped; layers are read from outputs |
 | Clean-up | A generic force field for tidying sketches; not a published force field and not a physical method |

@@ -3,6 +3,38 @@
 BlueMolecule is [vibe-coded](docs/vibe-coding.md). Each version below was written by an AI assistant from the
 author's requests and bug reports.
 
+## 2.1.0 (November 2026): transition states and frequencies by finite differences
+
+**Transition states** (issue #14): the Vibrations tab now helps to check a transition state.
+- A line at the top says what the frequencies make of the structure: a minimum, a transition state (exactly one
+  imaginary frequency) or a higher-order saddle point. Imaginary frequencies below 50i cm⁻¹, often numerical
+  noise, are counted apart.
+- Opening a file with an imaginary mode, or a transition-state search, selects its largest imaginary mode, and the
+  message on opening gives the number of imaginary frequencies.
+- **Arrow length** sets the length of the displacement arrows, apart from the amplitude (the largest atom shift of
+  the animation).
+- **Both ends** shows the two ends of the motion as translucent structures (blue −, orange +) on a still view; a
+  bond that forms is drawn at one end only.
+- **Bonds along mode N** lists the pairs whose distance changes most, with the distances at both ends: along an
+  imaginary mode, which bonds form and which break. A row measures that distance.
+- **Forward and reverse inputs…** writes two optimisation inputs (*name*_minus and *name*_plus) from the geometry
+  displaced both ways, in any program of the calculation-input dialog. A Gaussian route or ORCA keyword line taken
+  from the file becomes an optimisation (`opt=(ts,calcfc)` becomes `opt`, `OptTS` becomes `Opt`).
+- **Negative Hessian eigenvalues**: a new optimisation plot, and a line in the Steps tab, count them at each step of
+  Gaussian and Q-Chem optimisations. A good transition-state search stays at 1.
+
+**Frequencies computed by finite differences** (issue #32) showed every displaced geometry as a step of the job:
+74 for divinylbenzene in Psi4 (`frequencies(..., dertype='gradient')`), 50 for water in Q-Chem anharmonic (VPT2) jobs.
+The energy plots treated them as optimisation steps, and Psi4's normal modes and dipole belonged to the last
+displaced geometry. Only the reference geometry is kept now, with its energy, dipole and vibrations.
+
+Also fixed:
+- The calculation-input dialog wrote the **keywords of an ORCA output separated by commas** (`! B3LYP,def2-SVP,Opt`),
+  which ORCA does not read; they are separated by spaces again.
+- With **Use the route from this file**, a Gaussian route with `geom=check` or `guess=read` made Gaussian read the old
+  geometry from a checkpoint file instead of the exported one; these keywords are now left out.
+- The displacement of **Displace along the selected mode** went back to 0.15 Å whenever another mode was selected.
+
 ## 2.0.2 (November 2026): ORCA 6 QM/MM energies
 
 Checked against a real ORCA 6.1 QM/MM optimisation (the synthetic example imitated another layout):

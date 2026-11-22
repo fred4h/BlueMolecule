@@ -466,6 +466,95 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   check(/This geometry\s*-\d+\.\d{8} Eh \(MP5\)/.test(e5) && /SCF\s*-\d+\.\d{8} Eh/.test(e5) && /MP4\s*-\d+\.\d{8} Eh/.test(e5),
     'an MP5 job: the energy is MP5, with SCF, MP2 to MP4 listed: ' + (e5.match(/Energy.{0,240}/) || [''])[0]);
 
+  // ================================================================ 2.1: normal-mode tools for transition states (#14)
+  console.log('#14 transition states');
+  await page.evaluate(() => { BM.app.state.vib.playing = true; });   // the arrow-key checks above paused the animations
+  await open('g16_sn2_ts_optfreq.log');
+  await sleep(250);
+  let ts = await page.evaluate(() => ({ vib: BM.app.state.active.vibIndex, anim: BM.app.state.anim.kind, tab: BM.app.state.active.tab, toast: document.querySelector('#toast').textContent,
+    sum: document.querySelector('#vib-summary') && document.querySelector('#vib-summary').textContent, cls: document.querySelector('#vib-summary') && document.querySelector('#vib-summary').className }));
+  check(ts.vib === 0 && ts.anim === 'vib' && ts.tab === 'vib', 'opening a TS frequency job selects and animates its imaginary mode: ' + JSON.stringify(ts));
+  check(/one imaginary frequency \(492\.2i cm⁻¹\), selected/.test(ts.toast), 'the message on opening says there is one imaginary frequency: ' + ts.toast);
+  check(ts.sum === 'One imaginary frequency (492.2i cm⁻¹): a transition state.' && / ok\b/.test(ts.cls), 'the Vibrations tab says it is a transition state: ' + ts.sum);
+  const bondRows = () => page.$$eval('#vib-bonds-table tr.row', rs => rs.map(r => [...r.cells].map(c => c.textContent)));
+  let br = await bondRows();
+  check(br.length === 2 && br[0].join('|') === 'C1–F2|2.336|1.850|1.364|forms' && br[1].join('|') === 'C1–F3|1.364|1.850|2.336|breaks',
+    'the bond table shows the C–F bond that forms and the one that breaks, with the distances at both ends: ' + JSON.stringify(br));
+  // amplitude: the distances at the ends follow it
+  await page.$eval('#panel [data-vib="amplitude"]', e => { e.value = '0.5'; e.dispatchEvent(new Event('input', { bubbles: true })); });
+  await sleep(80);
+  br = await bondRows();
+  const dm = +br[0][1], d0 = +br[0][2], dp = +br[0][3];
+  check(dm > 2.336 && dp < 1.364 && Math.abs((dm - d0) - (d0 - dp)) < 0.002, 'a larger amplitude moves the ends further apart: ' + JSON.stringify(br[0]));
+  // arrow length is its own control: the longest arrow is that long, whatever the amplitude
+  await page.$eval('#panel [data-vib="arrows"]', e => { e.checked = true; e.dispatchEvent(new Event('input', { bubbles: true })); });
+  await page.$eval('#panel [data-vib="arrowLen"]', e => { e.value = '1.5'; e.dispatchEvent(new Event('input', { bubbles: true })); });
+  await sleep(60);
+  const longest = await page.evaluate(() => { const a = BM.app.R().arrows; let m = 0; for (let i = 0; a && i < a.length; i += 3) m = Math.max(m, Math.hypot(a[i], a[i + 1], a[i + 2])); return m; });
+  check(Math.abs(longest - 1.5) < 1e-6, 'the Arrow length slider sets the longest arrow: ' + longest);
+  await page.$eval('#panel [data-vib="arrows"]', e => { e.checked = false; e.dispatchEvent(new Event('input', { bubbles: true })); });
+  // both ends: a still view with two translucent structures at the amplitude
+  await page.check('#panel [data-vib="ends"]');
+  await sleep(120);
+  ts = await page.evaluate(() => { const d = BM.app.state.active, R = BM.app.R(), eq = d.data.frames[d.data.vibrations.frameIndex].xyz;
+    return { anim: BM.app.state.anim.kind, playing: BM.app.state.vib.playing, ends: R.vibEnds.length, op: R.vibEnds.map(m => m.opacity), still: Array.from(R.xyz).every((x, i) => Math.abs(x - eq[i]) < 1e-9) }; });
+  check(ts.anim === null && !ts.playing && ts.ends === 2 && ts.op.every(o => o > 0 && o < 1) && ts.still, 'Both ends stops the animation at the centre and draws both ends, translucent: ' + JSON.stringify(ts));
+  await page.click('#vib-table tr.row[data-i="1"]');
+  await sleep(120);
+  ts = await page.evaluate(() => ({ vib: BM.app.state.active.vibIndex, anim: BM.app.state.anim.kind, ends: BM.app.R().vibEnds.length, link: !!document.querySelector('#vib-summary a') }));
+  check(ts.vib === 1 && ts.anim === null && ts.ends === 2 && ts.link, 'another mode keeps the still view with its own ends, and the summary offers to show the imaginary one: ' + JSON.stringify(ts));
+  await page.click('#vib-summary a');
+  await sleep(120);
+  check((await page.evaluate(() => BM.app.state.active.vibIndex)) === 0, '"Show it" selects the imaginary mode again');
+  await page.uncheck('#panel [data-vib="ends"]');
+  await sleep(60);
+  check((await page.evaluate(() => BM.app.R().vibEnds.length)) === 0, 'unticking Both ends removes them');
+  // a row of the bond table measures the pair
+  await page.click('#vib-bonds-table tr.row');
+  await sleep(80);
+  ts = await page.evaluate(() => ({ sel: BM.app.state.active.selection.join(), chip: document.querySelector('#measure').textContent }));
+  check(ts.sel === '0,1' && /C1 – F2/.test(ts.chip) && /distance/.test(ts.chip), 'clicking a bond row measures that distance: ' + JSON.stringify(ts));
+  // forward and reverse inputs: two optimisation inputs displaced by -/+ the Displace amount
+  await page.fill('#disp-amt', '0.2');
+  const taskBefore = await page.evaluate(() => JSON.parse(localStorage.getItem('bluemolecule.calc') || '{}').task);
+  await page.click('[data-act="vib-inputs"]');
+  await page.waitForSelector('#dlg[open]');
+  await sleep(120);
+  ts = await page.evaluate(() => ({ title: document.querySelector('#dlg').textContent.includes('Forward and reverse inputs'), route: document.querySelector('#dlg [data-c="route"]').value,
+    task: document.querySelector('#dlg [data-c="task"]').value, ro: document.querySelector('#dlg [data-c="preview"]').readOnly, note: document.querySelector('#dlg [data-c="note"]').textContent }));
+  check(ts.title && ts.route === '#p opt freq b3lyp/6-31+g(d)' && ts.task === 'opt' && ts.ro, 'the dialog turns the TS route into an optimisation: ' + JSON.stringify(ts));
+  check(/_minus\.gjf, g16_sn2_ts_optfreq_plus\.gjf: the geometry displaced by −0\.2 and \+0\.2 Å/.test(ts.note), 'the note names both files and the displacement: ' + ts.note);
+  await page.evaluate(() => { window.__saved.length = 0; });
+  await page.click('#dlg .btn.primary');
+  await sleep(250);
+  saved = await page.evaluate(() => window.__saved.map(x => ({ name: x.name, text: x.text })));
+  const cz = t => { const l = t.split('\n').find(s => /^C\s/.test(s)); return l ? +l.trim().split(/\s+/)[3] : NaN; };
+  check(saved.length === 2 && saved[0].name === 'g16_sn2_ts_optfreq_minus.gjf' && saved[1].name === 'g16_sn2_ts_optfreq_plus.gjf', 'two inputs saved: ' + saved.map(x => x.name));
+  check(saved.length === 2 && Math.abs(cz(saved[0].text) + 0.2) < 1e-6 && Math.abs(cz(saved[1].text) - 0.2) < 1e-6 && /%chk=g16_sn2_ts_optfreq_plus\.chk/.test(saved[1].text) && !/\bts\b/i.test(saved[1].text.split('\n').find(s => s[0] === '#')),
+    'the carbon (the largest shift) is displaced by -0.2 and +0.2 Å; own checkpoint files; no TS keywords: ' + saved.map(x => cz(x.text)));
+  check((await page.evaluate(() => JSON.parse(localStorage.getItem('bluemolecule.calc') || '{}').task)) === taskBefore, 'saving the pair keeps the default Task of the dialog: ' + taskBefore);
+  // the number of negative Hessian eigenvalues of the TS search, as a plot and in the Steps tab
+  await page.selectOption('#plot-pick', 'opt:negEig');
+  await sleep(120);
+  ts = await page.evaluate(() => { const s = BM.app.plot().spec; return { int: s.integerY, ys: s.points.map(p => p.y), label: s.yLabel }; });
+  check(ts.int && ts.ys.join() === '1,1,1,1' && /Negative Hessian eigenvalues/.test(ts.label), 'the TS search plots one negative eigenvalue at each step: ' + JSON.stringify(ts));
+  await tab('steps');
+  const stepsText = await page.$eval('#panel', e => e.textContent.replace(/\s+/g, ' '));
+  check(/Negative Hessian eigenvalues\s*1\s*✓/.test(stepsText), 'the Steps tab shows the count for the current step: ' + (stepsText.match(/Negative Hessian.{0,30}/) || [''])[0]);
+  // a minimum: said so, nothing selected
+  await open('g16_water_optfreq.log');
+  await sleep(150);
+  ts = await page.evaluate(() => ({ vib: BM.app.state.active.vibIndex, sum: document.querySelector('#vib-summary').textContent }));
+  check(ts.vib === -1 && ts.sum === 'No imaginary frequencies: a minimum.', 'a minimum is called one and no mode is selected: ' + JSON.stringify(ts));
+  // the ORCA keywords of a file are written with spaces
+  await open('orca5_water_optfreq.out');
+  await page.evaluate(() => BM.app.exportCalc('orca'));
+  await page.waitForSelector('#dlg[open]');
+  const kw = await page.inputValue('#dlg [data-c="kw"]');
+  check(kw && !/,/.test(kw) && /\bOpt\b/i.test(kw), 'the ORCA keywords of the file are separated by spaces: ' + kw);
+  await page.keyboard.press('Escape');
+  await sleep(80);
+
   check(errors.length === 0, 'no page errors: ' + errors.slice(0, 5).join(' | '));
   await browser.close();
   console.log(`UI tests (1.4.2 fixes): ${passes} passed, ${failures} failed`);
