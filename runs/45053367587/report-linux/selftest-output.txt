@@ -1,0 +1,106 @@
+
+(bluemolecule:7609): dbind-WARNING **: 18:12:05.902: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files
+dbus-daemon[7594]: [session uid=1001 pid=7594] Activating service name='org.freedesktop.portal.Desktop' requested by ':1.1' (uid=1001 pid=7609 comm="desktop/src-tauri/target/release/bluemolecule --se" label="unconfined")
+dbus-daemon[7594]: [session uid=1001 pid=7594] Activating service name='org.freedesktop.portal.Documents' requested by ':1.2' (uid=1001 pid=7614 comm="/usr/libexec/xdg-desktop-portal " label="unconfined")
+dbus-daemon[7594]: [session uid=1001 pid=7594] Activating service name='org.freedesktop.impl.portal.PermissionStore' requested by ':1.3' (uid=1001 pid=7619 comm="/usr/libexec/xdg-document-portal " label="unconfined")
+dbus-daemon[7594]: [session uid=1001 pid=7594] Successfully activated service 'org.freedesktop.impl.portal.PermissionStore'
+dbus-daemon[7594]: [session uid=1001 pid=7594] Successfully activated service 'org.freedesktop.portal.Documents'
+dbus-daemon[7594]: [session uid=1001 pid=7594] Activating service name='org.freedesktop.impl.portal.desktop.gtk' requested by ':1.2' (uid=1001 pid=7614 comm="/usr/libexec/xdg-desktop-portal " label="unconfined")
+
+(xdg-desktop-portal-gtk:7633): Gtk-WARNING **: 18:12:05.965: cannot open display: 
+dbus-daemon[7594]: [session uid=1001 pid=7594] Activated service 'org.freedesktop.impl.portal.desktop.gtk' failed: Process org.freedesktop.impl.portal.desktop.gtk exited with status 1
+dbus-daemon[7594]: [session uid=1001 pid=7594] Activating service name='org.freedesktop.impl.portal.desktop.gtk' requested by ':1.2' (uid=1001 pid=7614 comm="/usr/libexec/xdg-desktop-portal " label="unconfined")
+
+(xdg-desktop-portal-gtk:7641): Gtk-WARNING **: 18:12:05.994: cannot open display: 
+dbus-daemon[7594]: [session uid=1001 pid=7594] Activated service 'org.freedesktop.impl.portal.desktop.gtk' failed: Process org.freedesktop.impl.portal.desktop.gtk exited with status 1
+
+** (/usr/libexec/xdg-desktop-portal:7614): WARNING **: 18:12:05.995: Failed to create settings proxy: Error calling StartServiceByName for org.freedesktop.impl.portal.desktop.gtk: Process org.freedesktop.impl.portal.desktop.gtk exited with status 1
+
+** (/usr/libexec/xdg-desktop-portal:7614): WARNING **: 18:12:05.995: No skeleton to export
+dbus-daemon[7594]: [session uid=1001 pid=7594] Activating service name='org.freedesktop.impl.portal.desktop.gtk' requested by ':1.2' (uid=1001 pid=7614 comm="/usr/libexec/xdg-desktop-portal " label="unconfined")
+
+(xdg-desktop-portal-gtk:7643): Gtk-WARNING **: 18:12:06.003: cannot open display: 
+dbus-daemon[7594]: [session uid=1001 pid=7594] Activated service 'org.freedesktop.impl.portal.desktop.gtk' failed: Process org.freedesktop.impl.portal.desktop.gtk exited with status 1
+
+** (/usr/libexec/xdg-desktop-portal:7614): WARNING **: 18:12:06.005: Failed to create file chooser proxy: Error calling StartServiceByName for org.freedesktop.impl.portal.desktop.gtk: Process org.freedesktop.impl.portal.desktop.gtk exited with status 1
+
+** (/usr/libexec/xdg-desktop-portal:7614): WARNING **: 18:12:06.005: No skeleton to export
+dbus-daemon[7594]: [session uid=1001 pid=7594] Activating service name='org.freedesktop.impl.portal.desktop.gtk' requested by ':1.2' (uid=1001 pid=7614 comm="/usr/libexec/xdg-desktop-portal " label="unconfined")
+
+(xdg-desktop-portal-gtk:7645): Gtk-WARNING **: 18:12:06.013: cannot open display: 
+dbus-daemon[7594]: [session uid=1001 pid=7594] Activated service 'org.freedesktop.impl.portal.desktop.gtk' failed: Process org.freedesktop.impl.portal.desktop.gtk exited with status 1
+
+** (/usr/libexec/xdg-desktop-portal:7614): WARNING **: 18:12:06.014: Failed to create app chooser proxy: Error calling StartServiceByName for org.freedesktop.impl.portal.desktop.gtk: Process org.freedesktop.impl.portal.desktop.gtk exited with status 1
+
+** (/usr/libexec/xdg-desktop-portal:7614): WARNING **: 18:12:06.014: No skeleton to export
+dbus-daemon[7594]: [session uid=1001 pid=7594] Activating service name='org.freedesktop.impl.portal.desktop.gtk' requested by ':1.2' (uid=1001 pid=7614 comm="/usr/libexec/xdg-desktop-portal " label="unconfined")
+
+(xdg-desktop-portal-gtk:7647): Gtk-WARNING **: 18:12:06.022: cannot open display: 
+dbus-daemon[7594]: [session uid=1001 pid=7594] Activated service 'org.freedesktop.impl.portal.desktop.gtk' failed: Process org.freedesktop.impl.portal.desktop.gtk exited with status 1
+
+** (/usr/libexec/xdg-desktop-portal:7614): WARNING **: 18:12:06.023: Failed to create print proxy: Error calling StartServiceByName for org.freedesktop.impl.portal.desktop.gtk: Process org.freedesktop.impl.portal.desktop.gtk exited with status 1
+
+** (/usr/libexec/xdg-desktop-portal:7614): WARNING **: 18:12:06.023: No skeleton to export
+dbus-daemon[7594]: [session uid=1001 pid=7594] Activating service name='org.freedesktop.impl.portal.desktop.gtk' requested by ':1.2' (uid=1001 pid=7614 comm="/usr/libexec/xdg-desktop-portal " label="unconfined")
+
+(xdg-desktop-portal-gtk:7649): Gtk-WARNING **: 18:12:06.031: cannot open display: 
+dbus-daemon[7594]: [session uid=1001 pid=7594] Activated service 'org.freedesktop.impl.portal.desktop.gtk' failed: Process org.freedesktop.impl.portal.desktop.gtk exited with status 1
+
+** (/usr/libexec/xdg-desktop-portal:7614): WARNING **: 18:12:06.032: Failed to create notification proxy: Error calling StartServiceByName for org.freedesktop.impl.portal.desktop.gtk: Process org.freedesktop.impl.portal.desktop.gtk exited with status 1
+
+** (/usr/libexec/xdg-desktop-portal:7614): WARNING **: 18:12:06.032: No skeleton to export
+dbus-daemon[7594]: [session uid=1001 pid=7594] Activating service name='org.freedesktop.impl.portal.desktop.gtk' requested by ':1.2' (uid=1001 pid=7614 comm="/usr/libexec/xdg-desktop-portal " label="unconfined")
+
+(xdg-desktop-portal-gtk:7651): Gtk-WARNING **: 18:12:06.040: cannot open display: 
+dbus-daemon[7594]: [session uid=1001 pid=7594] Activated service 'org.freedesktop.impl.portal.desktop.gtk' failed: Process org.freedesktop.impl.portal.desktop.gtk exited with status 1
+
+** (/usr/libexec/xdg-desktop-portal:7614): WARNING **: 18:12:06.041: Failed to create inhibit proxy: Error calling StartServiceByName for org.freedesktop.impl.portal.desktop.gtk: Process org.freedesktop.impl.portal.desktop.gtk exited with status 1
+
+** (/usr/libexec/xdg-desktop-portal:7614): WARNING **: 18:12:06.041: No skeleton to export
+dbus-daemon[7594]: [session uid=1001 pid=7594] Activating service name='org.freedesktop.impl.portal.desktop.gtk' requested by ':1.2' (uid=1001 pid=7614 comm="/usr/libexec/xdg-desktop-portal " label="unconfined")
+
+(xdg-desktop-portal-gtk:7653): Gtk-WARNING **: 18:12:06.049: cannot open display: 
+dbus-daemon[7594]: [session uid=1001 pid=7594] Activated service 'org.freedesktop.impl.portal.desktop.gtk' failed: Process org.freedesktop.impl.portal.desktop.gtk exited with status 1
+
+** (/usr/libexec/xdg-desktop-portal:7614): WARNING **: 18:12:06.051: Failed to create access proxy: Error calling StartServiceByName for org.freedesktop.impl.portal.desktop.gtk: Process org.freedesktop.impl.portal.desktop.gtk exited with status 1
+
+** (/usr/libexec/xdg-desktop-portal:7614): WARNING **: 18:12:06.051: No skeleton to export
+dbus-daemon[7594]: [session uid=1001 pid=7594] Activating service name='org.freedesktop.impl.portal.desktop.gtk' requested by ':1.2' (uid=1001 pid=7614 comm="/usr/libexec/xdg-desktop-portal " label="unconfined")
+
+(xdg-desktop-portal-gtk:7655): Gtk-WARNING **: 18:12:06.058: cannot open display: 
+dbus-daemon[7594]: [session uid=1001 pid=7594] Activated service 'org.freedesktop.impl.portal.desktop.gtk' failed: Process org.freedesktop.impl.portal.desktop.gtk exited with status 1
+dbus-daemon[7594]: [session uid=1001 pid=7594] Activating service name='org.freedesktop.impl.portal.desktop.gtk' requested by ':1.2' (uid=1001 pid=7614 comm="/usr/libexec/xdg-desktop-portal " label="unconfined")
+
+(xdg-desktop-portal-gtk:7657): Gtk-WARNING **: 18:12:06.068: cannot open display: 
+dbus-daemon[7594]: [session uid=1001 pid=7594] Activated service 'org.freedesktop.impl.portal.desktop.gtk' failed: Process org.freedesktop.impl.portal.desktop.gtk exited with status 1
+
+** (/usr/libexec/xdg-desktop-portal:7614): WARNING **: 18:12:06.069: Failed to create access proxy: Error calling StartServiceByName for org.freedesktop.impl.portal.desktop.gtk: Process org.freedesktop.impl.portal.desktop.gtk exited with status 1
+
+** (/usr/libexec/xdg-desktop-portal:7614): WARNING **: 18:12:06.069: No skeleton to export
+
+** (/usr/libexec/xdg-desktop-portal:7614): WARNING **: 18:12:06.071: Failed connect to PipeWire: Couldn't connect to PipeWire
+dbus-daemon[7594]: [session uid=1001 pid=7594] Activating service name='org.freedesktop.impl.portal.desktop.gtk' requested by ':1.2' (uid=1001 pid=7614 comm="/usr/libexec/xdg-desktop-portal " label="unconfined")
+
+(xdg-desktop-portal-gtk:7660): Gtk-WARNING **: 18:12:06.078: cannot open display: 
+dbus-daemon[7594]: [session uid=1001 pid=7594] Activated service 'org.freedesktop.impl.portal.desktop.gtk' failed: Process org.freedesktop.impl.portal.desktop.gtk exited with status 1
+
+** (/usr/libexec/xdg-desktop-portal:7614): WARNING **: 18:12:06.080: Failed to create account proxy: Error calling StartServiceByName for org.freedesktop.impl.portal.desktop.gtk: Process org.freedesktop.impl.portal.desktop.gtk exited with status 1
+
+** (/usr/libexec/xdg-desktop-portal:7614): WARNING **: 18:12:06.080: No skeleton to export
+dbus-daemon[7594]: [session uid=1001 pid=7594] Activating service name='org.freedesktop.impl.portal.desktop.gtk' requested by ':1.2' (uid=1001 pid=7614 comm="/usr/libexec/xdg-desktop-portal " label="unconfined")
+
+(xdg-desktop-portal-gtk:7662): Gtk-WARNING **: 18:12:06.088: cannot open display: 
+dbus-daemon[7594]: [session uid=1001 pid=7594] Activated service 'org.freedesktop.impl.portal.desktop.gtk' failed: Process org.freedesktop.impl.portal.desktop.gtk exited with status 1
+
+** (/usr/libexec/xdg-desktop-portal:7614): WARNING **: 18:12:06.089: Failed to create email proxy: Error calling StartServiceByName for org.freedesktop.impl.portal.desktop.gtk: Process org.freedesktop.impl.portal.desktop.gtk exited with status 1
+
+** (/usr/libexec/xdg-desktop-portal:7614): WARNING **: 18:12:06.089: No skeleton to export
+dbus-daemon[7594]: [session uid=1001 pid=7594] Activating service name='org.freedesktop.impl.portal.desktop.gtk' requested by ':1.2' (uid=1001 pid=7614 comm="/usr/libexec/xdg-desktop-portal " label="unconfined")
+
+(xdg-desktop-portal-gtk:7664): Gtk-WARNING **: 18:12:06.097: cannot open display: 
+dbus-daemon[7594]: [session uid=1001 pid=7594] Activated service 'org.freedesktop.impl.portal.desktop.gtk' failed: Process org.freedesktop.impl.portal.desktop.gtk exited with status 1
+
+** (/usr/libexec/xdg-desktop-portal:7614): WARNING **: 18:12:06.098: Failed to create dynamic_launcher proxy: Error calling StartServiceByName for org.freedesktop.impl.portal.desktop.gtk: Process org.freedesktop.impl.portal.desktop.gtk exited with status 1
+
+** (/usr/libexec/xdg-desktop-portal:7614): WARNING **: 18:12:06.098: No skeleton to export
+dbus-daemon[7594]: [session uid=1001 pid=7594] Successfully activated service 'org.freedesktop.portal.Desktop'
