@@ -1,0 +1,8 @@
+run 45474582907
+commit 2805072470e0cbb253126b4fc5e2ad3664c5277d
+branch claude/2.4-orbitals
+build result success
+url https://github.com/fred4h/BlueMolecule/actions/runs/45474582907
+report-linux: exit=0 seconds=15 peak=1088MB
+report-macos: exit=0 seconds=15 peak=835MB
+report-windows: exit=0 seconds=24 peak=598MB
