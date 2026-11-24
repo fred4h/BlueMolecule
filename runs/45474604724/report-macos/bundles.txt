@@ -1,0 +1,228 @@
+## files
+-rw-r--r--@ 1 runner  staff  5025058 Nov 24 19:53 desktop/src-tauri/target/release/bundle/dmg/BlueMolecule_2.4.0_aarch64.dmg
+## desktop/src-tauri/target/release/bundle/macos/BlueMolecule.app/Contents/Info.plist
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>English</string>
+	<key>CFBundleDisplayName</key>
+	<string>BlueMolecule</string>
+	<key>CFBundleExecutable</key>
+	<string>bluemolecule</string>
+	<key>CFBundleIdentifier</key>
+	<string>org.bluemolecule.BlueMolecule</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>BlueMolecule</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>2.4.0</string>
+	<key>CFBundleVersion</key>
+	<string>2.4.0</string>
+	<key>CSResourcesFileMapped</key>
+	<true/>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.education</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>10.15</string>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>xyz</string>
+			</array>
+			<key>CFBundleTypeName</key>
+			<string>XYZ coordinates</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+		</dict>
+		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>cube</string>
+				<string>cub</string>
+			</array>
+			<key>CFBundleTypeName</key>
+			<string>Gaussian cube</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+		</dict>
+		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>fchk</string>
+				<string>fch</string>
+			</array>
+			<key>CFBundleTypeName</key>
+			<string>Gaussian formatted checkpoint</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+		</dict>
+		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>gjf</string>
+			</array>
+			<key>CFBundleTypeName</key>
+			<string>Gaussian input</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+		</dict>
+		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>molden</string>
+			</array>
+			<key>CFBundleTypeName</key>
+			<string>Molden file</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+		</dict>
+		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>mol</string>
+			</array>
+			<key>CFBundleTypeName</key>
+			<string>MDL molfile</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+		</dict>
+		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>sdf</string>
+			</array>
+			<key>CFBundleTypeName</key>
+			<string>MDL SD file</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+		</dict>
+		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>mol2</string>
+			</array>
+			<key>CFBundleTypeName</key>
+			<string>Tripos Mol2</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+		</dict>
+		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>pdb</string>
+				<string>ent</string>
+			</array>
+			<key>CFBundleTypeName</key>
+			<string>Protein Data Bank file</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+		</dict>
+		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>cif</string>
+				<string>mmcif</string>
+			</array>
+			<key>CFBundleTypeName</key>
+			<string>Crystallographic information file</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+		</dict>
+		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>gro</string>
+			</array>
+			<key>CFBundleTypeName</key>
+			<string>GROMACS structure</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+		</dict>
+		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>cml</string>
+			</array>
+			<key>CFBundleTypeName</key>
+			<string>Chemical Markup Language</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+		</dict>
+		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>cjson</string>
+			</array>
+			<key>CFBundleTypeName</key>
+			<string>Chemical JSON</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+		</dict>
+		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>xsf</string>
+				<string>axsf</string>
+			</array>
+			<key>CFBundleTypeName</key>
+			<string>XCrySDen structure</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+		</dict>
+	</array>
+	<key>CFBundleIconFile</key>
+	<string>icon.icns</string>
+	<key>LSRequiresCarbon</key>
+	<true/>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright (c) 2026 Frederico Henrique Do. C. R. Ferreira. MIT License.</string>
+</dict>
+</plist>total 12424
+drwxr-xr-x   11 runner  staff      352 Nov 24 19:52 .
+drwxr-xr-x    5 runner  staff      160 Nov 24 19:51 ..
+-rw-r--r--    1 runner  staff        0 Nov 24 19:51 .cargo-artifact-lock
+-rw-r--r--    1 runner  staff        0 Nov 24 19:51 .cargo-build-lock
+-rw-r--r--    1 runner  staff        0 Nov 24 19:51 .cargo-lock
+-rwxr-xr-x    1 runner  staff  5807456 Nov 24 19:53 bluemolecule
+-rw-r--r--    1 runner  staff     1031 Nov 24 19:52 bluemolecule.d
+drwxr-xr-x  299 runner  staff     9568 Nov 24 19:51 build
+drwxr-xr-x    5 runner  staff      160 Nov 24 19:52 bundle
+drwxr-xr-x    2 runner  staff       64 Nov 24 19:51 examples
+drwxr-xr-x    2 runner  staff       64 Nov 24 19:51 incremental
