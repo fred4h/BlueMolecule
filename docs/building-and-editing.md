@@ -6,7 +6,8 @@ job.
 
 ![Building aspirin from SMILES; the Draw tool is active and the Build tab is open](images/build.png)
 
-Start with **New** (an empty molecule), **Build** on the start screen (from SMILES), or the **Build** tab of any open
+Start with **New** (an empty molecule), **Build** on the start screen (from SMILES), a structure downloaded from
+PubChem or the PDB ([Download](user-guide.md#downloading-from-pubchem-and-the-pdb)), or the **Build** tab of any open
 file. Editing a geometry from a file creates an **edited copy**: the file's own geometries stay unchanged, and the
 Build tab says which copy you are editing. Every change can be undone with **Ctrl/⌘ + Z** and redone with
 **Ctrl/⌘ + Shift + Z** or **Ctrl + Y**.

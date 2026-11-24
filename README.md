@@ -45,11 +45,12 @@
   - SMILES input and a library of molecules, groups, ligands and coordination geometries.
   - Hydrogen and bond-order handling, a clean-up force field, point-group detection and symmetrization, and a coordinate editor.
   - A conformer search (rotatable bonds turned, relaxed with the clean-up force field, kept when distinct), and crystal tools: supercells, surface slabs from Miller indices, cell edits and boxes around molecules.
+- **Downloads from PubChem and the PDB.** A molecule from PubChem by name or CID (its 3D conformer), or an entry or its biological assembly from the Protein Data Bank by ID. Off until you allow it.
 - **Exports.** Writes 24 structure, crystal and MD formats and calculation inputs for 10 programs. Other formats go through Open Babel when it is installed. Images are saved as PNG, JPEG, WebP, TIFF or PDF at a print size and resolution, with an sRGB or Display P3 colour profile, up to poster size.
 - **Large files.** Outputs of hundreds of megabytes are read in chunks, and Gaussian and ORCA outputs of several gigabytes (QM/MM jobs on whole proteins) are condensed while they are read. For files of 1 GB and more, a dialog lets you choose what to load: every Nth step or frame, a range, or the last N, and which vibrations to animate.
 - **MD trajectories.** Amber (prmtop with text or NetCDF coordinates and trajectories), CHARMM/NAMD (PSF, DCD), GROMACS (GRO, TRR, XTC) and LAMMPS, read in slices when they are long.
-- **Its own window.** On Linux it opens a Qt WebEngine window, or a browser app window if Qt is missing, with its own name and icon. On macOS it is a small native app, and on Windows an Edge app window started by its own launcher. Both are experimental. The single HTML file also works in any modern browser.
-- **Private by design.** Nothing is uploaded. The only network traffic is between the window and its own launcher on `127.0.0.1`.
+- **Its own window.** A desktop program for Linux, Windows and macOS, with an installer, **Open with** entries for chemistry files and a built-in updater. The single HTML file also works in any modern browser.
+- **Private by design.** Nothing is uploaded. BlueMolecule uses the network only when you ask: to check for updates, and to download from PubChem or the PDB once you have allowed it. A download sends only the name or ID you typed.
 
 <table>
   <tr>
@@ -94,7 +95,7 @@ not available.
 | | |
 |---|---|
 | [Installation](docs/installation.md) | Linux, Windows, macOS and browser; updates; Open Babel; uninstalling |
-| [User guide](docs/user-guide.md) | The window, mouse and keyboard, toolbar, tabs, plots, exporting |
+| [User guide](docs/user-guide.md) | The window, mouse and keyboard, toolbar, downloads from PubChem and the PDB, tabs, plots, exporting |
 | [Analysing outputs](docs/analysing-outputs.md) | Contents overview, optimisations, scans and IRC, vibrations, spectra, excited states, NMR, orbitals and surfaces, charges |
 | [QM/MM and ONIOM](docs/qmmm-oniom.md) | What is read from each program, energies, layer views |
 | [Representations](docs/representations.md) | Display rows, styles, colour schemes, presets, proteins, nucleic acids, lipids, glycans |
@@ -109,8 +110,8 @@ not available.
 
 ## Status
 
-BlueMolecule 2.5.0 is the current release (1.4.1 was the first public one). The automated test suite has about
-36,900 checks in 42 suites, 24,500 of them from cutting example outputs as a running job would leave them:
+BlueMolecule 2.6.0 is the current release (1.4.1 was the first public one). The automated test suite has about
+37,200 checks in 44 suites, 24,500 of them from cutting example outputs as a running job would leave them:
 - format readers and writers against example files;
 - chemistry routines;
 - the selection language;
@@ -144,6 +145,6 @@ Reference data comes from the scientific literature:
 - glycan symbols: the Symbol Nomenclature for Glycans (SNFG), Varki et al., *Glycobiology* 2015.
 
 BlueMolecule is an independent project. It is not affiliated with or endorsed by the makers of Chemcraft, GaussView,
-Avogadro, VMD, Gaussian, ORCA or any other program named here. Those names are trademarks of their owners and are used
-only to describe file compatibility and features. BlueMolecule contains no code, data, icons or text taken from any
+Avogadro, VMD, Gaussian, ORCA or any other program named here, nor by PubChem or the RCSB Protein Data Bank. Those names
+are trademarks of their owners and are used only to describe file compatibility and features. BlueMolecule contains no code, data, icons or text taken from any
 of them.

@@ -6,7 +6,7 @@ been checked, what has not, and what the program does not do yet.
 
 ## What has been checked
 
-- **About 36,900 automated checks in 42 test suites** (24,500 of them cut example outputs as a running job would
+- **About 37,200 automated checks in 44 test suites** (24,500 of them cut example outputs as a running job would
   leave them), all passing for this release
   ([how to run them](developer-guide.md#tests)). They cover:
   - every reader and writer, including format detection and the units and conventions of each program;
@@ -56,6 +56,11 @@ been checked, what has not, and what the program does not do yet.
 - **The desktop program:** every change is built on Linux, Windows and macOS by the cloud builds and started once
   there with a self-test: the 3D view (WebGL 2) in each system's web engine, a 900 MB log and a molecule opened
   through the native bridge, a save, and a picture of the view.
+- **Downloads (2.6):** the self-test of the cloud builds downloaded from the live PubChem and PDB services in the web
+  engine of each system (WebKitGTK on Linux, WebView2 on Windows, WebKit on macOS): aspirin's 3D conformer (21
+  atoms, CID 2244), sodium chloride through its SMILES (PubChem has no 3D conformer for it), the 1CRN entry and its
+  first assembly (327 atoms), and a missing entry, which gave the right message. The tests in the repository answer
+  in the services' place (`tests/test_fetchdb.js`, `tests/browser_fetch_test.js`).
 - **Script injection:** crafted files with HTML in titles, atom and residue names, labels and file names. None of it
   may become markup in the page (`tests/browser_xss_test.js`).
 - **Screenshots** of the interface, produced by the browser tests, were inspected during development.
@@ -103,7 +108,7 @@ been checked, what has not, and what the program does not do yet.
 | fchk files | No ECD rotatory strengths and no orbital contributions of the excited states; no IRC paths. Q-Chem fchk files hold no energies, so their steps have none. A checkpoint file's optimisation history is used only for an optimisation or scan job whose last step is the current geometry |
 | Gaussian inputs | ONIOM layer columns in `.gjf` files are skipped; layers are read from outputs |
 | Clean-up | A generic force field for tidying sketches; not a published force field and not a physical method |
-| Building | No download from PubChem or the PDB |
+| Downloads | PubChem: the first compound a name matches, as its first 3D conformer. Compounds without one (salts, mixtures, large or very flexible molecules) are built from their SMILES by BlueMolecule's own builder. PDB: mmCIF only, and only the first biological assembly. A download is read whole into memory. BlueMolecule has no network settings of its own: downloads use those of the system or the browser |
 | Conformer search | Ring conformations are not explored, and the energies come from the generic clean-up force field, so the ranking is rough. Up to 300 atoms |
 | Crystal tools | Supercells repeat the cell along a, b and c (no other supercell matrices in the interface). Slabs are cut from the lattice of the cell as given: a conventional cell gives the surface cell of its lattice, which may be larger than the primitive one. The termination is chosen by a shift, not from a list of distinct terminations |
 | Browser-only use | The single HTML file has no Open Babel and is limited by the browser's memory |

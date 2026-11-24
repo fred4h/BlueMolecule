@@ -57,6 +57,22 @@
     rep.checks.files = rep.files.length > 0 && rep.files.every(f => f.atoms > 0);
     // a save through the host (written next to the report in self-test mode)
     rep.checks.save = await BM.native.save('self-test.xyz', new Blob(['3\nwater\nO 0 0 0.117\nH 0 0.757 -0.469\nH 0 -0.757 -0.469\n'], { type: 'text/plain' })) === true;
+    // downloads from PubChem and the PDB in this system's web engine (issue #22). Reported, not required to pass:
+    // the cloud runner's network and the two services are outside BlueMolecule.
+    if (BM.fetchdb) {
+      rep.downloads = {};
+      const attempt = async (key, fn, sum) => {
+        const s = performance.now();
+        try { const r = await fn(); rep.downloads[key] = Object.assign({ ok: true, ms: Math.round(performance.now() - s) }, sum(r)); }
+        catch (e) { rep.downloads[key] = { ok: false, ms: Math.round(performance.now() - s), error: String((e && e.message) || e) }; }
+      };
+      const read = r => BM.parseFile(r.fileName, r.text);
+      await attempt('pubchem', () => BM.fetchdb.pubchem('aspirin', { timeout: 30000 }), r => { const ds = read(r); return { cid: r.cid, atoms: ds.frames[0].Z.length, formula: BM.geom.formula(ds.frames[0].Z) }; });
+      await attempt('pubchemSmiles', () => BM.fetchdb.pubchem('sodium chloride', { timeout: 30000 }), r => ({ cid: r.cid, conformer: !!r.text, smiles: r.smiles || null }));
+      await attempt('pdb', () => BM.fetchdb.pdb('1CRN', { timeout: 30000 }), r => { const ds = read(r); return { atoms: ds.frames[0].Z.length, title: ds.title, bytes: r.text.length }; });
+      await attempt('pdbAssembly', () => BM.fetchdb.pdb('1CRN', { timeout: 30000, assembly: true }), r => ({ atoms: read(r).frames[0].Z.length }));
+      await attempt('missing', () => BM.fetchdb.pdb('0XXX', { timeout: 30000 }), () => ({ note: 'found?' }));
+    }
     // a picture of the smallest molecule
     let image = null;
     const small = app.state.docs.slice().sort((a, b) => a.data.frames[0].Z.length - b.data.frames[0].Z.length)[0];

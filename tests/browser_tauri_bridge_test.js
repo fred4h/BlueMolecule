@@ -55,10 +55,11 @@ function mockTauri(files, opts) {
   const b64 = f => fs.readFileSync(path.join(FIX, f)).toString('base64');
   const files = [{ name: 'g16_water_optfreq.log', b64: b64('g16_water_optfreq.log') }, { name: 'cisplatin.xyz', b64: b64('cisplatin.xyz') }];
   const errors = [];
-  const open = async (init, extra) => {
+  const open = async (init, extra, route) => {
     const ctx = await browser.newContext({ viewport: { width: 1300, height: 900 } });
     await ctx.addInitScript(init);
     if (extra) await ctx.addInitScript(extra);
+    if (route) await ctx.route(/^https?:/, route);
     const page = await ctx.newPage();
     page.on('pageerror', e => errors.push(e.message));
     await page.goto(HTML);
@@ -155,12 +156,31 @@ function mockTauri(files, opts) {
 
   console.log('self-test script');
   const selfTest = fs.readFileSync(path.join(ROOT, 'desktop', 'src-tauri', 'src', 'selftest.js'), 'utf8');
-  page = await open(mockTauri(files, { selfTest: true }), selfTest);
+  // its downloads from PubChem and the PDB, answered here (the cloud builds ask the real services)
+  const asked = [], cors = { 'access-control-allow-origin': '*' };
+  const sdf = fs.readFileSync(path.join(FIX, 'acetic_acid.sdf'), 'utf8').replace(/^[^\n]*/, '2244');
+  const cif = fs.readFileSync(path.join(FIX, 'struct', 'small.mmcif'), 'utf8');
+  const answer = route => {
+    const u = route.request().url();
+    asked.push(u);
+    const ok = (body, type) => route.fulfill({ status: 200, body, headers: Object.assign({ 'content-type': type || 'text/plain' }, cors) });
+    if (/\/name\/aspirin\/SDF\?record_type=3d$/.test(u)) return ok(sdf);
+    if (/\/name\/sodium%20chloride\/property\/SMILES\/JSON$/.test(u)) return ok('{"PropertyTable":{"Properties":[{"CID":5234,"SMILES":"[Na+].[Cl-]"}]}}', 'application/json');
+    if (/\/download\/1CRN(-assembly1)?\.cif$/.test(u)) return ok(cif);
+    return route.fulfill({ status: 404, body: 'Not Found', headers: cors });
+  };
+  page = await open(mockTauri(files, { selfTest: true }), selfTest, answer);
   await page.waitForFunction(() => window.__report, null, { timeout: 60000 });
   const rep = await page.evaluate(() => window.__report);
   check(rep.report.ok === true, 'the self-test passes in Chromium: ' + JSON.stringify(rep.report.checks) + ' ' + (rep.report.error || '') + ' ' + rep.report.errors.join(' | '));
   check(rep.report.files.length === 2 && rep.report.files[1].atoms === 11 && rep.report.gpu, 'it reports the files and the GPU: ' + JSON.stringify(rep.report.files.map(f => f.name)) + ' ' + rep.report.gpu);
   check(typeof rep.image === 'string' && rep.image.length > 4000 && atob(rep.image.slice(0, 12)).startsWith('\x89PNG'), 'and a picture of the view');
+  const dl = rep.report.downloads || {};
+  check(dl.pubchem && dl.pubchem.ok && dl.pubchem.atoms === 8 && dl.pubchem.cid === '2244', 'it reports a PubChem download: ' + JSON.stringify(dl.pubchem));
+  check(dl.pubchemSmiles && dl.pubchemSmiles.ok && dl.pubchemSmiles.smiles === '[Na+].[Cl-]' && !dl.pubchemSmiles.conformer, 'and one without a 3D conformer: ' + JSON.stringify(dl.pubchemSmiles));
+  check(dl.pdb && dl.pdb.ok && dl.pdb.atoms > 0 && dl.pdbAssembly && dl.pdbAssembly.ok, 'and the PDB entry and assembly: ' + JSON.stringify([dl.pdb, dl.pdbAssembly]));
+  check(dl.missing && !dl.missing.ok && /no entry 0XXX/.test(dl.missing.error), 'and a missing entry: ' + JSON.stringify(dl.missing));
+  check(asked.length === 6 && asked.every(u => /^https:\/\/(pubchem\.ncbi\.nlm\.nih\.gov|files\.rcsb\.org)\//.test(u)), 'only the two databases were asked: ' + asked.join(' '));
   await page.context().close();
 
   const errs = errors.filter(e => !/WebGL|GPU stall/i.test(e));

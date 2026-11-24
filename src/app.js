@@ -17,7 +17,7 @@
     cartoon: { bg: 'white', material: 'flat', ao: 0, outline: 2, dof: 0, shadows: false, floor: false, gradient: false, fog: false }
   };
   const FX_KEYS = ['material', 'ao', 'outline', 'dof', 'shadows', 'floor', 'gradient'];
-  const VERSION = '2.5.0';
+  const VERSION = '2.6.0';
   const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const isNum = v => typeof v === 'number' && isFinite(v);
   const fx = (v, d) => (isNum(v) ? v.toFixed(d) : '—');
@@ -1661,6 +1661,7 @@
     if (d.pending) html += `<div class="sec"><div class="route pending-note">Coordinates pending: open a coordinate or trajectory file with ${f.Z.length} atoms (inpcrd, NetCDF, DCD, TRR, XTC, PDB, GRO…).</div></div>`;
     html += sec('File', kv([
       ['Name', esc(d.name)], ['Format', esc(formatName(data))], ['Program', esc(data.program)], ['Title', esc(data.title)],
+      ['Downloaded', data.downloaded ? `<span title="${esc(data.downloaded.url)}">${esc(data.downloaded.from)} · ${esc(data.downloaded.date)}</span>` : null],
       ['Status', term], ['Jobs', esc((m.jobTypes || []).join(', '))]]));
     html += loadedHtml(d);
     const route = m.route || m.keywords;
@@ -3175,6 +3176,7 @@
         ${k('MD files', 'Open a topology (prmtop, PSF) or structure first, then coordinates or trajectories (inpcrd, Amber NetCDF, DCD, TRR, XTC) with the same atom count')}
         ${k('Files of 1 GB+', 'A dialog asks what to load: every Nth step or frame, a range or the last N, and which vibrations; Info → Load other parts… reads it again')}
         ${k('Other formats', 'Converted with Open Babel when the BlueMolecule app or launcher finds obabel')}
+        ${k('Download', 'A molecule from PubChem by name or CID, or an entry or biological assembly from the PDB by its ID; off until you allow it in the dialog')}
         ${k('Export', 'Save as… (structure, crystal, MD and QC formats, plus Open Babel), calculation inputs for ten programs, images, vibration animations')}
       </div>
       <p class="note">The Build tab adds SMILES, a fragment library, hydrogens, bond orders, alignment, a clean-up force field (not a QM method), symmetry and a coordinate editor. BlueMolecule is an independent viewer for quantum-chemistry work; everything runs locally and files never leave your computer.</p>`,
@@ -3203,7 +3205,7 @@
     }
     status(r.available ? 'An update is available' : 'Ready');
     const box = r.supported === false ? '' : `<label class="upd-auto"><input type="checkbox" data-upd="auto"${updatesAuto() ? ' checked' : ''}> Check for updates when BlueMolecule starts</label>
-      <p class="note">A check asks GitHub for the latest release and sends nothing else. It is BlueMolecule's only use of the network, and it never happens unless you ask or tick this box.</p>`;
+      <p class="note">A check asks GitHub for the latest release and sends nothing else. It never happens unless you ask or tick this box. (BlueMolecule's only other use of the network is Download, from PubChem and the PDB, which is off until you allow it.)</p>`;
     const keep = form => { const c = form.querySelector('[data-upd="auto"]'); if (c) setUpdatesAuto(c.checked); };
     if (r.available) {
       dialog(`BlueMolecule ${esc(r.version)} is available`, `<p>You have version ${esc(r.current)}${r.date ? '; this one was released on ' + esc(String(r.date).slice(0, 10)) : ''}.</p>
@@ -3222,6 +3224,126 @@
         : r.error ? 'The check did not succeed: ' + esc(r.error) : `BlueMolecule ${esc(r.current)} is the latest version.`;
       dialog('Updates', `<p>${msg}</p>${box}`, [{ label: 'Close', primary: true, onClick: f => { keep(f); } }]);
     }
+  }
+
+  // ---------------- downloads from PubChem and the PDB (issue #22) ----------------
+  // Off until the user ticks "Allow downloads…" in the dialog, and even then a request goes out only when they press
+  // Download. What is sent is what they typed, as part of the address (BM.fetchdb).
+  const DOWNLOADS_KEY = 'bluemolecule.downloads.allow', DOWNLOADS_PREFS = 'bluemolecule.downloads';
+  function downloadsAllowed() { try { return localStorage.getItem(DOWNLOADS_KEY) === '1'; } catch (e) { return false; } }
+  function setDownloadsAllowed(on) { try { localStorage.setItem(DOWNLOADS_KEY, on ? '1' : '0'); } catch (e) { /* ignore */ } }
+  function downloadPrefs() {
+    let p = {};
+    try { p = JSON.parse(localStorage.getItem(DOWNLOADS_PREFS) || '{}') || {}; } catch (e) { p = {}; }
+    return { source: p.source === 'pdb' ? 'pdb' : 'pubchem', assembly: !!p.assembly };
+  }
+  const sizeText = n => n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' kB';
+  let download = null;   // the running download: {ctl: AbortController}
+  function stopDownload() { if (download) { const j = download; download = null; j.ctl.abort(); } }
+  /** The Download dialog: PubChem by name or CID, or the PDB by ID (optionally the first biological assembly). */
+  function downloadDialog(source) {
+    const p = downloadPrefs();
+    if (source === 'pdb' || source === 'pubchem') p.source = source;
+    let busy = false;
+    const body = `<div class="fdb">
+        <div class="field"><span>Database</span><span class="sa-seg">
+          <label><input type="radio" name="fdb-src" value="pubchem" ${p.source === 'pubchem' ? 'checked' : ''}> PubChem (molecules)</label>
+          <label><input type="radio" name="fdb-src" value="pdb" ${p.source === 'pdb' ? 'checked' : ''}> Protein Data Bank</label></span></div>
+        <label class="field"><span data-fdb="ql">Name or CID</span><input type="text" data-fdb="q" spellcheck="false" autocomplete="off"></label>
+        <label class="field" data-fdb="asmrow"><span></span><span class="inline"><input type="checkbox" data-fdb="asm" ${p.assembly ? 'checked' : ''}> biological assembly 1, instead of the deposited coordinates</span></label>
+        <label class="fdb-allow"><input type="checkbox" data-fdb="allow" ${downloadsAllowed() ? 'checked' : ''}> Allow downloads from PubChem and the Protein Data Bank</label>
+        <p class="note">When you press Download, BlueMolecule sends what you typed above, and nothing else, to pubchem.ncbi.nlm.nih.gov (PubChem) or files.rcsb.org (RCSB PDB). Your files never leave your computer. Untick the box to turn downloads off again.</p>
+        <p class="note" data-fdb="msg" aria-live="polite"></p>
+      </div>`;
+    const src = form => { const r = $('input[name=fdb-src]:checked', form); return r ? r.value : 'pubchem'; };
+    const say = (form, text, err) => { const m = $('[data-fdb=msg]', form); if (m) { m.textContent = text || ''; m.classList.toggle('err', !!err); } };
+    const sync = form => {
+      const s = src(form), q = $('[data-fdb=q]', form);
+      $('[data-fdb=ql]', form).textContent = s === 'pdb' ? 'PDB ID' : 'Name or CID';
+      q.placeholder = s === 'pdb' ? 'e.g. 1CRN or 4HHB' : 'e.g. caffeine, ibuprofen or 2244';
+      $('[data-fdb=asmrow]', form).classList.toggle('hidden', s !== 'pdb');
+      $$('input', form).forEach(i => { if (i.dataset.fdb !== 'allow') i.disabled = busy; });
+      const go = $('[data-dbtn="1"]', form);
+      if (go) go.disabled = busy || !$('[data-fdb=allow]', form).checked;
+    };
+    const unticked = 'Tick “Allow downloads…” first.';
+    dialog('Download a structure', body, [
+      { label: 'Cancel', onClick: () => { stopDownload(); } },
+      { label: 'Download', primary: true, onClick: async form => {
+        if (busy) return true;
+        const s = src(form), q = $('[data-fdb=q]', form).value, asm = $('[data-fdb=asm]', form).checked;
+        if (!$('[data-fdb=allow]', form).checked) { say(form, unticked, true); return true; }
+        const chk = BM.fetchdb.parse(s, q);
+        if (chk.error) { say(form, chk.error, true); $('[data-fdb=q]', form).focus(); return true; }
+        try { localStorage.setItem(DOWNLOADS_PREFS, JSON.stringify({ source: s, assembly: asm })); } catch (e) { /* ignore */ }
+        const where = s === 'pdb' ? 'the Protein Data Bank' : 'PubChem';
+        stopDownload();
+        const job = { ctl: new AbortController() };
+        download = job; busy = true; sync(form);
+        say(form, 'Downloading from ' + where + '…'); status('Downloading from ' + where + '…');
+        const onProgress = n => { if (download === job) say(form, 'Downloading from ' + where + '… ' + sizeText(n)); };
+        try {
+          const opts = { signal: job.ctl.signal, onProgress, assembly: asm };
+          const r = s === 'pdb' ? await BM.fetchdb.pdb(q, opts) : await BM.fetchdb.pubchem(q, opts);
+          if (download !== job) return true;             // cancelled meanwhile (Cancel and Esc close the dialog themselves)
+          download = null; busy = false;
+          status('Ready');
+          openDownload(r);
+          return false;
+        } catch (e) {
+          if (download !== job) return true;
+          download = null; busy = false; sync(form);
+          status('Ready');
+          say(form, e.message || String(e), true);
+          return true;
+        }
+      } }], form => {
+      sync(form);
+      $$('input[name=fdb-src]', form).forEach(r => r.addEventListener('change', () => { say(form, ''); sync(form); $('[data-fdb=q]', form).focus(); }));
+      $('[data-fdb=allow]', form).addEventListener('change', e => {
+        setDownloadsAllowed(e.target.checked);
+        if (!e.target.checked && busy) { stopDownload(); busy = false; status('Ready'); say(form, 'Download stopped.'); }
+        else say(form, '');
+        sync(form);
+      });
+      const qi = $('[data-fdb=q]', form);
+      qi.addEventListener('keydown', e => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();                                // (Enter would otherwise submit, and close, the dialog)
+        const go = $('[data-dbtn="1"]', form);
+        if (go && !go.disabled) go.click(); else if (!busy) say(form, unticked, true);
+      });
+      qi.focus();
+      $('#dlg').addEventListener('close', stopDownload, { once: true });
+    });
+  }
+  /** A downloaded structure opens like a file of its format; a PubChem compound without a 3D conformer is built from
+   *  its SMILES with BlueMolecule's own builder, and says so. */
+  function openDownload(r) {
+    const from = r.source === 'pdb' ? 'RCSB Protein Data Bank' + (r.assembly ? ', biological assembly 1' : '') : 'PubChem' + (r.cid ? ' CID ' + r.cid : '');
+    let ds;
+    if (r.text) {
+      try { ds = BM.parseFile(r.fileName, r.text); } catch (e) { toast(conciseError(e.message), true); return null; }
+      if (r.source === 'pubchem') ds.title = r.name + (r.cid && r.name !== 'CID ' + r.cid ? ' · PubChem CID ' + r.cid : '');
+    } else {
+      let b;
+      try { b = BM.chem.smilesTo3D(r.smiles, { seed: 1 }); }
+      catch (e) { toast('PubChem has no 3D structure of ' + r.name + ', and its SMILES could not be built: ' + e.message, true); return null; }
+      const mol = b.mol, arom = new Set(b.aromaticBonds || []);
+      ds = BM.emptyDataset('built', r.fileName);
+      ds.program = 'BlueMolecule, from the PubChem SMILES';
+      ds.title = r.name + (r.cid && r.name !== 'CID ' + r.cid ? ' · PubChem CID ' + r.cid : '');
+      ds.bonds = mol.bonds.map((bd, k) => [bd[0], bd[1], arom.has(k) ? 1.5 : bd[2]]);
+      const fr = { Z: Array.from(mol.Z), xyz: Float64Array.from(mol.xyz), energy: null, energies: null, label: 'Built from the PubChem SMILES', converged: false, opt: null, atomNames: null, resNames: null, resIds: null };
+      if (mol.formalCharges && mol.formalCharges.some(q => q)) fr.formalCharges = Array.from(mol.formalCharges, q => q || 0);
+      ds.frames = [fr];
+      ds.warnings.push('PubChem has no 3D conformer of this compound, so BlueMolecule built one from its SMILES, ' + r.smiles +
+        ', with its own builder and clean-up force field (not a PubChem conformer).' + (b.warnings.length ? ' ' + b.warnings.join(' ') : ''));
+    }
+    ds.downloaded = { from, url: r.url, date: new Date().toISOString().slice(0, 10) };
+    const d = openData(r.fileName, ds, ' from ' + (r.source === 'pdb' ? 'the PDB' : 'PubChem'));
+    if (d && !r.text && state.active === d) { d.tab = 'info'; renderTabs(); renderPanel(); }
+    return d;
   }
 
   // ---------------- status ----------------
@@ -3293,6 +3415,8 @@
     $('#btn-open').onclick = () => openDialog();
     $('#btn-open-2').onclick = () => openDialog();
     $('#btn-open-3').onclick = () => openDialog();
+    $('#btn-fetch').onclick = () => downloadDialog();
+    $('#btn-fetch-2').onclick = () => downloadDialog();
     $('#file-input').onchange = e => { openFiles(e.target.files); e.target.value = ''; };
     $('#btn-image').onclick = exportImage;
     $('#btn-help').onclick = showHelp;
@@ -3651,7 +3775,7 @@
     }
     loadLaunchFiles();
     BM.app = {
-      state, openText, openFile, openFiles, openDialog, loadLaunchFiles, openData, activate, selectVib, setFrame, setView, R: () => R, plot: () => plot, exportSimple, exportGaussian, exportOrca, exportCalc, plotCSV, displace, onAtomClick, editSet, undo,
+      state, openText, openFile, openFiles, openDialog, loadLaunchFiles, openData, downloadDialog, openDownload, activate, selectVib, setFrame, setView, R: () => R, plot: () => plot, exportSimple, exportGaussian, exportOrca, exportCalc, plotCSV, displace, onAtomClick, editSet, undo,
       saveAs, saveFile, saveContext, plotTypes, plotGroups, renderPlot, goTo, setJob, convFor, version: VERSION,
       curFrame, cellOf, topoFor, bondsFor, ordersFor, topoFrame, selectAll, editDelete, newMolecule: () => ui.newMolecule(), setTool: id => ui.setTool(id), ui: () => ui, kit,
       applyPreset, refreshReps, repCtx, selectBy, renderPanel, renderTabs

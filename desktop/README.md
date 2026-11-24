@@ -26,7 +26,8 @@ cd desktop && npx @tauri-apps/cli@2 build    # installers in src-tauri/target/re
 ```
 
 The self-test opens the files it is given, checks WebGL 2, saving and the native bridge, takes a picture of the view
-and exits with 0 when everything passed:
+and exits with 0 when everything passed. It also tries a few downloads from PubChem and the PDB (aspirin, sodium
+chloride, 1CRN) and reports them under `downloads`; they do not count towards passing:
 
 ```bash
 src-tauri/target/release/bluemolecule --self-test=$PWD/report.json ../tests/fixtures/cisplatin.xyz
