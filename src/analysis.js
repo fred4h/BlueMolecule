@@ -272,7 +272,13 @@
     const col = (s, spin, label) => {
       if (!s || !s.energies || !s.energies.length) return;
       const nOcc = isNum(s.nOcc) ? s.nOcc : 0;
-      out.push({ spin, label, levels: Array.from(s.energies, (e, i) => ({ index: i + 1, e, occ: i < nOcc })), homo: nOcc > 0 ? nOcc - 1 : -1, lumo: nOcc < s.energies.length ? nOcc : -1 });
+      // occupations, when the file gives them (Molden), mark the occupied orbitals; otherwise the first nOcc are
+      const occ = s.occupations && s.occupations.length === s.energies.length ? Array.from(s.occupations, x => x > 0.5) : null;
+      const levels = Array.from(s.energies, (e, i) => ({ index: i + 1, e, occ: occ ? occ[i] : i < nOcc }));
+      let homo = -1, lumo = -1;
+      levels.forEach((l, i) => { if (l.occ) homo = i; });
+      for (let i = homo + 1; i < levels.length; i++) if (!levels[i].occ) { lumo = i; break; }
+      out.push({ spin, label, levels, homo, lumo });
     };
     const beta = o.beta && o.beta.energies && o.beta.energies.length;
     col(o.alpha, 'alpha', beta ? 'α' : 'MO');

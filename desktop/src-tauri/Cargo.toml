@@ -1,6 +1,6 @@
 [package]
 name = "bluemolecule"
-version = "2.3.0"
+version = "2.4.0"
 description = "BlueMolecule: a viewer and builder for molecules and quantum-chemistry outputs"
 authors = ["Frederico Henrique Do. C. R. Ferreira"]
 license = "MIT"

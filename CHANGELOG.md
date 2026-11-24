@@ -3,6 +3,44 @@
 BlueMolecule is [vibe-coded](docs/vibe-coding.md). Each version below was written by an AI assistant from the
 author's requests and bug reports.
 
+## 2.4.0 (November 2026): orbitals and surfaces
+
+**Orbitals and densities from fchk and Molden files** (issue #17), in the Surfaces tab:
+- BlueMolecule computes orbitals, the electron density and the spin density from the basis set and MO coefficients
+  in the file, as `cubegen` and `orca_plot` do, so no cube file is needed. Pick an orbital in the menu (with its
+  energy, occupation and HOMO/LUMO label, α or β), or use **HOMO** and **LUMO**; or click a level of the MO energy
+  plot and **Show orbital**.
+- Three grids (0.45, 0.3 and 0.2 Bohr). The calculation runs in the background, in Web Workers on several cores,
+  with a progress bar, the time left and **Cancel**. Each result joins the list of surfaces and can be shown again,
+  removed, or saved as a cube file.
+- Shells of any angular momentum (s to i), pure or Cartesian. Programs write Molden files in different conventions:
+  BlueMolecule checks that the orbitals are orthonormal and recognises the conventions of ORCA (primitive
+  normalisation, signs of f and g functions), Psi4 (before 1.0, and 1.0 to 1.3.2), CFOUR and Turbomole. The tab says
+  which one it found, and warns when none fits.
+- **Save as → Molden** writes the basis set and orbitals in the standard Molden convention: fchk files can be
+  converted to Molden files.
+- Checked against other programs for the same wavefunctions: the densities of Gaussian 09's `cubegen`, of a density
+  cube written by NCIPLOT, of HORTON and of Multiwfn, orbital values of a Fortran code, and Q-Chem's overlap
+  matrices; and the orthonormality of the orbitals of real Gaussian, Q-Chem, Psi4, ORCA, CFOUR, Turbomole, Molpro
+  and Molden files (the public test files of the IOData, ChemTools and cclib projects, not included here).
+- Molden files: orbitals listed by symmetry (Molpro, Molcas) are sorted by energy. The MO energy plot follows the
+  occupations in the file.
+
+**Molecular surfaces and the electrostatic potential** (issue #18), in the Surfaces tab of any structure:
+- **van der Waals**, **solvent-accessible** and **solvent-excluded** (Connolly) surfaces, with a probe radius
+  (1.4 Å, water, by default). The solvent-excluded surface fills the grooves between atoms where the probe touches
+  two or three of them, accurately to a small fraction of the grid spacing. Computed in a worker.
+- The **electrostatic potential** coloured onto a density surface or a molecular surface (red negative, white,
+  blue positive), with a range in atomic units and kcal/mol. It comes from the file's atomic charges (Mulliken,
+  ESP, NPA…, as point charges) or from a potential cube opened for the same atoms, in the same or another document.
+  Cube files of an electrostatic potential are recognised as potentials.
+
+Also:
+- fchk files: numbers that touch (Psi4 writes three-digit exponents into 16 columns) are read; before, such a file
+  could not be opened. Q-Chem optimisations and MD runs write the basis set at the first geometry and the orbitals
+  of a later one; the orbitals are placed at their own geometry.
+- The Surfaces tab is there for every structure, and a new surface zooms the view out when it does not fit.
+
 ## 2.3.0 (November 2026): more programs
 
 New readers, each checked against the public test files of the cclib project (outputs of several versions of each

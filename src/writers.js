@@ -696,7 +696,7 @@
   BM.registerSaveFormat = registerSaveFormat;
 })(typeof window !== 'undefined' ? (window.BM = window.BM || {}) : (globalThis.BM = globalThis.BM || {}));
 
-/* "Save as" formats for quantum-chemistry exchange: Molden (atoms + vibrations), Gaussian cube,
+/* "Save as" formats for quantum-chemistry exchange: Molden (atoms, vibrations and the orbitals of fchk and Molden files), Gaussian cube,
  * Gaussian input and ORCA input built from the current structure and dataset metadata. */
 (function (BM) {
   'use strict';
@@ -719,9 +719,14 @@
 
   function molden(c) {
     if (!c || !c.Z || !c.xyz) throw new Error('Molden export needs a structure.');
-    const L = ['[Molden Format]', '[Title]', ' ' + (line1(c.title) || 'BlueMolecule'), '[Atoms] Angs'];
-    c.Z.forEach((z, i) => L.push(sym(z).padEnd(4) + ix(i + 1, 6) + ix(Math.max(0, z), 5) +
-      fx(c.xyz[3 * i], 18, 10) + fx(c.xyz[3 * i + 1], 18, 10) + fx(c.xyz[3 * i + 2], 18, 10)));
+    // the basis set and orbitals (an fchk file converted to Molden), when they belong to this geometry
+    const orb = c.orbitalModel && BM.orbitals ? BM.orbitals.moldenSections(c.orbitalModel, c.Z, c.xyz) : null;
+    const L = ['[Molden Format]', '[Title]', ' ' + (line1(c.title) || 'BlueMolecule'), orb ? '[Atoms] AU' : '[Atoms] Angs'];
+    c.Z.forEach((z, i) => {
+      // with orbitals: the atoms in Bohr at the basis centres, so that the orbitals are exactly the file's
+      const p = orb ? (orb.centres[i] || [c.xyz[3 * i] / BOHR, c.xyz[3 * i + 1] / BOHR, c.xyz[3 * i + 2] / BOHR]) : [c.xyz[3 * i], c.xyz[3 * i + 1], c.xyz[3 * i + 2]];
+      L.push(sym(z).padEnd(4) + ix(i + 1, 6) + ix(Math.max(0, z), 5) + fx(p[0], 18, 10) + fx(p[1], 18, 10) + fx(p[2], 18, 10));
+    });
     const v = c.vibrations;
     if (v && v.freqs && v.freqs.length && v.modes && v.modes.length) {
       let g = c.frames && c.frames[v.frameIndex];
@@ -744,6 +749,7 @@
         for (let k = 0; k < nm; k++) L.push(fx(v.ir[k], 14, 4) + (fin(v.raman) ? fx(v.raman[k], 14, 4) : ''));
       }
     }
+    if (orb) L.push(...orb);
     return L.join('\n') + '\n';
   }
 
@@ -780,7 +786,7 @@
   const cm = (m, k, d) => (m && Number.isFinite(m[k]) ? m[k] : d);
 
   const R = BM.registerSaveFormat;
-  R({ id: 'molden', name: 'Molden (atoms + vibrations)', ext: 'molden', write: molden });
+  R({ id: 'molden', name: 'Molden (atoms, vibrations, orbitals)', ext: 'molden', write: molden });
   R({ id: 'cube', name: 'Gaussian cube (Bohr)', ext: 'cube', kind: 'volume', needs: ['volume'], write: cube });
   R({ id: 'gaussian-input', name: 'Gaussian input', ext: 'gjf', write: c => BM.writers.gaussianInput({ Z: c.Z, xyz: c.xyz,
     route: gaussianRoute(c.meta), title: line1(c.title) || 'BlueMolecule', charge: cm(c.meta, 'charge', 0),

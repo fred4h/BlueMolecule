@@ -17,7 +17,7 @@
     cartoon: { bg: 'white', material: 'flat', ao: 0, outline: 2, dof: 0, shadows: false, floor: false, gradient: false, fog: false }
   };
   const FX_KEYS = ['material', 'ao', 'outline', 'dof', 'shadows', 'floor', 'gradient'];
-  const VERSION = '2.3.0';
+  const VERSION = '2.4.0';
   const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const isNum = v => typeof v === 'number' && isFinite(v);
   const fx = (v, d) => (isNum(v) ? v.toFixed(d) : '—');
@@ -113,12 +113,18 @@
 
   function makeSurface(v, i) {
     const st = BM.iso.stats(v);
+    if (v.kind === 'molsurf') {   // a molecular surface: the zero level of its field (BM.molsurf)
+      return { vol: v, stats: st, iso: 0, visible: i === 0, opacity: 1, both: false, colorPos: '#b9c9de', colorNeg: '#ff8c42', mesh: null, meshIso: null, esp: { src: 'none', range: null } };
+    }
     let iso;
     if (v.kind === 'density') iso = st.absMax > 0.02 ? 0.002 : st.absMax * 0.2;
+    else if (v.kind === 'spin') iso = st.absMax > 0.02 ? 0.002 : st.absMax * 0.2;
     else if (v.kind === 'orbital') iso = st.absMax > 0.06 ? 0.02 : st.absMax * 0.3;
     else iso = st.absMax * 0.1;
     iso = Number(iso.toPrecision(2)) || 0.001;
-    return { vol: v, stats: st, iso, visible: i === 0, opacity: 1, both: st.min < -iso * 0.5 && v.kind !== 'density', colorPos: '#3b7bff', colorNeg: '#ff8c42', mesh: null, meshIso: null };
+    // both signs: orbitals and other signed volumes; the spin density whenever it has a negative part (spin polarisation)
+    const both = v.kind === 'spin' ? st.min < 0 : st.min < -iso * 0.5 && v.kind !== 'density';
+    return { vol: v, stats: st, iso, visible: i === 0, opacity: 1, both, colorPos: '#3b7bff', colorNeg: '#ff8c42', mesh: null, meshIso: null, esp: { src: 'none', range: null } };
   }
 
   function makeDoc(name, data) {
@@ -938,7 +944,10 @@
     const list = [];
     for (const s of d.surfaces) {
       if (!s.visible) continue;
-      list.push({ mesh: surfaceMesh(s, 1), color: hex2rgb(s.colorPos), opacity: s.opacity });
+      const mesh = surfaceMesh(s, 1);
+      let colors = null;
+      try { colors = espColors(d, s, mesh); } catch (e) { console.warn('[BlueMolecule] surface colours failed:', e); }
+      list.push({ mesh, color: hex2rgb(s.colorPos), opacity: s.opacity, colors });
       if (s.both) list.push({ mesh: surfaceMesh(s, -1), color: hex2rgb(s.colorNeg), opacity: s.opacity });
     }
     R.setSurfaces(list);
@@ -1584,7 +1593,7 @@
     if (d.data.frames.length > 1) t.push(['steps', 'Steps', visibleFrames(d).length]);
     if (d.data.vibrations) t.push(['vib', 'Vibrations', d.data.vibrations.freqs.length]);
     if (d.data.excitedStates && d.data.excitedStates.length) t.push(['states', 'States', d.data.excitedStates.length]);
-    if (d.surfaces.length) t.push(['surf', 'Surfaces', d.surfaces.length]);
+    if (d.surfaces.length || (!d.pending && curFrame(d).Z.length)) t.push(['surf', 'Surfaces', d.surfaces.length || 0]);
     if (!d.pending) t.push(['build', 'Build']);
     return t;
   }
@@ -1742,7 +1751,9 @@
       const a = mo[0], gap = a.homo >= 0 && a.lumo >= 0 ? (a.levels[a.lumo].e - a.levels[a.homo].e) * HARTREE.ev : null;
       it.push({ name: 'Orbital energies', count: mo.reduce((x, c2) => x + c2.levels.length, 0), sub: (mo.length > 1 ? 'α + β' : '') + (isNum(gap) ? (mo.length > 1 ? ' · ' : '') + 'gap ' + gap.toFixed(2) + ' eV' : ''), plot: 'mo', anchor: 'sec-orb' });
     }
-    if (d.surfaces.length) it.push({ name: 'Volumes', count: d.surfaces.length, sub: [...new Set(d.surfaces.map(x => x.vol.kind))].join(', '), tab: 'surf' });
+    const bm = data.basis && data.mos && BM.orbitals ? BM.orbitals.model(data) : null;
+    if (bm) it.push({ name: 'Basis set and orbitals', count: bm.nbf, sub: 'functions · orbitals and densities can be drawn', tab: 'surf' });
+    if (d.surfaces.length) it.push({ name: 'Volumes', count: d.surfaces.length, sub: [...new Set(d.surfaces.map(x => KIND_NAMES[x.vol.kind] || x.vol.kind))].join(', '), tab: 'surf' });
     const T = data.thermo;
     if (T) it.push({ name: 'Thermochemistry', count: '', sub: isNum(T.G) ? 'G = ' + T.G.toFixed(5) : isNum(T.zpe) ? 'ZPE' : '', anchor: 'sec-thermo' });
     if (data.dipole) it.push({ name: 'Dipole', count: '', sub: isNum(data.dipole.total) ? data.dipole.total.toFixed(3) + ' D' : '', anchor: 'sec-dipole' });
@@ -1912,21 +1923,254 @@
       <p class="note">Contributions are 2c² for closed-shell Gaussian output and c² otherwise.</p></div>${det}`;
   }
 
-  function panelSurf(d) {
-    return d.surfaces.map((s, i) => {
-      const mx = s.stats.absMax || 1;
-      const lo = Math.max(mx * 1e-4, 1e-6);
-      const pos = Math.log(s.iso / lo) / Math.log(mx / lo);
-      return `<div class="surf" data-surf="${i}">
-        <div class="surf-head"><input type="checkbox" data-s="visible" ${s.visible ? 'checked' : ''}><span class="t" title="${esc(s.vol.name)}">${esc(s.vol.name || 'Volume ' + (i + 1))}</span><span class="badge pill">${esc(s.vol.kind)}</span></div>
+  // ---------------- Surfaces tab: computed orbitals and densities, molecular surfaces, ESP colouring ----------------
+  const ORB_GRIDS = { coarse: { h: 0.45, max: 1.5e6, name: 'Coarse' }, medium: { h: 0.3, max: 4e6, name: 'Medium' }, fine: { h: 0.2, max: 1e7, name: 'Fine' } };
+  const KIND_NAMES = { orbital: 'orbital', density: 'density', spin: 'spin density', molsurf: 'surface', potential: 'potential', other: 'volume' };
+  /** The orbital section's choices for a document (created on first use, HOMO selected). */
+  function orbState(d, M) {
+    if (!d.orb) {
+      const f = BM.orbitals.frontier(M, 'alpha');
+      d.orb = { kind: 'mo', spin: 'alpha', index: Math.max(0, f.homo), grid: 'medium' };
+    }
+    if (!M.sets[d.orb.spin]) d.orb.spin = 'alpha';
+    return d.orb;
+  }
+  function orbOptions(M, spin, sel) {
+    const items = BM.orbitals.list(M).filter(x => x.spin === spin), EV = HARTREE.ev;
+    return items.map(x => `<option value="${x.index}" ${x.index === sel ? 'selected' : ''}>${x.index + 1}${x.tag ? ' · ' + x.tag : ''}${isNum(x.energy) ? ' · ' + (x.energy * EV).toFixed(2) + ' eV' : ''}${x.occ ? ' · occ ' + (+x.occ.toFixed(3)) : ''}${x.sym ? ' · ' + esc(x.sym) : ''}</option>`).join('');
+  }
+  /** Progress text: percent, and the time left once it can be told. */
+  function jobText(job) {
+    if (job.progress === null) return 'working…';
+    const f = job.progress || 0, pc = Math.round(100 * f), el = (Date.now() - job.t0) / 1000;
+    if (f < 0.05 || el < 2) return pc + '%';
+    const left = el * (1 - f) / f;
+    return pc + '% · ' + (left < 90 ? Math.ceil(left) + ' s' : Math.ceil(left / 60) + ' min') + ' left';
+  }
+  function jobBar(job, act) {
+    const pc = job.progress === null ? 100 : Math.round(100 * (job.progress || 0));
+    return `<div class="sf-job"><span class="sf-bar${job.progress === null ? ' busy' : ''}"><i style="width:${pc}%"></i></span><span class="note mono" data-sf-pc>${esc(jobText(job))}</span><button class="btn small" data-act="${act}">Cancel</button></div>`;
+  }
+  function panelOrbitals(d, M) {
+    const o = orbState(d, M), det = M.detected, uhf = !!M.sets.beta, spin = BM.orbitals.hasSpin(M);
+    const kinds = [['mo', 'Orbital'], ['density', 'Electron density']].concat(spin ? [['spin', 'Spin density']] : []);
+    const busy = d.orbJob;
+    const conv = !det ? 'Checking the orbitals…' : det.skipped ? `The orbitals were not checked (${M.nbf} basis functions)` : det.error <= 1e-3 ? `MOs orthonormal to ${det.error.toExponential(0)} (${esc(BM.orbitals.describe(det))})` : `<span class="warn">The MOs are not orthonormal in any convention BlueMolecule knows (deviation ${det.error.toExponential(1)}); the result may be wrong.</span>`;
+    return `<div class="sec" id="sf-orb"><h3>Orbitals and densities</h3>
+      <div class="controls">
+        <label class="field"><span>Show</span><select data-orb="kind">${kinds.map(([k, n]) => `<option value="${k}" ${o.kind === k ? 'selected' : ''}>${n}</option>`).join('')}</select><span></span></label>
+        ${o.kind === 'mo' ? `${uhf ? `<label class="field"><span>Spin</span><select data-orb="spin"><option value="alpha" ${o.spin === 'alpha' ? 'selected' : ''}>α</option><option value="beta" ${o.spin === 'beta' ? 'selected' : ''}>β</option></select><span></span></label>` : ''}
+        <label class="field"><span>Orbital</span><select data-orb="index">${orbOptions(M, o.spin, o.index)}</select><span></span></label>` : ''}
+        <label class="field" title="Grid spacing: coarse 0.45, medium 0.3, fine 0.2 Bohr"><span>Grid</span><select data-orb="grid">${Object.keys(ORB_GRIDS).map(k => `<option value="${k}" ${o.grid === k ? 'selected' : ''}>${ORB_GRIDS[k].name}</option>`).join('')}</select><span></span></label>
+      </div>
+      ${busy ? jobBar(busy, 'sf-orb-cancel') : `<div class="btnrow"><button class="btn small primary" data-act="sf-orb">Compute</button>${o.kind === 'mo' ? `<button class="btn small" data-act="sf-homo" title="Compute the highest occupied orbital">HOMO</button><button class="btn small" data-act="sf-lumo" title="Compute the lowest unoccupied orbital">LUMO</button>` : ''}</div>`}
+      <p class="note">Computed from the basis set and orbitals in the file, as cubegen and orca_plot do.${conv ? ' ' + conv + '.' : ''}</p>
+    </div>`;
+  }
+  function panelMolSurf(d) {
+    const m = d.msurf || (d.msurf = { type: 'ses', probe: 1.4 });
+    const busy = d.msJob;
+    return `<div class="sec" id="sf-ms"><h3>Molecular surface</h3>
+      <div class="controls">
+        <label class="field"><span>Surface</span><select data-ms="type">${[['vdw', 'van der Waals'], ['sas', 'Solvent accessible'], ['ses', 'Solvent excluded']].map(([k, n]) => `<option value="${k}" ${m.type === k ? 'selected' : ''}>${n}</option>`).join('')}</select><span></span></label>
+        ${m.type !== 'vdw' ? `<label class="field" title="1.4 Å is water"><span>Probe radius</span><input type="number" data-ms="probe" value="${m.probe}" min="0.1" max="5" step="0.1"><span class="note">Å</span></label>` : ''}
+      </div>
+      ${busy ? jobBar(busy, 'sf-ms-cancel') : `<div class="btnrow"><button class="btn small primary" data-act="sf-ms">Compute</button></div>`}
+    </div>`;
+  }
+  /** Sources of a surface's colour: atomic charges of the current geometry, and potential (or other) volumes of the
+   *  open documents on the same atoms. */
+  function espSources(d, s) {
+    const out = [['none', 'Single colour']];
+    for (const k of chargeSchemes(d)) out.push(['q:' + k, 'ESP of the ' + k + ' charges']);
+    const f = curFrame(d);
+    for (const doc of state.docs) {
+      const g = doc.data.frames[doc.frameIndex];
+      const same = doc === d || (g && g.xyz && f.xyz && g.Z.length === f.Z.length && g.Z.every((z, i) => z === f.Z[i]) && Array.from(g.xyz).every((x, i) => Math.abs(x - f.xyz[i]) < 2e-3));
+      if (!same) continue;
+      doc.surfaces.forEach((x, i) => {
+        if (x === s || x.vol.kind === 'molsurf' || x.vol.kind === 'orbital' || x.vol.kind === 'density') return;
+        out.push(['v:' + doc.id + ':' + i, (x.vol.kind === 'potential' ? 'Potential: ' : 'Volume: ') + (x.vol.name || 'volume') + (doc === d ? '' : ' (' + doc.name + ')')]);
+      });
+    }
+    return out;
+  }
+  function surfCard(d, s, i) {
+    const k = s.vol.kind, mx = s.stats.absMax || 1, lo = Math.max(mx * 1e-4, 1e-6), pos = Math.log(s.iso / lo) / Math.log(mx / lo);
+    const canColour = k === 'density' || k === 'molsurf';
+    const srcs = canColour ? espSources(d, s) : null;
+    const e = s.esp || (s.esp = { src: 'none', range: null });
+    if (srcs && !srcs.some(x => x[0] === e.src)) e.src = 'none';
+    const r = e.src !== 'none' ? (e.range > 0 ? e.range : e.auto) : null;
+    const info = k === 'molsurf' ? `${esc(s.vol.name)} · grid ${s.vol.surface.spacing.toFixed(2)} Å` + (s.frameLabel ? ' · ' + esc(s.frameLabel) : '')
+      : `grid ${s.vol.dims.join(' × ')} · min ${s.stats.min.toExponential(2)} · max ${s.stats.max.toExponential(2)}` + (s.vol.computed ? ` · spacing ${(s.vol.computed.spacing * 0.529177).toFixed(2)} Å` : '');
+    return `<div class="surf" data-surf="${i}">
+        <div class="surf-head"><input type="checkbox" data-s="visible" ${s.visible ? 'checked' : ''}><span class="t" title="${esc(s.vol.name)}">${esc(s.vol.name || 'Volume ' + (i + 1))}</span><span class="badge pill">${esc(KIND_NAMES[k] || k)}</span>${s.computed ? `<button class="btn small icon-only" data-act="sf-del" title="Remove">×</button>` : ''}</div>
         <div class="controls" style="margin:4px 0 0">
-          <label class="field"><span>Isovalue</span><input type="range" data-s="isoSlider" min="0" max="1" step="0.001" value="${Math.max(0, Math.min(1, pos)).toFixed(3)}"><input type="number" data-s="iso" value="${s.iso}" step="any" style="width:84px"></label>
+          ${k === 'molsurf' ? '' : `<label class="field"><span>Isovalue</span><input type="range" data-s="isoSlider" min="0" max="1" step="0.001" value="${Math.max(0, Math.min(1, pos)).toFixed(3)}"><input type="number" data-s="iso" value="${s.iso}" step="any" style="width:84px"></label>`}
           <label class="field"><span>Opacity</span><input type="range" data-s="opacity" min="0.15" max="1" step="0.05" value="${s.opacity}"><output>${Math.round(s.opacity * 100)}%</output></label>
-          <div class="field"><span>Colours</span><span class="inline"><input type="color" data-s="colorPos" value="${s.colorPos}" title="Positive">${s.stats.min < 0 ? `<input type="color" data-s="colorNeg" value="${s.colorNeg}" title="Negative"><label class="inline"><input type="checkbox" data-s="both" ${s.both ? 'checked' : ''}> ± lobes</label>` : ''}</span><span></span></div>
+          ${canColour ? `<label class="field"><span>Colour</span><select data-s="esp">${srcs.map(([v, n]) => `<option value="${esc(v)}" ${v === e.src ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select><span></span></label>` : ''}
+          ${e.src !== 'none' ? `<label class="field" title="Potential at the ends of the colour scale (atomic units; empty: from the surface)"><span>Range ±</span><input type="number" data-s="espRange" value="${e.range > 0 ? e.range : ''}" placeholder="${isNum(e.auto) ? e.auto.toPrecision(2) : 'auto'}" step="any" min="0"><span class="note">a.u.</span></label>
+            <div class="esp-scale"><span>${isNum(r) ? '−' + r.toPrecision(2) : ''}</span><i></i><span>${isNum(r) ? '+' + r.toPrecision(2) : ''}</span></div>
+            <p class="note">${isNum(r) ? `Red: negative potential (electron rich), blue: positive. ±${r.toPrecision(2)} a.u. = ±${(r * HARTREE.kcal).toFixed(1)} kcal/mol.` : ''}${e.src.startsWith('q:') ? ' From point charges at the atoms: an approximation of the real potential.' : ''}</p>` : `<div class="field"><span>Colours</span><span class="inline"><input type="color" data-s="colorPos" value="${s.colorPos}" title="Positive">${s.stats.min < 0 && k !== 'molsurf' ? `<input type="color" data-s="colorNeg" value="${s.colorNeg}" title="Negative"><label class="inline"><input type="checkbox" data-s="both" ${s.both ? 'checked' : ''}> ± lobes</label>` : ''}</span><span></span></div>`}
         </div>
-        <p class="note mono">grid ${s.vol.dims.join(' × ')} · min ${s.stats.min.toExponential(2)} · max ${s.stats.max.toExponential(2)}</p>
+        <p class="note mono">${info}</p>
       </div>`;
-    }).join('') + '<p class="note">Isosurfaces are computed from the cube grid. To view an orbital, generate a cube with cubegen (Gaussian) or orca_plot (ORCA).</p>';
+  }
+  function panelSurf(d) {
+    const M = BM.orbitals ? BM.orbitals.model(d.data) : null;
+    // the orthonormality check (an overlap matrix: up to a few seconds for thousands of functions), after the panel
+    if (M && !M.detected && !M._checking) {
+      M._checking = true;
+      setTimeout(() => {
+        try { BM.orbitals.detect(M); } catch (e) { console.warn('[BlueMolecule] orbital check failed:', e); }
+        M._checking = false;
+        if (state.active === d && d.tab === 'surf' && !d.orbJob) renderPanel();
+      }, 30);
+    }
+    const cards = d.surfaces.map((s, i) => surfCard(d, s, i)).join('');
+    const tip = M ? '' : d.surfaces.some(s => s.vol.kind === 'orbital') ? '' : '<p class="note">To view orbitals, open the calculation’s fchk or Molden file, or a cube from cubegen (Gaussian) or orca_plot (ORCA).</p>';
+    return (M ? panelOrbitals(d, M) : '') + panelMolSurf(d) + (cards ? `<div class="sec"><h3>Surfaces</h3>${cards}</div>` : '') + tip;
+  }
+  /** Index of a frame with the basis set's geometry (the orbitals belong to it), or -1. */
+  function basisFrame(d, M) {
+    const fr = d.data.frames, B = 0.529177210903;
+    const cen = new Map();
+    for (const sh of M.shells) if (!cen.has(sh.atom)) cen.set(sh.atom, sh.center);
+    const fits = f => f && f.xyz && Array.from(cen).every(([a, c]) => a < f.Z.length && Math.abs(f.xyz[3 * a] - c[0] * B) < 2e-3 && Math.abs(f.xyz[3 * a + 1] - c[1] * B) < 2e-3 && Math.abs(f.xyz[3 * a + 2] - c[2] * B) < 2e-3);
+    if (fits(fr[d.frameIndex])) return d.frameIndex;
+    for (let k = fr.length - 1; k >= 0; k--) if (fits(fr[k])) return k;
+    return -1;
+  }
+  function addComputed(d, vol, key) {
+    const s = makeSurface(vol, 0);
+    s.visible = true; s.computed = true; s.key = key;
+    // the new surface alone (the others stay in the list, to be shown again with their check boxes)
+    for (const x of d.surfaces) x.visible = false;
+    d.surfaces.push(s);
+    // keep memory in check: at most 12 computed volumes, the oldest hidden ones go first
+    let comp = d.surfaces.filter(x => x.computed);
+    while (comp.length > 12) { const old = comp.find(x => !x.visible) || comp[0]; d.surfaces.splice(d.surfaces.indexOf(old), 1); comp = d.surfaces.filter(x => x.computed); }
+    return s;
+  }
+  function computeOrbital(d) {
+    const M = BM.orbitals.model(d.data);
+    if (!M || d.orbJob) return;
+    const o = orbState(d, M);
+    const what = o.kind === 'mo' ? { kind: 'mo', spin: o.spin, index: o.index } : { kind: o.kind };
+    const key = (what.kind === 'mo' ? 'mo:' + what.spin + ':' + what.index : what.kind) + '@' + o.grid;
+    const have = d.surfaces.find(x => x.key === key);
+    const fi = basisFrame(d, M);
+    if (fi >= 0 && fi !== d.frameIndex) { setFrame(d, fi); status('Showing the geometry of the orbitals (frame ' + (fi + 1) + ').'); }
+    if (have) {
+      for (const x of d.surfaces) x.visible = x === have;
+      renderTabs(); renderPanel(); refreshSurfaces(); return;
+    }
+    let job;
+    try {
+      const det = BM.orbitals.detect(M);
+      if (det.error > 1e-3) toast('The orbitals of this file are not orthonormal in any convention BlueMolecule knows; the surface may be wrong.', true);
+      const g = ORB_GRIDS[o.grid] || ORB_GRIDS.medium, grid = BM.orbitals.gridFor(M, { spacing: g.h, maxPoints: g.max });
+      job = BM.orbitals.compute(M, what, grid, { onProgress: f => jobProgress(d, d.orbJob, f) });
+    } catch (e) { toast('Could not compute: ' + e.message, true); return; }
+    const t0 = Date.now();
+    d.orbJob = { cancel: job.cancel, progress: 0, t0: Date.now() };
+    renderPanel();
+    job.promise.then(vol => {
+      d.orbJob = null;
+      const s = addComputed(d, vol, key);
+      if (state.active === d) { renderTabs(); renderPanel(); refreshSurfaces(); includeSurface(s); }
+      const th = vol.computed && vol.computed.workers;
+      status(vol.name + ': ' + vol.dims.join(' × ') + ' points in ' + ((Date.now() - t0) / 1000).toFixed(1) + ' s' + (th ? ' (' + th + (th > 1 ? ' threads)' : ' thread)') : ''));
+    }).catch(e => {
+      d.orbJob = null;
+      if (state.active === d) renderPanel();
+      if (e && e.message !== 'cancelled') toast('Could not compute the orbital: ' + e.message, true);
+    });
+  }
+  function computeMolSurface(d) {
+    if (d.msJob) return;
+    const m = d.msurf || (d.msurf = { type: 'ses', probe: 1.4 }), g = geomFor(d);
+    let job;
+    try { job = BM.molsurf.fieldAsync(g.Z, g.xyz, { type: m.type, probe: m.probe }); } catch (e) { toast('Could not compute the surface: ' + e.message, true); return; }
+    const t0 = Date.now(), frame = d.frameIndex;
+    d.msJob = { cancel: job.cancel, progress: null, t0: Date.now() };
+    renderPanel();
+    job.promise.then(vol => {
+      d.msJob = null;
+      const s = addComputed(d, vol, null);
+      if (d.data.frames.length > 1) s.frameLabel = 'frame ' + (frame + 1);
+      if (state.active === d) { renderTabs(); renderPanel(); refreshSurfaces(); includeSurface(s); }
+      status(vol.name + ' in ' + ((Date.now() - t0) / 1000).toFixed(1) + ' s');
+    }).catch(e => {
+      d.msJob = null;
+      if (state.active === d) renderPanel();
+      if (e && e.message !== 'cancelled') toast('Could not compute the surface: ' + e.message, true);
+    });
+  }
+  /** Zoom out, if needed, so that a new surface is in view. */
+  function includeSurface(s) {
+    if (!s || !s.mesh) return;
+    for (const k of Object.keys(s.mesh)) if (s.mesh[k] && s.mesh[k].positions) R.include(s.mesh[k].positions);
+  }
+  function jobProgress(d, job, f) {
+    if (!job) return;
+    job.progress = f;
+    if (state.active !== d || d.tab !== 'surf') return;
+    const b = $('#sf-orb .sf-bar i'), t = $('#sf-orb [data-sf-pc]');
+    if (b) b.style.width = Math.round(100 * f) + '%';
+    if (t) t.textContent = jobText(job);
+  }
+  function surfAction(act, a) {
+    const d = state.active;
+    if (!d) return;
+    const M = BM.orbitals.model(d.data);
+    if (act === 'sf-orb') computeOrbital(d);
+    else if (act === 'sf-orb-cancel') { if (d.orbJob) d.orbJob.cancel(); }
+    else if (act === 'sf-ms') computeMolSurface(d);
+    else if (act === 'sf-ms-cancel') { if (d.msJob) d.msJob.cancel(); }
+    else if ((act === 'sf-homo' || act === 'sf-lumo') && M) {
+      const o = orbState(d, M), f = BM.orbitals.frontier(M, o.spin), k = act === 'sf-homo' ? f.homo : f.lumo;
+      if (k >= 0) { o.index = k; renderPanel(); computeOrbital(d); }
+    } else if (act === 'sf-del') {
+      const card = a.closest('[data-surf]'), i = card ? +card.dataset.surf : -1;
+      if (i >= 0 && d.surfaces[i] && d.surfaces[i].computed) { d.surfaces.splice(i, 1); renderTabs(); renderPanel(); refreshSurfaces(); }
+    }
+  }
+  /** Show an orbital picked in the MO level plot (id: column * 100000 + 1-based index). */
+  function showPlotOrbital(d, id) {
+    const M = BM.orbitals.model(d.data);
+    if (!M || id === null || id === undefined) return;
+    const cols = BM.analysis.moLevels(d.data), c = cols[Math.floor(id / 100000)];
+    if (!c) return;
+    const o = orbState(d, M);
+    o.kind = 'mo'; o.spin = c.spin === 'beta' && M.sets.beta ? 'beta' : 'alpha'; o.index = id % 100000 - 1;
+    if (d.tab !== 'surf') { d.tab = 'surf'; renderTabs(); }
+    renderPanel();
+    computeOrbital(d);
+  }
+  /** Per-vertex colours of a surface from its potential source, or null. */
+  function espColors(d, s, mesh) {
+    const e = s.esp;
+    if (!e || e.src === 'none' || !mesh || !mesh.positions.length) return null;
+    const key = e.src + '|' + e.range + '|' + s.iso + '|' + mesh.positions.length;
+    if (s._espKey === key && s._espColors) return s._espColors;
+    let vals = null;
+    if (e.src.startsWith('q:')) {
+      const q = d.data.charges && d.data.charges[e.src.slice(2)], g = geomFor(d);
+      if (q && q.length === g.Z.length) vals = BM.molsurf.espCharges(g.Z, g.xyz, q, mesh.positions);
+    } else if (e.src.startsWith('v:')) {
+      const [, id, i] = e.src.split(':'), doc = state.docs.find(x => x.id === +id), src = doc && doc.surfaces[+i];
+      if (src) vals = BM.molsurf.sample(src.vol, mesh.positions);
+    }
+    if (!vals) return null;
+    // the scale: the 98th percentile of |V| on the surface, unless set
+    const abs = Array.from(vals).filter(Number.isFinite).map(Math.abs).sort((a, b) => a - b);
+    e.auto = abs.length ? Number((abs[Math.min(abs.length - 1, Math.floor(abs.length * 0.98))] || 1e-3).toPrecision(2)) : null;
+    const r = e.range > 0 ? e.range : e.auto || 0.05;
+    s._espColors = BM.molsurf.colors(vals, -r, r);
+    s._espKey = key;
+    return s._espColors;
   }
 
   // ---------------- editing ----------------
@@ -2207,7 +2451,8 @@
       if (!nuc.some(n => n.z === s.z)) s.z = nuc[0].z;
       return go + `<label>Nucleus ${selIn('z', s.z, nuc.map(n => [n.z, n.label + ' (' + n.count + ')']))}</label><label title="Reference shielding σref (ppm): δ = σref − σ. Leave 0 to plot shieldings.">σref ${numIn('ref', s.ref, 0.1, 70)}</label>${chk('merge', s.merge, 'merge', 'Merge near-equal shieldings (within 0.05 ppm) into one stick')}${chk('peaks', s.peaks, 'labels')}`;
     }
-    if (t === 'mo') return go + `<label title="Energy window below the HOMO and above the LUMO">Window ± ${numIn('window', s.window, 1, 52)} eV</label><span class="pc-read" id="mo-read">${d.moSel !== null ? esc(moLabel(d, d.moSel)) : '<span class="dim">click a level</span>'}</span>`;
+    if (t === 'mo') return go + `<label title="Energy window below the HOMO and above the LUMO">Window ± ${numIn('window', s.window, 1, 52)} eV</label><span class="pc-read" id="mo-read">${d.moSel !== null ? esc(moLabel(d, d.moSel)) : '<span class="dim">click a level</span>'}</span>` +
+      (BM.orbitals && BM.orbitals.model(d.data) ? `<button class="btn small" data-show-mo ${d.moSel === null ? 'disabled' : ''} title="Compute the selected orbital and show it (Surfaces tab)">Show orbital</button>` : '');
     if (t === 'charges') return go + `<label>Scheme ${selIn('scheme', d.chargeScheme, chargeSchemes(d).map(x => [x, x]))}</label><span class="dim">click a bar to select the atom</span>`;
     let h = go + `<label>${selIn('shape', s.shape, [['lorentzian', 'Lorentzian'], ['gaussian', 'Gaussian']])}</label><label>FWHM ${numIn('fwhm', s.fwhm, 1, 52)}</label><label title="Frequency scaling factor">Scale ${numIn('scale', s.scale, 0.001, 62)}</label>`;
     if (t === 'ir') h += `${d.data.vibrations.irUnit ? '' : `<label>${selIn('yMode', s.yMode, [['relative', 'Relative'], ['epsilon', 'ε']])}</label>`}${chk('invert', s.invert, 'transmittance')}`;
@@ -2787,7 +3032,8 @@
       Z: g.Z, xyz: g.xyz, bonds: topo.bonds.map(b => [b[0], b[1], b[2] === undefined ? 1 : b[2]]), formalCharges: topo.formalCharges,
       cell: f.cell || d.data.cell || null, title: d.built ? d.name : (d.data.title || baseName(d)), atomNames: f.atomNames, resNames: f.resNames, resIds: f.resIds, chains: f.chains || null,
       frames: list.map(x => ({ Z: x.Z, xyz: x.xyz, energy: x.energy, label: x.label, cell: x.cell || null })), frameIndex: all ? Math.max(0, vis.indexOf(d.frameIndex)) : d.frameIndex,
-      volume: surf ? surf.vol : null, vibrations: d.data.vibrations, charges: d.data.charges, meta: d.data.meta, baseName: baseName(d), mos: d.data.mos || null
+      volume: surf ? surf.vol : null, vibrations: d.data.vibrations, charges: d.data.charges, meta: d.data.meta, baseName: baseName(d), mos: d.data.mos || null,
+      orbitalModel: BM.orbitals ? BM.orbitals.model(d.data) : null
     };
   }
   function runWriter(d, id, all) {
@@ -3119,7 +3365,7 @@
         case 'undo': undo(false); break;
         case 'redo': undo(true); break;
         case 'example': { const ex = (BM.examples || []).find(x => x.id === a.dataset.ex); if (ex) openText(ex.name, ex.text); break; }
-        default: if (act.startsWith('rp-')) displayAction(act, a); else if (act.startsWith('b-')) ui.action(act, a, e);
+        default: if (act.startsWith('rp-')) displayAction(act, a); else if (act.startsWith('b-')) ui.action(act, a, e); else if (act.startsWith('sf-')) surfAction(act, a);
       }
     });
     // documents
@@ -3179,8 +3425,25 @@
         return;
       }
       if (t.id === 'disp-amt') { const x = parseFloat(t.value); if (x > 0) state.vib.disp = x; return; }
+      if (t.dataset.orb) {
+        const o = d.orb, k = t.dataset.orb;
+        if (!o) return;
+        if (k === 'index') o.index = +t.value;
+        else o[k] = t.value;
+        if (k === 'kind' || k === 'spin') renderPanel();
+        return;
+      }
+      if (t.dataset.ms) {
+        const m = d.msurf, k = t.dataset.ms;
+        if (!m) return;
+        if (k === 'probe') { const v = parseFloat(t.value); if (v > 0 && v <= 5) m.probe = v; }
+        else { m[k] = t.value; renderPanel(); }
+        return;
+      }
       if (t.dataset.s) {
         const card = t.closest('[data-surf]'), s = d.surfaces[+card.dataset.surf], k = t.dataset.s;
+        if (k === 'esp') { s.esp.src = t.value; s._espKey = null; refreshSurfaces(); renderPanel(); return; }
+        if (k === 'espRange') { const v = parseFloat(t.value); s.esp.range = v > 0 ? v : null; s._espKey = null; scheduleSurfaces(); return; }
         if (k === 'visible') s.visible = t.checked;
         else if (k === 'both') s.both = t.checked;
         else if (k === 'opacity') { s.opacity = parseFloat(t.value); t.nextElementSibling.textContent = Math.round(s.opacity * 100) + '%'; }
@@ -3201,7 +3464,11 @@
     });
     // plot
     $('#plot-pick').addEventListener('change', e => { const d = state.active; if (!d) return; d.plotType = e.target.value; renderPlot(); e.target.blur(); });
-    $('#plot-controls').addEventListener('click', e => { const b = e.target.closest('[data-plot-go]'), d = state.active; if (b && d) { d.plotType = b.dataset.plotGo; renderPlot(); } });
+    $('#plot-controls').addEventListener('click', e => {
+      const b = e.target.closest('[data-plot-go]'), d = state.active;
+      if (b && d) { d.plotType = b.dataset.plotGo; renderPlot(); return; }
+      if (e.target.closest('[data-show-mo]') && d && d.moSel !== null) showPlotOrbital(d, d.moSel);
+    });
     $('#plot-controls').addEventListener('change', e => {
       const d = state.active, t = e.target; if (!d || !t.dataset.pc) return;
       const key = specKey(d.plotType), spec = d.spec[key], k = t.dataset.pc;
@@ -3220,7 +3487,7 @@
       else if (t === 'uv' || t === 'ecd') { d.stateIndex = d.data.excitedStates.findIndex(s => s.index === id); if (d.tab !== 'states') d.tab = 'states'; renderTabs(); renderPanel(); renderPlotDraw(); }
       else if (t === 'nmr') { d.selection = (item && item.atoms ? item.atoms : [id]).slice(); R.setSelection(d.selection); updateMeasure(); renderPlotDraw(); status(item && item.label ? item.label : ''); }
       else if (t === 'charges') { onAtomClick(id); renderPlotDraw(); }
-      else if (t === 'mo') { d.moSel = id; const r = $('#mo-read'); if (r) r.textContent = moLabel(d, id); status(moLabel(d, id)); renderPlotDraw(); }
+      else if (t === 'mo') { d.moSel = id; const r = $('#mo-read'); if (r) r.textContent = moLabel(d, id); const sb = $('#plot-controls [data-show-mo]'); if (sb) sb.disabled = false; status(moLabel(d, id)); renderPlotDraw(); }
       else { if (d.tab !== 'vib') { d.tab = 'vib'; renderTabs(); } selectVib(d, id); renderPanel(); }
     };
     $('#btn-plot-collapse').onclick = () => { state.plotCollapsed = !state.plotCollapsed; $('#center').classList.toggle('plot-collapsed', state.plotCollapsed); };

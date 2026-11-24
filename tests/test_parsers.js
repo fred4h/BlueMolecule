@@ -596,7 +596,8 @@ test('Molden with frequencies and geometries', () => {
   arrNear(ds.vibrations.raman, [2.184578, 87.149025, 21.880203].map(v => +v.toFixed(4)), 1e-9, '[INT] 2nd column');
   arrNear(Array.from(ds.vibrations.modes[0]), E.mode0, 1e-9, 'vibration 1');
   arrNear(Array.from(ds.frames[2].xyz), E.final, 1e-8, 'final geometry');
-  ok(ds.warnings.some(w => /cube/.test(w)), 'orbital warning');
+  // (its [GTO] and [MO] are a stub: one s function and one orbital, read as they are)
+  ok(ds.basis && ds.basis.nbf === 1 && ds.mos && ds.mos.alpha.coeffs.length === 1 && ds.mos.alpha.occupations[0] === 2, 'orbitals read from [GTO] and [MO]');
   eq(ds.title, 'water opt+freq (synthetic, from ORCA data)', 'title');
 });
 

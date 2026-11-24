@@ -24,6 +24,7 @@
 - **Opens quantum-chemistry outputs.** It shows every geometry of an optimisation, scan or IRC, plus energies and thermochemistry. It also reads orbital energies, charges, dipoles, vibrations, excited states and NMR shieldings. The Info tab lists everything found in the file, and you can pick which job, plot or property to look at.
 - **Optimisation graphs.** Energy, ΔE, each convergence criterion against its threshold (log scale), the RMSD to the final geometry and the largest atomic step, all plotted per optimisation step.
 - **Spectra.** IR and Raman (Lorentzian or Gaussian broadening, scale factor, ε or relative intensity), UV-Vis and ECD from excited states, and NMR sticks with a reference shielding.
+- **Orbitals and surfaces.** Orbitals, electron densities and spin densities computed straight from fchk and Molden files (Gaussian, Q-Chem, Psi4, ORCA, CFOUR, Turbomole, Molpro), without cubegen or orca_plot, in the background on several cores. Van der Waals, solvent-accessible and solvent-excluded surfaces, and the electrostatic potential coloured onto a surface from atomic charges or a potential cube. Isosurfaces of cube and XSF volumes.
 - **Zoomable plots.** Drag a box to zoom into any plot, or use the magnifier buttons; a click still selects. Each plot exports as CSV, PNG or SVG, as zoomed.
 - **Vibrations.** Animated modes with displacement arrows, imaginary frequencies highlighted, displacement along a mode, and multi-frame XYZ animations. For transition states: the number of imaginary frequencies, both ends of the motion, the bonds that form and break, forward and reverse optimisation inputs in one click, and the negative Hessian eigenvalues of the TS search.
 - **QM/MM and ONIOM.**
@@ -93,7 +94,7 @@ not available.
 |---|---|
 | [Installation](docs/installation.md) | Linux, Windows, macOS and browser; updates; Open Babel; uninstalling |
 | [User guide](docs/user-guide.md) | The window, mouse and keyboard, toolbar, tabs, plots, exporting |
-| [Analysing outputs](docs/analysing-outputs.md) | Contents overview, optimisations, scans and IRC, vibrations, spectra, excited states, NMR, orbitals, charges |
+| [Analysing outputs](docs/analysing-outputs.md) | Contents overview, optimisations, scans and IRC, vibrations, spectra, excited states, NMR, orbitals and surfaces, charges |
 | [QM/MM and ONIOM](docs/qmmm-oniom.md) | What is read from each program, energies, layer views |
 | [Representations](docs/representations.md) | Display rows, styles, colour schemes, presets, proteins, nucleic acids, lipids, glycans |
 | [Selection language](docs/selection-language.md) | Complete reference with examples |
@@ -107,8 +108,8 @@ not available.
 
 ## Status
 
-BlueMolecule 2.3.0 is the current release (1.4.1 was the first public one). The automated test suite has about
-35,900 checks in 38 suites, 24,500 of them from cutting example outputs as a running job would leave them:
+BlueMolecule 2.4.0 is the current release (1.4.1 was the first public one). The automated test suite has about
+36,700 checks in 40 suites, 24,500 of them from cutting example outputs as a running job would leave them:
 - format readers and writers against example files;
 - chemistry routines;
 - the selection language;
