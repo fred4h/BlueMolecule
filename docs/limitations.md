@@ -56,6 +56,11 @@ been checked, what has not, and what the program does not do yet.
 - **The desktop program:** every change is built on Linux, Windows and macOS by the cloud builds and started once
   there with a self-test: the 3D view (WebGL 2) in each system's web engine, a 900 MB log and a molecule opened
   through the native bridge, a save, and a picture of the view.
+- **Downloads (2.6):** the self-test of the cloud builds downloaded from the live PubChem and PDB services in the web
+  engine of each system (WebKitGTK on Linux, WebView2 on Windows, WebKit on macOS): aspirin's 3D conformer (21
+  atoms, CID 2244), sodium chloride through its SMILES (PubChem has no 3D conformer for it), the 1CRN entry and its
+  first assembly (327 atoms), and a missing entry, which gave the right message. The tests in the repository answer
+  in the services' place (`tests/test_fetchdb.js`, `tests/browser_fetch_test.js`).
 - **Script injection:** crafted files with HTML in titles, atom and residue names, labels and file names. None of it
   may become markup in the page (`tests/browser_xss_test.js`).
 - **Screenshots** of the interface, produced by the browser tests, were inspected during development.
@@ -80,10 +85,6 @@ been checked, what has not, and what the program does not do yet.
   a headless browser. It still needs confirmation on real desktops.
 - **The macromolecule views** were tested on generated protein, membrane, glycan and DNA structures, not yet on
   structures from the PDB or from simulation set-up tools.
-- **Downloads from the live services.** PubChem and the PDB could not be reached from the environment 2.6 was
-  written in. The tests answer in their place, with records in their formats (`tests/test_fetchdb.js`,
-  `tests/browser_fetch_test.js`); the addresses, answers and error codes follow the services' documentation. The
-  cloud builds try real downloads in each system's web engine and report them, without requiring them to pass.
 
 ## Known limitations
 
