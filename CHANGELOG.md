@@ -3,6 +3,25 @@
 BlueMolecule is [vibe-coded](docs/vibe-coding.md). Each version below was written by an AI assistant from the
 author's requests and bug reports.
 
+## 2.5.0 (November 2026): conformers and crystal tools
+
+**Conformer search** (issue #20), in the Build tab:
+- The rotatable bonds are turned in steps of 120° (180° between two planar sp² atoms): every combination up to 1,000
+  of them, 300 random ones beyond. Each structure is relaxed with the clean-up force field.
+- The distinct conformers are kept, lowest first: within an energy window, more than an RMSD threshold apart (heavy
+  atoms, after superposition), and the same conformer numbered another way or mirrored only once.
+- They open as a new document with their relative energies, ready for the Steps tab, calculation inputs and Save as.
+  The energies come from the generic clean-up force field: a guide for choosing starting points.
+
+**Crystal tools** (issue #21), in the Build tab, for structures with a unit cell:
+- **Supercells** along a, b and c.
+- **Surface slabs** of the (h k l) lattice planes: layers, vacuum and a shift of the termination. The slab's normal is
+  turned to z, and the slab is centred in the cell.
+- **Cell edits**: lengths and angles, with the atoms scaled with the cell or kept in place; **wrap** the atoms into the
+  cell; **remove** the cell.
+- For a molecule, **Add a box**: an orthorhombic cell with a margin, for periodic codes.
+- Each tool is an edit with undo; Save as writes the new cell.
+
 ## 2.4.0 (November 2026): orbitals and surfaces
 
 **Orbitals and densities from fchk and Molden files** (issue #17), in the Surfaces tab:

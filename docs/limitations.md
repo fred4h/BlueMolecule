@@ -6,7 +6,7 @@ been checked, what has not, and what the program does not do yet.
 
 ## What has been checked
 
-- **About 36,700 automated checks in 40 test suites** (24,500 of them cut example outputs as a running job would
+- **About 36,900 automated checks in 42 test suites** (24,500 of them cut example outputs as a running job would
   leave them), all passing for this release
   ([how to run them](developer-guide.md#tests)). They cover:
   - every reader and writer, including format detection and the units and conventions of each program;
@@ -103,7 +103,9 @@ been checked, what has not, and what the program does not do yet.
 | fchk files | No ECD rotatory strengths and no orbital contributions of the excited states; no IRC paths. Q-Chem fchk files hold no energies, so their steps have none. A checkpoint file's optimisation history is used only for an optimisation or scan job whose last step is the current geometry |
 | Gaussian inputs | ONIOM layer columns in `.gjf` files are skipped; layers are read from outputs |
 | Clean-up | A generic force field for tidying sketches; not a published force field and not a physical method |
-| Building | No conformer search, crystal builder or download from PubChem or the PDB |
+| Building | No download from PubChem or the PDB |
+| Conformer search | Ring conformations are not explored, and the energies come from the generic clean-up force field, so the ranking is rough. Up to 300 atoms |
+| Crystal tools | Supercells repeat the cell along a, b and c (no other supercell matrices in the interface). Slabs are cut from the lattice of the cell as given: a conventional cell gives the surface cell of its lattice, which may be larger than the primitive one. The termination is chosen by a shift, not from a list of distinct terminations |
 | Browser-only use | The single HTML file has no Open Babel and is limited by the browser's memory |
 | Language | The interface and documentation are in English only |
 
@@ -111,8 +113,7 @@ been checked, what has not, and what the program does not do yet.
 
 Not promised, and in no particular order:
 - the electrostatic potential computed from the wavefunction;
-- ASCII Amber trajectories (`mdcrd`);
-- conformer search and crystal tools.
+- ASCII Amber trajectories (`mdcrd`).
 
 Validating the readers against real outputs comes before all of these. [Reports with example files](../CONTRIBUTING.md)
 help most.

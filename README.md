@@ -44,6 +44,7 @@
   - Avogadro-style tools: draw, select, templates, bond-centric and manipulate.
   - SMILES input and a library of molecules, groups, ligands and coordination geometries.
   - Hydrogen and bond-order handling, a clean-up force field, point-group detection and symmetrization, and a coordinate editor.
+  - A conformer search (rotatable bonds turned, relaxed with the clean-up force field, kept when distinct), and crystal tools: supercells, surface slabs from Miller indices, cell edits and boxes around molecules.
 - **Exports.** Writes 24 structure, crystal and MD formats and calculation inputs for 10 programs. Other formats go through Open Babel when it is installed. Images are saved as PNG, JPEG, WebP, TIFF or PDF at a print size and resolution, with an sRGB or Display P3 colour profile, up to poster size.
 - **Large files.** Outputs of hundreds of megabytes are read in chunks, and Gaussian and ORCA outputs of several gigabytes (QM/MM jobs on whole proteins) are condensed while they are read. For files of 1 GB and more, a dialog lets you choose what to load: every Nth step or frame, a range, or the last N, and which vibrations to animate.
 - **MD trajectories.** Amber (prmtop with text or NetCDF coordinates and trajectories), CHARMM/NAMD (PSF, DCD), GROMACS (GRO, TRR, XTC) and LAMMPS, read in slices when they are long.
@@ -98,7 +99,7 @@ not available.
 | [QM/MM and ONIOM](docs/qmmm-oniom.md) | What is read from each program, energies, layer views |
 | [Representations](docs/representations.md) | Display rows, styles, colour schemes, presets, proteins, nucleic acids, lipids, glycans |
 | [Selection language](docs/selection-language.md) | Complete reference with examples |
-| [Building and editing](docs/building-and-editing.md) | Build tools, library, hydrogens, clean-up, symmetry, calculation inputs |
+| [Building and editing](docs/building-and-editing.md) | Build tools, library, hydrogens, clean-up, conformers, crystal tools, symmetry, calculation inputs |
 | [File formats](docs/file-formats.md) | Every format that can be opened or saved |
 | [Large files and trajectories](docs/large-files-and-trajectories.md) | Very large outputs, choosing what to load, topology plus trajectory, Amber NetCDF, memory |
 | [Troubleshooting](docs/troubleshooting.md) | Window opens in a browser, files that will not open, Wayland, diagnostics |
@@ -108,8 +109,8 @@ not available.
 
 ## Status
 
-BlueMolecule 2.4.0 is the current release (1.4.1 was the first public one). The automated test suite has about
-36,700 checks in 40 suites, 24,500 of them from cutting example outputs as a running job would leave them:
+BlueMolecule 2.5.0 is the current release (1.4.1 was the first public one). The automated test suite has about
+36,900 checks in 42 suites, 24,500 of them from cutting example outputs as a running job would leave them:
 - format readers and writers against example files;
 - chemistry routines;
 - the selection language;

@@ -88,6 +88,48 @@ published force field, and *not* a quantum-chemical method. It exists to turn sk
 into reasonable starting geometries, with sensible bond lengths, angles and ring shapes. Always optimise the result
 with a real method before drawing conclusions.
 
+### Conformers
+
+**Search** generates conformers of the structure as starting points for calculations:
+1. The rotatable bonds are found: single bonds outside rings whose two atoms both have other heavy-atom neighbours.
+   Amide C–N bonds and linear chains are left alone.
+2. Each is turned in steps of 120°, or 180° between two planar sp² atoms (biphenyl, for example). Every combination
+   is tried when there are at most 1,000 of them, otherwise 300 random ones.
+3. Each structure is relaxed with the clean-up force field.
+4. The structures are sorted by energy. A structure is kept when it lies within the **energy window** above the
+   lowest and differs from every lower one by more than the **RMSD** threshold (heavy atoms, after superposition).
+   The same conformer numbered another way, or its mirror image, is kept once.
+
+The conformers open as a new document, lowest first, with their relative energies in the labels. Use the Steps tab
+to go through them, **Export → Calculation input…** or **Save as** to send them to a program. **Cancel** stops a
+long search.
+
+The energies come from the clean-up force field, a generic model: they rank the structures roughly, to choose which
+to optimise, and are not conformational energies. Ring conformations (chair and boat, for example) are not explored.
+
+### Crystal
+
+For a structure with a unit cell (CIF, POSCAR, Quantum ESPRESSO, CP2K, XSF and the other periodic formats), the
+section shows the lattice parameters and:
+- **Supercell**: repeats the cell along a, b and c.
+- **Make slab**: a surface slab of the (h k l) lattice planes:
+  - **layers**: how many times the oriented cell is repeated along the normal;
+  - **vacuum**: the gap between the slab and its periodic image, in Å;
+  - **shift**: moves the termination by a fraction of a layer.
+
+  The slab's cell keeps two lattice vectors in the plane and has its third vector along the normal, which is turned
+  to z (the first vector along x). The slab is centred in the cell.
+- **Lengths** and **Angles**, then **Apply**: change the cell. With **scale atoms with the cell**, the atoms keep
+  their fractional coordinates; without it, they stay where they are. The cell keeps its orientation.
+- **Wrap atoms into the cell** moves every atom into the cell, and **Remove the cell** makes the structure a
+  molecule.
+
+For a molecule, **Add a box** puts it in the middle of an orthorhombic cell with the given margin to each face, for
+plane-wave and other periodic codes.
+
+Each action is an edit of the current geometry: **Undo** brings back the atoms and the cell, and **Save as** writes
+the new cell (CIF, POSCAR, Quantum ESPRESSO, CP2K, XSF…).
+
 ### Symmetry
 
 - Choose a **tolerance**: tight (0.02 Å), normal (0.1 Å) or loose (0.3 Å).
@@ -113,6 +155,7 @@ Some operations are switched off for large structures, to keep the interface res
 | Automatic clean-up after each edit | 1,500 atoms |
 | Clean-up | 3,000 atoms |
 | Symmetry detection and symmetrization | 1,000 atoms |
+| Conformer search | 300 atoms |
 | Coordinate editor | 20,000 atoms |
 
 ## Calculation inputs
