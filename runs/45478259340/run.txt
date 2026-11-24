@@ -1,0 +1,8 @@
+run 45478259340
+commit e84d1f0c4e38063af860fa58a9a91752ebace35e
+branch 41/merge
+build result success
+url https://github.com/fred4h/BlueMolecule/actions/runs/45478259340
+report-linux: exit=0 seconds=13 peak=1102MB
+report-macos: exit=0 seconds=10 peak=880MB
+report-windows: exit=0 seconds=19 peak=656MB

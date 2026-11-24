@@ -1,0 +1,44 @@
+{
+  "checks": {
+    "bridge": true,
+    "files": true,
+    "picture": true,
+    "save": true,
+    "webgl2": true
+  },
+  "errors": [],
+  "files": [
+    {
+      "atoms": 11,
+      "energy": null,
+      "frames": 1,
+      "name": "cisplatin.xyz",
+      "vibrations": 0,
+      "warnings": []
+    },
+    {
+      "atoms": 64,
+      "energy": -925.4183124,
+      "frames": 310,
+      "name": "big-opt.log",
+      "vibrations": 0,
+      "warnings": []
+    }
+  ],
+  "gpu": "Apple GPU",
+  "imageBytes": 49655,
+  "maxTexture": 16384,
+  "memory": {
+    "available": 3436806144,
+    "jsHeapLimit": null,
+    "total": 7516192768
+  },
+  "nativeKind": "tauri-app",
+  "ok": true,
+  "openSeconds": 3.81,
+  "seconds": 7.31,
+  "startSeconds": 1.9,
+  "started": "2026-11-24T20:14:02.622Z",
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)",
+  "version": "2.5.0"
+}
