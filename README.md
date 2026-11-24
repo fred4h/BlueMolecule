@@ -6,7 +6,7 @@
 
 <p align="center">
   A viewer and builder for quantum-chemistry and molecular-modelling files that runs entirely on your own computer.<br>
-  <sub>Gaussian · ORCA · GAMESS · NWChem · Q-Chem · Psi4 · xtb · MOPAC · CP2K · Turbomole · VASP · Quantum ESPRESSO · CASTEP · PDB/mmCIF · GROMACS · Amber · CHARMM/NAMD · LAMMPS</sub>
+  <sub>Gaussian · ORCA · GAMESS · NWChem · Q-Chem · Psi4 · Molpro · Dalton · xtb · MOPAC · CP2K · Turbomole · VASP · Quantum ESPRESSO · CASTEP · PDB/mmCIF · GROMACS · Amber · CHARMM/NAMD · LAMMPS</sub>
 </p>
 
 > [!IMPORTANT]
@@ -107,8 +107,8 @@ not available.
 
 ## Status
 
-BlueMolecule 2.2.0 is the current release (1.4.1 was the first public one). The automated test suite has about
-35,700 checks in 37 suites, 24,500 of them from cutting example outputs as a running job would leave them:
+BlueMolecule 2.3.0 is the current release (1.4.1 was the first public one). The automated test suite has about
+35,900 checks in 38 suites, 24,500 of them from cutting example outputs as a running job would leave them:
 - format readers and writers against example files;
 - chemistry routines;
 - the selection language;

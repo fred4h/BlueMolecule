@@ -75,7 +75,16 @@ function dcd(natoms, frames) {
     ['qc/mopac_water_opt_force.out', 'mopac-out', ['Geometries', 'Vibrations']],
     ['qc/cp2k_water_geoopt.out', 'cp2k-out', ['Geometries', 'Unit cell']],
     ['qc/nwchem_water_tddft.out', 'nwchem-out', ['Excited states']],
-    ['qc/coord', 'turbomole-coord', []]
+    ['qc/coord', 'turbomole-coord', []],
+    // 2.3: Molpro, Dalton, Turbomole program outputs, GAMESS punch files, fchk excited states and optimisation history
+    ['qc/molpro_water_optfreq.out', 'molpro-out', ['Geometries', 'Vibrations', 'Charges', 'Orbital energies']],
+    ['qc/dalton_water_optfreq.out', 'dalton-out', ['Geometries', 'Vibrations', 'Orbital energies']],
+    ['qc/dalton_water_tddft.out', 'dalton-out', ['Excited states', 'Warnings']],
+    ['qc/turbomole_water_escf.out', 'turbomole-out', ['Excited states']],
+    ['qc/turbomole_water_aoforce.out', 'turbomole-out', ['Vibrations']],
+    ['qc/gamess_water_opt.dat', 'gamess-punch', ['Geometries', 'Warnings']],
+    ['qc/g16_water_opt.fchk', 'fchk', ['Geometries']],
+    ['qc/g16_water_td.fchk', 'fchk', ['Excited states']]
   ];
   for (const [f, fmt, want] of qc) {
     const before = errors.length;

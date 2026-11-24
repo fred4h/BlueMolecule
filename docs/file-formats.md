@@ -1,6 +1,6 @@
 # File formats
 
-BlueMolecule reads **48 file formats** and saves **24**, plus calculation inputs for **10 programs**. With
+BlueMolecule reads **52 file formats** and saves **24**, plus calculation inputs for **10 programs**. With
 [Open Babel](installation.md#open-babel-optional) installed, it can also open and save the many formats Open Babel
 supports.
 
@@ -28,10 +28,14 @@ each program's output ([why that matters](vibe-coding.md#how-the-program-was-che
 | **NWChem** | `.out` `.log` `.nwout` | Geometries (including ab initio MD steps), optimisation criteria, energies, vibrations with IR, thermochemistry, TD-DFT excited states, charges, orbital energies, dipole |
 | **Q-Chem** | `.out` `.log` `.qcout` | Geometries, optimisation criteria, energies, several jobs, vibrations with IR, thermochemistry, TD-DFT excited states, charges, orbital energies, dipole |
 | **Psi4** | `.out` `.log` | Geometries, optimisation criteria, energies, vibrations with IR, thermochemistry, charges, orbital energies, dipole |
+| **Molpro** 2006–2018 | `.out` `.log` `.pro` | The first and the optimised geometry with the optimisation table (energies, gradient, step and thresholds), energies of every method (`!` lines: HF, DFT, MP2–MP4, CCSD, CCSD(T)…), vibrations with IR, zero-point energy, Mulliken charges, orbital energies, dipole. The optimisation log (`.log`) gives every geometry |
+| **Dalton** 2013–2018 | `.out` | Geometries of an optimisation with its criteria, HF, DFT, MP2 and CC energies, vibrations with IR and Raman, zero-point energy, excited states (response) with oscillator strengths, orbital energies, dipole |
+| **Turbomole** programs | `dscf.out` `ridft.out` `escf.out` `aoforce.out` `ricc2.out` `job.last`… | The structure, SCF, MP2, CC2 and CCSD energies, functional and basis, dipole; excited states from escf (with ECD rotatory strengths and orbital contributions) and ricc2 (CC2, ADC(2)); vibrations with IR from aoforce; the cycles of a `job.last` |
 | **xtb** | `.out` `.log` `.xtbout` | Optimisation cycles, energies, gradient norm, vibrations with IR, thermochemistry, charges, orbital energies, dipole, ONIOM regions |
 | **MOPAC** | `.out` `.arc` `.mopout` | Geometries, optimisation cycles, heats of formation, vibrations with IR (relative: MOPAC prints squared transition dipoles), charges, orbital energies (alpha and beta for UHF), dipole |
 | **CP2K** | `.out` `.log` | Optimisation cycles and energies, charges, the cell, QM/MM regions and link atoms |
 | **Turbomole** | `gradient` | Every optimisation cycle with energy and gradient |
+| **GAMESS** punch | `.dat` `.pun` | Every step of an optimisation, energies, vibrations (Hessian jobs), orbital energies, dipole. Symmetry-unique atoms are expanded with the point group; the AIMPAC section, when present, gives GAMESS's own atom order |
 | **ORCA / xtb** | `.engrad` | The structure with its energy and gradient |
 | **VASP** | `OUTCAR` | Ionic steps with energies and forces, the cell |
 | **Quantum ESPRESSO** | `.pwo` `.out` | Relaxation steps with energies, the cell |
@@ -44,7 +48,7 @@ Opened for their geometry (and charge, multiplicity, route or keywords where pre
 |---|---|---|
 | Gaussian | `.gjf` `.com` `.gau` `.gjc` | Cartesian and Z-matrix (including variables) geometries; ONIOM layer columns are skipped (layers are read from outputs) |
 | ORCA | `.inp` | `* xyz`, `* int` (internal coordinates) and `* xyzfile` blocks; `{name}` values from `%paras` (a scanned parameter takes its first value) |
-| GAMESS | `.inp` | `$DATA` with C1 symmetry |
+| GAMESS | `.inp` | Cartesian `$DATA`, with C1 or a point group (the symmetry-unique atoms are expanded) |
 | NWChem | `.nw` `.nwi` | `geometry` block |
 | Q-Chem | `.in` `.qcin` `.inp` | `$molecule` (of the first job that has one, for inputs of several jobs) |
 | Psi4 | `.dat` `.in` `.psi4` | `molecule { }` block |
@@ -58,7 +62,7 @@ Opened for their geometry (and charge, multiplicity, route or keywords where pre
 
 | Format | Files | What is read |
 |---|---|---|
-| Gaussian formatted checkpoint | `.fchk` `.fch` `.fck` | Structure, energy, vibrations with IR, charges, orbital energies, dipole |
+| Gaussian formatted checkpoint | `.fchk` `.fch` `.fck` | Structure, energy, vibrations with IR, charges, orbital energies, dipole; every geometry of an optimisation or relaxed scan (Gaussian) or of an optimisation or MD run (Q-Chem); excited states with oscillator strengths (Gaussian TD and CIS, Q-Chem) |
 | Molden | `.molden` `.mold` `.molf` | Structure, optimisation geometries and energies, vibrations with IR and Raman |
 | Gaussian cube | `.cube` `.cub` | Volumetric data for isosurfaces, including cubes with several orbitals; Bohr and Å grids |
 | XCrySDen XSF / AXSF | `.xsf` `.axsf` | Structure, cell, animation steps and `DATAGRID_3D` volumes |

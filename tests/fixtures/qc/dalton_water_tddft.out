@@ -1,0 +1,101 @@
+
+     *************** Dalton - An Electronic Structure Program ***************
+
+    This is output from DALTON 2015.0
+
+
+   Content of the .dal input file
+ ----------------------------------
+
+BASIS
+cc-pVDZ
+water
+synthetic fixture
+AtomTypes=2 Angstrom NoSymmetry
+Charge=8.0 Atoms=1
+O      0.0000000000    0.0000000000    0.119731637
+Charge=1.0 Atoms=2
+H      0.0000000000    0.7614422731   -0.478926549
+H      0.0000000000   -0.7614422731   -0.478926549
+**DALTON
+.RUN RESPONSE
+**WAVE FUNCTIONS
+.DFT
+B3LYP
+**RESPONSE
+*LINEAR
+.SINGLE RESIDUE
+.ROOTP
+ 2
+**END OF
+
+
+       *******************************************************************
+       *********** Output from DALTON general input processing ***********
+       *******************************************************************
+
+  Basis set used is "cc-pVDZ" from the basis set library.
+
+@    Final DFT energy:            -76.408953322400
+
+
+ *** @ Excit. operator sym 1 & ref. state sym 1 => excited state symmetry 1  ( A1 ) ***
+
+ @ Excited state no:    1 in symmetry 1  ( A1 )
+ --------------------------------------------------
+
+@ Excitation energy :  0.35466771     au
+@                      9.6510000     eV;   77840.565     cm-1
+
+@ Total energy :      -76.05429     au
+
+@ Operator type:    ZDIPLEN 
+@ Oscillator strength (LENGTH)   :  7.54000000E-02  (Transition moment :  0.10000000     )
+
+
+ *** @ Excit. operator sym 2 & ref. state sym 1 => excited state symmetry 2  ( B1 ) ***
+
+ @ Excited state no:    1 in symmetry 2  ( B1 )
+ --------------------------------------------------
+
+@ Excitation energy :  0.26103779     au
+@                      7.1032000     eV;   57291.172     cm-1
+
+@ Total energy :      -76.14792     au
+
+@ Operator type:    XDIPLEN 
+@ Oscillator strength (LENGTH)   :  3.20000000E-03  (Transition moment :  0.10000000     )
+
+@ Operator type:    YDIPLEN 
+@ Oscillator strength (LENGTH)   :  9.60000000E-03  (Transition moment :  0.10000000     )
+
+
+ *** @ Excit. operator sym 3 & ref. state sym 1 => excited state symmetry 3  ( B2 ) ***
+
+ @ Excited state no:    1 in symmetry 3  ( B2 )
+ --------------------------------------------------
+
+@ Excitation energy :  0.41182393     au
+@                      11.2063000     eV;   90384.906     cm-1
+
+@ Total energy :      -75.99713     au
+
+@ Operator type:    XDIPLEN 
+@ Oscillator strength (LENGTH)   :  8.30000000E-03  (Transition moment :  0.10000000     )
+
+@ Operator type:    YDIPLEN 
+@ Oscillator strength (LENGTH)   :  2.49000000E-02  (Transition moment :  0.10000000     )
+
+
+ *** @ Excit. operator sym 4 & ref. state sym 1 => excited state symmetry 4  ( A2 ) ***
+
+ @ Excited state no:    1 in symmetry 4  ( A2 )
+ --------------------------------------------------
+
+@ Excitation energy :  0.32726741     au
+@                      8.9054000     eV;   71826.896     cm-1
+
+@ Total energy :      -76.08169     au
+
+
+ >>>> Total CPU  time used in DALTON:   1.10 seconds

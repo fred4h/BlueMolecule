@@ -1,7 +1,7 @@
 # Analysing outputs
 
 This page covers what BlueMolecule shows for the output of a quantum-chemistry job: Gaussian, ORCA, GAMESS,
-NWChem, Q-Chem, Psi4, xtb, MOPAC, CP2K, Turbomole, VASP or Quantum ESPRESSO. [File formats](file-formats.md) says
+NWChem, Q-Chem, Psi4, Molpro, Dalton, xtb, MOPAC, CP2K, Turbomole, VASP or Quantum ESPRESSO. [File formats](file-formats.md) says
 which program provides which kind of data. QM/MM and ONIOM jobs have [their own page](qmmm-oniom.md).
 
 > [!NOTE]
@@ -97,9 +97,15 @@ Different programs print different criteria:
 - Gaussian prints forces and displacements with their thresholds.
 - ORCA prints the energy change, gradients and steps.
 - xtb, MOPAC and Turbomole print a gradient norm.
+- Molpro prints the largest gradient and step with their thresholds, and the step length; Dalton the gradient norm
+  and the step length.
 
-Some outputs, such as xtb, MOPAC and CP2K, report optimisation cycles without printing every geometry. Their
-energies and criteria are still plotted per cycle.
+Some outputs, such as xtb, MOPAC, CP2K and Molpro, report optimisation cycles without printing every geometry. Their
+energies and criteria are still plotted per cycle. A Molpro optimisation converges when the largest gradient and
+either the energy change or the largest step are below their thresholds, so not every criterion has to be met.
+
+Formatted checkpoint (fchk) files keep the history of an optimisation: Gaussian's every geometry and energy, also
+for each point of a relaxed scan, and Q-Chem's every geometry (without energies).
 
 ## Scans and IRC
 
@@ -204,6 +210,10 @@ for example `Singlet-B2`. Selecting a state shows:
 
 Selecting a state also marks it in the UV-Vis or ECD spectrum, and clicking a band in the spectrum selects the
 state.
+
+Excited states are also read from Gaussian and Q-Chem fchk files (energies and oscillator strengths, and for
+Gaussian whether each state is a singlet or a triplet), Dalton response outputs, and Turbomole's escf (with ECD
+rotatory strengths and orbital contributions) and ricc2 (CC2, ADC(2)) outputs.
 
 ## Orbitals and volumes
 

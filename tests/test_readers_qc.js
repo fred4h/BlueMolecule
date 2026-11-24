@@ -91,9 +91,20 @@ test('GAMESS input ($DATA C1)', () => {
   arrNear(Array.from(ds.frames[0].xyz), GEO[0], 1e-9, 'coordinates');
   eq(ds.title, 'water', 'title');
   eq(ds.meta.method + '/' + ds.meta.basis, 'B3LYP/6-31G(d)', 'method/basis');
+  // a point group (2.3): the symmetry-unique atoms are expanded in GAMESS's frame (C2 axis z, a mirror plane xz)
+  const cnv = BM.parseFile('w.inp', t.replace('\nC1\n', '\nCNV 2\n\n'));
+  arrNear(Array.from(cnv.frames[0].xyz), GEO[0], 1e-9, 'CNV 2 with every atom listed: the same three atoms');
+  ok(cnv.warnings.some(w => /shown once/.test(w)), 'CNV 2 with every atom listed: a warning about the coinciding atoms');
+  const uniq = t.replace('\nC1\n', '\nCNV 2\n\n').split('\n').filter((l, k, a) => !(/^H\b/.test(l.trim()) && a.slice(0, k).some(x => /^H\b/.test(x.trim())))).join('\n');
+  const cu = BM.parseFile('w.inp', uniq);
+  arrNear(Array.from(cu.frames[0].xyz), GEO[0], 1e-9, 'CNV 2 with the unique atoms only (O and one H): water');
+  eq(cu.warnings.length, 0, 'CNV 2 unique atoms: no warning');
   let msg = '';
-  try { BM.parseFile('w.inp', t.replace('\nC1\n', '\nCNV 2\n\n')); } catch (e) { msg = e.message; }
-  ok(/C1/.test(msg), 'non-C1 symmetry explained: ' + msg);
+  try { BM.parseFile('w.inp', t.replace('\nC1\n', '\nI 0\n\n')); } catch (e) { msg = e.message; }
+  ok(/not supported/.test(msg), 'an unknown group is explained: ' + msg);
+  msg = '';
+  try { BM.parseFile('w.inp', t.replace('\nC1\n', '\nCNV 2\n0 0 0 0 0 1 1 0 0\n')); } catch (e) { msg = e.message; }
+  ok(/symmetry frame/.test(msg), 'a local frame line is explained: ' + msg);
   const w = BM.inputPrograms.find(p => p.id === 'gamess').write({ Z: [8, 1, 1], xyz: GEO[0], title: 'rt', task: 'opt' }).text;
   arrNear(Array.from(BM.parseFile('rt.inp', w).frames[0].xyz), GEO[0], 1e-8, 'writer round trip');
 });

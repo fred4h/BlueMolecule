@@ -1,0 +1,30 @@
+Water optimisation                                                      
+FOpt      RB3LYP                                                      6-31G(d)            
+Number of atoms                            I                3
+Charge                                     I                0
+Multiplicity                               I                1
+Route                                      C   N=           2
+#p b3lyp/6-31g(d) opt                                       
+Number of alpha electrons                  I                5
+Number of beta electrons                   I                5
+Atomic numbers                             I   N=           3
+           8           1           1
+Current cartesian coordinates              R   N=           9
+  0.00000000E+00  0.00000000E+00  2.26260003E-01  0.00000000E+00  1.43891736E+00
+ -9.05040012E-01  0.00000000E+00 -1.43891736E+00 -9.05040012E-01
+SCF Energy                                 R     -7.640895332240000E+01
+Total Energy                               R     -7.640895332240000E+01
+Optimization Num results per geometry      I                2
+Optimization Num geometry variables        I                9
+Opt point       1 Results for each geome   R   N=           6
+ -7.64088069E+01  0.00000000E+00 -7.64089481E+01  0.00000000E+00 -7.64089533E+01
+  0.00000000E+00
+Opt point       1 Geometries               R   N=          27
+  0.00000000E+00  0.00000000E+00  2.22129214E-01  0.00000000E+00  1.43441927E+00
+ -8.88516855E-01  0.00000000E+00 -1.43441927E+00 -8.88516855E-01  0.00000000E+00
+  0.00000000E+00  2.25179870E-01  0.00000000E+00  1.43979009E+00 -9.00719482E-01
+  0.00000000E+00 -1.43979009E+00 -9.00719482E-01  0.00000000E+00  0.00000000E+00
+  2.26260003E-01  0.00000000E+00  1.43891736E+00 -9.05040012E-01  0.00000000E+00
+ -1.43891736E+00 -9.05040012E-01
+Optimization Number of geometries          I   N=           1
+           3
