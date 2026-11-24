@@ -1,0 +1,8 @@
+20:59:09 0 MB
+20:59:11 448 MB | WebKitNetworkPr 52 (1) | WebKitWebProces 264 (1) | bluemolecule 132 (1)
+20:59:13 936 MB | WebKitNetworkPr 52 (1) | WebKitWebProces 693 (1) | bluemolecule 189 (1)
+20:59:15 1045 MB | WebKitNetworkPr 52 (1) | WebKitWebProces 791 (1) | bluemolecule 200 (1)
+20:59:17 1126 MB | WebKitNetworkPr 53 (1) | WebKitWebProces 878 (1) | bluemolecule 195 (1)
+20:59:19 1060 MB | WebKitNetworkPr 53 (1) | WebKitWebProces 811 (1) | bluemolecule 195 (1)
+20:59:21 944 MB | WebKitNetworkPr 65 (1) | WebKitWebProces 696 (1) | bluemolecule 182 (1)
+20:59:23 970 MB | WebKitNetworkPr 69 (1) | WebKitWebProces 719 (1) | bluemolecule 181 (1)
