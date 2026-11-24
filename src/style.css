@@ -120,6 +120,20 @@ table.list .lab { display: inline-block; max-width: 84px; overflow: hidden; text
 table.list .lab.busy { color: var(--warn, #d99a2b); font-style: italic; }
 table.list { table-layout: auto; }
 .ok-mark { color: var(--ok); }
+/* Vibrations: the stationary point, the key of both ends, bonds along a mode (issue #14) */
+.vib-summary { margin: 0 0 10px; padding: 6px 9px; border-left: 3px solid var(--line-2); background: var(--panel-2); border-radius: 0 6px 6px 0; font-size: 12.5px; }
+.vib-summary.ok { border-left-color: var(--ok); }
+.vib-summary.warn { border-left-color: var(--warn); }
+.vib-summary a { color: var(--accent-2); white-space: nowrap; }
+.end-key { display: inline-block; min-width: 16px; padding: 0 4px; border-radius: 4px; text-align: center; font-weight: 700; color: #0b1220; line-height: 1.35; }
+.end-key.minus { background: rgb(128, 184, 255); }
+.end-key.plus { background: rgb(255, 178, 97); }
+table.list td.chg { font-family: var(--sans); }
+table.list td.chg.forms { color: var(--ok); }
+table.list td.chg.breaks { color: var(--bad); }
+table.list td.chg.shorter, table.list td.chg.longer { color: var(--muted); }
+[data-theme="light"] table.list td.chg.forms { color: #15803d; }
+[data-theme="light"] table.list td.chg.breaks { color: #b91c1c; }
 .no-mark { color: var(--bad); }
 /* Info → Contents */
 .contents { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }

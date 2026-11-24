@@ -25,7 +25,7 @@
 - **Optimisation graphs.** Energy, ΔE, each convergence criterion against its threshold (log scale), the RMSD to the final geometry and the largest atomic step, all plotted per optimisation step.
 - **Spectra.** IR and Raman (Lorentzian or Gaussian broadening, scale factor, ε or relative intensity), UV-Vis and ECD from excited states, and NMR sticks with a reference shielding.
 - **Zoomable plots.** Drag a box to zoom into any plot, or use the magnifier buttons; a click still selects. Each plot exports as CSV, PNG or SVG, as zoomed.
-- **Vibrations.** Animated modes with displacement arrows, imaginary frequencies highlighted, displacement along a mode, and multi-frame XYZ animations.
+- **Vibrations.** Animated modes with displacement arrows, imaginary frequencies highlighted, displacement along a mode, and multi-frame XYZ animations. For transition states: the number of imaginary frequencies, both ends of the motion, the bonds that form and break, forward and reverse optimisation inputs in one click, and the negative Hessian eigenvalues of the TS search.
 - **QM/MM and ONIOM.**
   - Supports Gaussian ONIOM (2 or 3 layers), ORCA QM/MM and QM/XTB, CP2K QM/MM and xtb ONIOM.
   - Layers, link atoms and frozen atoms are read from the file.
@@ -106,8 +106,8 @@ not available.
 
 ## Status
 
-BlueMolecule 2.0.2 is the current release (1.4.1 was the first public one). The automated test suite has about
-34,500 checks in 35 suites, 23,700 of them from cutting example outputs as a running job would leave them:
+BlueMolecule 2.1.0 is the current release (1.4.1 was the first public one). The automated test suite has about
+35,500 checks in 36 suites, 24,500 of them from cutting example outputs as a running job would leave them:
 - format readers and writers against example files;
 - chemistry routines;
 - the selection language;

@@ -73,7 +73,9 @@ new steps.
   - maximum and RMS force;
   - maximum and RMS displacement;
   - energy change;
-  - gradient norm.
+  - gradient norm;
+  - the number of negative eigenvalues of the optimiser's Hessian, when the program prints the eigenvalues
+    (Gaussian and Q-Chem). A transition-state search should keep exactly one.
 
 **Optimisation plots** (the plot picker's *Optimisation* group):
 
@@ -86,6 +88,7 @@ new steps.
 | RMSD to final | The RMSD of each geometry from the final one, after optimal superposition (Kabsch) |
 | Largest atomic step | The largest displacement of any atom from the previous geometry |
 | All criteria / threshold | Every criterion divided by its threshold on one log-scale plot. A criterion is met below 1 |
+| Negative Hessian eigenvalues | Transition-state searches (and minimisations that meet a negative eigenvalue): the number of negative eigenvalues of the optimiser's Hessian at each step, from Gaussian's `Eigenvalues ---` rows and Q-Chem's `Hessian Eigenvalues:` block. A good TS search stays at 1 |
 
 A badge such as **converged at step 5** marks the step where the program reported convergence. Click a point to
 go to that geometry.
@@ -114,11 +117,46 @@ The **Vibrations** tab lists each mode with:
 - its IR intensity (km/mol; for MOPAC, the squared transition dipole in D²) and Raman activity (Å⁴/amu), when
   computed.
 
-- **Click a mode**, or a peak in the spectrum, to animate it. **Amplitude** and **Speed** adjust the animation, and
-  **Arrows** shows the displacement vectors.
-- **Displace along the selected mode** (− or + direction, by a chosen largest atom shift in Å) creates a new
-  edited geometry. Use it, for example, to push a structure off a saddle point, then
-  **Export → Calculation input** to start a new optimisation.
+![A transition state: both ends of the imaginary mode in blue and orange, the C–F bonds that form and break, and one negative Hessian eigenvalue at each step of the TS search](images/transition-state.png)
+
+A line at the top of the tab says what the frequencies make of the structure, and how many imaginary frequencies
+there are:
+- none: a minimum (for a transition-state search, *not* a transition state);
+- exactly one: a transition state;
+- more than one: a higher-order saddle point.
+
+Imaginary frequencies below 50i cm⁻¹ are counted apart: in a minimum they are often numerical noise, from loose
+convergence or a coarse integration grid. When a file has an imaginary mode (one above 50i cm⁻¹, or any in a
+transition-state search), opening it selects the largest one, and the message on opening gives the count.
+**Show it** in that line selects the imaginary mode again.
+
+- **Click a mode**, or a peak in the spectrum, to animate it.
+- **Amplitude** is the largest atom shift of the animation, in Å. **Speed** sets how fast it moves.
+- **Arrows** shows the displacement vectors. **Arrow length** sets the length of the longest one, in Å, whatever
+  the amplitude.
+- **Both ends** stops the animation at the centre and shows the two ends of the motion (± the amplitude) as
+  translucent structures, blue for the − end and orange for the + end. The bonds drawn at each end follow its own
+  distances, so a bond that forms appears at one end only. Press play to animate with the ends shown.
+
+**Bonds along mode N** lists the atom pairs whose distance changes most along the selected mode, with the distance at
+the − end, at this geometry and at the + end (± the amplitude). Pairs that only span an angle are left out. Along
+the imaginary mode of a transition state, a partial bond that gets shorter towards the + end **forms** and one
+that gets longer **breaks**. A bond counts as partial when it is longer than 1.15 × the sum of the covalent radii,
+or is drawn at one end only. For other modes and for ordinary bonds the table says **shorter** or **longer**. Click
+a row to measure that distance: the measurement follows the animation.
+
+**Displace along the selected mode** uses a largest atom shift in Å (0.15 by default):
+- **− direction** and **+ direction** each create a new edited geometry, for example to push a structure off a saddle
+  point. Then use **Export → Calculation input** to start a new optimisation.
+- **Forward and reverse inputs…** writes two optimisation inputs at once: *name*_minus and *name*_plus, from the
+  geometry displaced by − and + that shift. Optimising both shows which minima the transition state connects (an
+  IRC does this more rigorously).
+  - The dialog is the usual calculation-input dialog, with the Task set to **Optimization**.
+  - A Gaussian route or ORCA keyword line taken from the file becomes an optimisation:
+    - Gaussian: `opt=(ts,calcfc,noeigentest)` becomes `opt`, other `opt` options and keywords are kept, `opt` is
+      added when missing, and `geom=` and `guess=` are dropped;
+    - ORCA: `OptTS` becomes `Opt`.
+  - Check the route before running the inputs.
 - **Save animation (.xyz)**: the mode as a multi-frame XYZ.
 
 ## Spectra

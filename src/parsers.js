@@ -462,6 +462,7 @@
         }
       }
       if (/^Harmonic frequencies/.test(t)) break;   // the next section (hpmodes prints both)
+      if (rowsIn && /^-{5,}$/.test(t)) break;   // the box of " - Thermochemistry -" right after the last block
       // a line this reader does not know among the labels of a block, before its atom rows: skipped (a few at most)
       if (block && !rowsIn && ++odd <= 8) continue;
       if (rec.freqs.length) rec.stopped = { line: j, text: /^\d/.test(t) ? null : t.slice(0, 70) };
@@ -653,6 +654,7 @@
     let scfMethod = null, stdBasis = null, solventOut = null, routeMB = null, cellVecs = null;
     // Excited-state optimisations / scans / IRCs: the TD total energy is the frame energy of that job.
     let tdGeomJob = false;
+    let negEig = null;   // negative eigenvalues of the Hessian in this optimisation step (1 for a TS search)
     let ccKind = 'CCSD', lastCorr = null;   // coupled-cluster / QCI: the kind of this job, the last E(Corr) printed
     const tdFrames = new Set();
     const jobsT = new JobTracker(ds);
@@ -910,8 +912,23 @@
         if (m && !oniomJob) { sink.energy('TD', num(m[1])); if (tdGeomJob && sink.current()) tdFrames.add(sink.current()); }
         continue;
       }
+      if (t.startsWith('ITU=')) {
+        // "Eigenvalues ---" rows of the step's Hessian (Berny optimiser): count the negative ones; a line such as
+        // "Use linear search instead of GDIIS." may come first
+        let neg = 0, seen = false, j = i + 1;
+        while (j < n && j < i + 4 && !L[j].trim().startsWith('Eigenvalues ---')) j++;
+        for (; j < n && j < i + 2000; j++) {
+          const s = L[j].trim();
+          if (!s.startsWith('Eigenvalues ---')) break;
+          seen = true;
+          for (const x of s.slice(15).match(/-?\d*\.\d+(?:[DdEe][-+]?\d+)?/g) || []) if (num(x) < 0) neg++;
+        }
+        if (seen) { negEig = neg; i = j - 1; }
+        continue;
+      }
       if (t.startsWith('Item') && /Value\s+Threshold\s+Converged/.test(t)) {
         const opt = {};
+        if (negEig !== null) { opt.negEig = negEig; negEig = null; }
         for (let j = i + 1; j < Math.min(n, i + 8); j++) {
           const s = L[j].trim();
           const m = /^(Maximum|RMS)\s+(Force|Displacement)\s+(\S+)\s+(\S+)\s+(YES|NO)/.exec(s);

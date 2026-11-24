@@ -7,7 +7,7 @@
   const HARTREE = { kcal: 627.509474, kj: 2625.49964, ev: 27.211386 };
   const UNIT_LABEL = { kcal: 'kcal/mol', kj: 'kJ/mol', ev: 'eV' };
   const BG = { navy: [0.063, 0.090, 0.133], black: [0, 0, 0], white: [1, 1, 1], gray: [0.91, 0.925, 0.945] };
-  const VERSION = '2.0.2';
+  const VERSION = '2.1.0';
   const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const isNum = v => typeof v === 'number' && isFinite(v);
   const fx = (v, d) => (isNum(v) ? v.toFixed(d) : '—');
@@ -18,7 +18,9 @@
     docs: [], active: null, nextId: 1,
     view: { style: 'ballstick', labels: 'none', color: 'element', showH: true, bondLengths: false, perspective: true, fog: true, axes: true, bg: 'navy', atomScale: 0.25, bondRadius: 0.11, vdwScale: 1, tol: 0.4, dummies: true, theme: 'dark', bondOrders: true, hbonds: false, dipole: false, cell: true },
     anim: { kind: null, raf: 0, last: 0, phase: 0, acc: 0 },
-    vib: { amplitude: 0.35, speed: 1.0, arrows: false, playing: true },
+    // amplitude: largest atom shift of the animation and the two ends (Å); arrowLen: length of the longest arrow (Å);
+    // ends: show both ends of the selected vibration as translucent structures
+    vib: { amplitude: 0.35, speed: 1.0, arrows: false, arrowLen: 0.8, ends: false, playing: true, disp: 0.15 },
     fps: 6,
     plotCollapsed: false,
     build: {
@@ -34,7 +36,7 @@
     try {
       const p = JSON.parse(localStorage.getItem('bluemolecule.prefs') || '{}');
       if (p.view) Object.assign(state.view, p.view);
-      if (p.vib) Object.assign(state.vib, p.vib);
+      if (p.vib) for (const k of ['amplitude', 'speed', 'arrows', 'arrowLen']) if (p.vib[k] !== undefined) state.vib[k] = p.vib[k];
       if (p.build) {
         const b = state.build;
         for (const k of ['element', 'order', 'adjustH', 'autoOpt', 'symTol']) if (p.build[k] !== undefined) b[k] = p.build[k];
@@ -48,7 +50,7 @@
   function savePrefs() {
     try {
       const cs = document.documentElement.style, b = state.build;
-      localStorage.setItem('bluemolecule.prefs', JSON.stringify({ view: state.view, vib: { amplitude: state.vib.amplitude, speed: state.vib.speed, arrows: state.vib.arrows },
+      localStorage.setItem('bluemolecule.prefs', JSON.stringify({ view: state.view, vib: { amplitude: state.vib.amplitude, speed: state.vib.speed, arrows: state.vib.arrows, arrowLen: state.vib.arrowLen },
         build: { element: b.element, order: b.order, adjustH: b.adjustH, autoOpt: b.autoOpt, symTol: b.symTol, tpl: b.tpl, fold: b.fold },
         sidebar: cs.getPropertyValue('--sidebar-w'), plotH: cs.getPropertyValue('--plot-h') }));
     } catch (e) { /* ignore */ }
@@ -171,8 +173,17 @@
     activate(d);
     const w = (data.warnings || []).length;
     const nf = data.frames.length;
-    if (d.pending) toast(`Opened ${name}: ${data.frames[0].Z.length} atoms, coordinates pending — open a coordinate or trajectory file next`);
-    else toast(`Opened ${name}${note || ''}: ${data.frames[d.frameIndex].Z.length} atoms${nf > 1 ? `, ${nf} geometries` : ''}${data.vibrations ? `, ${data.vibrations.freqs.length} vibrations` : ''}${w ? ` (${w} warning${w > 1 ? 's' : ''})` : ''}`);
+    if (d.pending) { toast(`Opened ${name}: ${data.frames[0].Z.length} atoms, coordinates pending — open a coordinate or trajectory file next`); return d; }
+    // frequencies with imaginary modes (or of a transition-state search): say how many, and show the largest one
+    // unless it is only numerical noise (issue #14)
+    let vibNote = '';
+    const v = data.vibrations;
+    if (v && v.frameIndex === d.frameIndex) {
+      const st = BM.vibtools.stationary(v), ts = tsJob(d);
+      if (st.imag.length || ts) vibNote = ' — ' + BM.vibtools.describe(v, st, ts).short;
+      if (st.imag.length && (ts || st.large.length) && modeOf(d, st.imag[0])) { selectVib(d, st.imag[0]); renderPanel(); vibNote += ', selected'; }
+    }
+    toast(`Opened ${name}${note || ''}: ${data.frames[d.frameIndex].Z.length} atoms${nf > 1 ? `, ${nf} geometries` : ''}${v ? `, ${v.freqs.length} vibrations` : ''}${w ? ` (${w} warning${w > 1 ? 's' : ''})` : ''}${vibNote}`);
     return d;
   }
 
@@ -783,7 +794,7 @@
     $('#viewport').style.background = 'rgb(' + (BG[state.view.bg] || BG.navy).map(c => Math.round(c * 255)).join(',') + ')';
     $('#pending').classList.toggle('hidden', !(d && d.pending));
     if (d && d.pending) $('#pending-msg').textContent = `${d.name}: ${d.data.frames[0].Z.length} atoms. Open a coordinate or trajectory file with the same atom count (inpcrd, NetCDF, DCD, TRR, XTC, PDB, GRO…).`;
-    if (!d || d.pending) { R.setRepresentation(null, true); R.setScene([], new Float64Array(0), new Uint32Array(0)); pushReps(null); R.setSurfaces([]); R.setArrows(null); refreshExtras(); updateMeasure(); return; }
+    if (!d || d.pending) { R.setRepresentation(null, true); R.setScene([], new Float64Array(0), new Uint32Array(0)); pushReps(null); R.setSurfaces([]); R.setArrows(null); refreshEnds(); refreshExtras(); updateMeasure(); return; }
     const f = curFrame(d);
     if (!keepView) R.setOrientation(principalQuat(f.Z, f.xyz));
     const fi = d.frameIndex;
@@ -793,6 +804,7 @@
     pushReps(rr);
     R.setSelection(d.selection);
     refreshArrows();
+    refreshEnds();
     refreshSurfaces();
     refreshExtras();
     updateMeasure();
@@ -877,14 +889,27 @@
     }
     R.setAtomColors(null);
   }
+  /** Displacement arrows of the selected vibration: the longest is state.vib.arrowLen Å, whatever the amplitude. */
   function refreshArrows() {
     const d = state.active;
-    if (d && d.vibIndex >= 0 && state.vib.arrows && d._vibVec) {
-      const a = new Float64Array(d._vibVec.length);
-      for (let i = 0; i < a.length; i++) a[i] = d._vibVec[i] * 2.4;
-      R.setArrows(a);
-    } else R.setArrows(null);
+    const a = d && d.vibIndex >= 0 && state.vib.arrows && d._vibVec ? vibVec(d, d.vibIndex, state.vib.arrowLen) : null;
+    R.setArrows(a);
   }
+  /** Translucent structures at both ends of the selected vibration (the animation's amplitude), when shown. */
+  function refreshEnds() {
+    const d = state.active;
+    const on = !!(d && !d.pending && state.vib.ends && d.vibIndex >= 0 && d._vibVec);
+    const v = on ? state.view : null;
+    const key = on ? [d.id, d.vibIndex, state.vib.amplitude, v.style, v.atomScale, v.bondRadius, v.showH].join(':') : '';
+    if (key === refreshEnds.key) return;
+    refreshEnds.key = key;
+    if (!on) { R.setVibEnds([]); return; }
+    const eq = d.data.frames[d.data.vibrations.frameIndex], small = v.style === 'sticks' || v.style === 'wireframe';
+    R.setVibEnds(BM.vibtools.endMeshes(eq.Z, eq.xyz, d._vibVec, {
+      radius: i => (eq.Z[i] === 1 && !v.showH ? 0 : small ? 0.16 : Math.max(0.12, 0.85 * R.atomRadius(i))), bondRadius: small ? 0.1 : 0.065
+    }));
+  }
+  refreshEnds.key = '';
   function surfaceMesh(s, sign) {
     const key = sign + ':' + s.iso;
     s.mesh = s.mesh || {};
@@ -1438,6 +1463,23 @@
     if (d.plotType === 'ir' || d.plotType === 'raman') renderPlotDraw();
     if (d.tab === 'vib') { const r = $('#vib-table tr.on'); if (r) scrollRowIntoView(r); }
   }
+  /** A new amplitude for the animation, the two ends and the distances in the bond table. */
+  function setAmplitude(d, amp) {
+    if (!d || d.vibIndex < 0 || !d._vibVec) return;
+    d._vibVec = vibVec(d, d.vibIndex, amp);
+    refreshEnds();
+    refreshVibBonds(d);
+  }
+  /** Pause the animation of the selected vibration at its centre (the geometry of the frequency job). */
+  function holdVib(d) {
+    state.vib.playing = false;   // also for the next vibration selected
+    if (!d || d.vibIndex < 0) return;
+    if (state.anim.kind === 'vib') stopAnim(false); else R.updatePositions(curFrame(d).xyz);
+    state.anim.phase = 0;
+    refreshOverlays(d);
+    if (d.selection.length) updateMeasure(true);
+    renderPlaybar();
+  }
   function toggleVibPlay() {
     const d = state.active; if (!d || d.vibIndex < 0) return;
     if (state.anim.kind === 'vib') { state.vib.playing = false; state.anim.kind = null; renderPlaybar(); }
@@ -1783,6 +1825,7 @@
       const thr = o[k + 'Thr'], cv = o[k + 'Conv'];
       rows.push([CRIT_NAMES[k], `<span class="mono">${o[k].toExponential(2)}</span>${isNum(thr) ? ` <span class="dim mono">/ ${thr.toExponential(1)}</span>` : ''}${cv === true ? ' <span class="ok-mark">✓</span>' : cv === false ? ' <span class="no-mark">✗</span>' : ''}`]);
     }
+    if (isNum(o.negEig)) rows.push(['Negative Hessian eigenvalues', `<span class="mono">${o.negEig}</span>${tsJob(d) ? (o.negEig === 1 ? ' <span class="ok-mark">✓</span>' : ' <span class="no-mark">✗</span> <span class="dim">(1 for a transition-state search)</span>') : ''}`]);
     return rows.length ? `<div class="sec" style="margin-top:14px"><h3>Convergence at geometry ${d.frameIndex + 1}</h3>${kv(rows)}<p class="note"><a href="#" data-go-plot="opt:all" data-go-tab="" data-go-anchor="">Plot all criteria / threshold</a></p></div>` : '';
   }
 
@@ -1794,25 +1837,49 @@
     const partial = v.modesLoaded !== undefined && v.modesLoaded < nV;
     const hasMode = i => (v.modes && v.modes.has ? v.modes.has(i) : !!v.modes[i]);
     const rows = v.freqs.slice(lo, hi).map((f, i0) => { const i = lo + i0; return `<tr class="row${partial && !hasMode(i) ? ' nodisp' : ''}" data-i="${i}"${partial && !hasMode(i) ? ' title="Displacements not loaded"' : ''}><td>${i + 1}</td><td class="${f < 0 ? 'imag' : ''}">${f < 0 ? Math.abs(f).toFixed(2) + 'i' : f.toFixed(2)}</td>${hasSym ? `<td class="dim">${esc(v.sym[i] || '')}</td>` : ''}${hasIR ? `<td>${fx(v.ir[i], 2)}</td>` : ''}${hasR ? `<td>${fx(v.raman[i], 2)}</td>` : ''}</tr>`; }).join('');
+    const st = BM.vibtools.stationary(v), desc = BM.vibtools.describe(v, st, tsJob(d)), top = st.imag.length ? st.imag[0] : -1;
+    const show = top >= 0 && d.vibIndex !== top ? ` <a href="#" data-act="vib-imag">Show ${st.imag.length > 1 ? 'the largest' : 'it'}</a>` : '';
+    const off = d.vibIndex < 0 ? 'disabled' : '';
     return `<div class="sec">
+      <p class="vib-summary ${desc.ok ? 'ok' : 'warn'}" id="vib-summary">${esc(desc.text)}${show}</p>
       <div class="controls">
-        <label class="field"><span>Amplitude</span><input type="range" data-vib="amplitude" min="0.05" max="1.2" step="0.05" value="${state.vib.amplitude}"><output>${state.vib.amplitude.toFixed(2)} Å</output></label>
+        <label class="field" title="Largest atom shift in the animation and at the two ends"><span>Amplitude</span><input type="range" data-vib="amplitude" min="0.05" max="1.2" step="0.05" value="${state.vib.amplitude}"><output>${state.vib.amplitude.toFixed(2)} Å</output></label>
         <label class="field"><span>Speed</span><input type="range" data-vib="speed" min="0.2" max="3" step="0.1" value="${state.vib.speed}"><output>${state.vib.speed.toFixed(1)}×</output></label>
         <label class="field"><span>Arrows</span><span><input type="checkbox" data-vib="arrows" ${state.vib.arrows ? 'checked' : ''}> show displacement vectors</span><span></span></label>
+        <label class="field" title="Length of the longest arrow"><span>Arrow length</span><input type="range" data-vib="arrowLen" min="0.2" max="3" step="0.1" value="${state.vib.arrowLen}"><output>${state.vib.arrowLen.toFixed(1)} Å</output></label>
+        <label class="field" title="Both ends of the motion as translucent structures, at the amplitude above"><span>Both ends</span><span><input type="checkbox" data-vib="ends" ${state.vib.ends ? 'checked' : ''}> <span class="end-key minus">−</span> and <span class="end-key plus">+</span> ends, still</span><span></span></label>
       </div>
       <table class="list" id="vib-table"><tr><th>#</th><th>ν (cm⁻¹)</th>${hasSym ? '<th>Sym.</th>' : ''}${hasIR ? '<th>IR (' + esc(v.irUnit || 'km/mol') + ')</th>' : ''}${hasR ? '<th>Raman (Å⁴/amu)</th>' : ''}</tr>${rows}</table>
       <p class="note">Click a mode to animate it, or click a peak in the spectrum below. Imaginary modes are shown in orange.</p>
       </div>
+      <div class="sec" id="vib-bonds">${vibBondsHtml(d)}</div>
       <div class="sec"><h3>Displace along the selected mode</h3>
-        <div class="inline"><input type="number" id="disp-amt" value="0.15" step="0.05" min="0.01" style="width:90px"> <span class="note">Å (largest atom shift)</span></div>
+        <div class="inline"><input type="number" id="disp-amt" value="${state.vib.disp || 0.15}" step="0.05" min="0.01" style="width:90px"> <span class="note">Å (largest atom shift)</span></div>
         <div class="btnrow" style="margin-top:8px">
-          <button class="btn small" data-act="displace-minus" ${d.vibIndex < 0 ? 'disabled' : ''}>− direction</button>
-          <button class="btn small" data-act="displace-plus" ${d.vibIndex < 0 ? 'disabled' : ''}>+ direction</button>
-          <button class="btn small" data-act="export-vib" ${d.vibIndex < 0 ? 'disabled' : ''}>Save animation (.xyz)</button>
+          <button class="btn small" data-act="displace-minus" ${off}>− direction</button>
+          <button class="btn small" data-act="displace-plus" ${off}>+ direction</button>
+          <button class="btn small" data-act="export-vib" ${off}>Save animation (.xyz)</button>
+          <button class="btn small" data-act="vib-inputs" ${off} title="Two calculation inputs, displaced by − and + this amount, to optimise towards both minima">Forward and reverse inputs…</button>
         </div>
-        <p class="note">Creates a new “Edited” geometry, e.g. to push a structure off a saddle point; then use Export → Calculation input.</p>
+        <p class="note">− / + direction creates a new “Edited” geometry, e.g. to push a structure off a saddle point. Forward and reverse inputs writes one optimisation input for each direction (<i>name</i>_minus and <i>name</i>_plus).</p>
       </div>`;
   }
+  /** Is the document's job (or one of its jobs) a transition-state search? */
+  const tsJob = d => ((d.data.meta && d.data.meta.jobTypes) || []).indexOf('ts') >= 0 || (d.data.jobs || []).some(j => (j.kinds || []).indexOf('ts') >= 0);
+  /** Atom pairs whose distance changes most along the selected vibration, with the distances at both ends. */
+  function vibBondsHtml(d) {
+    const v = d.data.vibrations;
+    if (!v || d.vibIndex < 0 || !d._vibVec) return '';
+    const eq = d.data.frames[v.frameIndex], f = v.freqs[d.vibIndex], imag = f < 0;
+    const rows = BM.vibtools.bondChanges(eq.Z, eq.xyz, d._vibVec, { imaginary: imag });
+    if (!rows.length) return '';
+    const lab = i => el.symbol(eq.Z[i]) + (i + 1), sel = d.selection.length === 2 ? d.selection.slice().sort((a, b) => a - b).join(',') : '';
+    const body = rows.map(r => `<tr class="row${sel === r.i + ',' + r.j ? ' on' : ''}" data-pair="${r.i},${r.j}"><td>${lab(r.i)}–${lab(r.j)}</td><td class="mono">${r.dMinus.toFixed(3)}</td><td class="mono">${r.d0.toFixed(3)}</td><td class="mono">${r.dPlus.toFixed(3)}</td><td class="chg ${r.change}">${r.change}</td></tr>`).join('');
+    return `<h3>Bonds along mode ${d.vibIndex + 1}</h3>
+      <table class="list" id="vib-bonds-table"><tr><th>Atoms</th><th>− end</th><th>Here</th><th>+ end</th><th>Toward +</th></tr>${body}</table>
+      <p class="note">Distances in Å at both ends of the motion (±${state.vib.amplitude.toFixed(2)} Å, the amplitude) and at this geometry, largest change first.${imag ? ' Along the imaginary mode of a transition state, the bonds that form and break are those of the reaction.' : ''} Click a row to measure it.</p>`;
+  }
+  function refreshVibBonds(d) { const box = $('#vib-bonds'); if (box && d && d.tab === 'vib') box.innerHTML = vibBondsHtml(d); }
 
   function panelStates(d) {
     const S = d.data.excitedStates;
@@ -2027,7 +2094,7 @@
   function displace(sign) {
     const d = state.active, v = d && d.data.vibrations;
     if (!v || d.vibIndex < 0) return;
-    const amt = parseFloat($('#disp-amt') ? $('#disp-amt').value : '0.15') || 0.15;
+    const amt = parseFloat($('#disp-amt') ? $('#disp-amt').value : state.vib.disp) || state.vib.disp || 0.15;
     const mode = d.vibIndex, u = vibVec(d, mode, amt * sign);
     if (!u) return toast(NOT_LOADED, true);
     const eq = d.data.frames[v.frameIndex];
@@ -2169,7 +2236,7 @@
     const a = axis === 'y' ? z.y0 : z.x0, b = axis === 'y' ? z.y1 : z.x1, i = text.indexOf('\n') + 1;
     return text.slice(0, i) + `# zoomed in: only ${what} from ${+a.toPrecision(7)} to ${+b.toPrecision(7)}\n` + text.slice(i);
   }
-  const fmtCrit = (key, v) => (!isNum(v) ? '—' : key === 'energy' ? v.toFixed(6) + ' Eh' : key === 'dE' ? v.toFixed(3) + ' kcal/mol' : key === 'rmsd' || key === 'maxStep' ? v.toFixed(4) + ' Å' : v.toExponential(3));
+  const fmtCrit = (key, v) => (!isNum(v) ? '—' : key === 'energy' ? v.toFixed(6) + ' Eh' : key === 'dE' ? v.toFixed(3) + ' kcal/mol' : key === 'rmsd' || key === 'maxStep' ? v.toFixed(4) + ' Å' : key === 'negEig' ? String(v) : v.toExponential(3));
   /** {spec, csv()} for the document's current plot. */
   function buildPlot(d) {
     const t = d.plotType;
@@ -2246,7 +2313,8 @@
     const log = ser.log && d.spec.opt.log;
     const pts = steps.map((s, k) => ({ x: s.n, y: ser.values[k], id: s.frame, mark: k === c.converged, label: `${s.label}${s.frame === null ? ' (geometry not loaded)' : ''} · ${ser.label} = ${fmtCrit(key, ser.values[k])}${ser.threshold ? ' (threshold ' + ser.threshold.toExponential(1) + ')' : ''}` })).filter(p => isNum(p.y) && (!log || p.y > 0));
     return {
-      spec: Object.assign(base, { yLabel: ser.label + (ser.unit ? ' (' + ser.unit + ')' : ''), logY: log, points: pts, hlines: ser.threshold ? [{ y: ser.threshold, label: 'threshold ' + ser.threshold.toExponential(1) }] : [] }),
+      spec: Object.assign(base, { yLabel: ser.label + (ser.unit ? ' (' + ser.unit + ')' : ''), logY: log, points: pts, hlines: ser.threshold ? [{ y: ser.threshold, label: 'threshold ' + ser.threshold.toExponential(1) }] : [] },
+        ser.integer ? { integerY: true, yRange: [-0.5, Math.max(1, ...pts.map(p => p.y)) + 0.5] } : {}),
       csv: z => { const ok = inZ(z); return zoomCSV(head + `${unitWord},frame,${key}${ser.unit ? '_' + ser.unit.replace(/[^A-Za-z]+/g, '_') : ''}${ser.threshold ? ',threshold' : ''}\n` + steps.map((s, k) => (ok(s.n) ? [s.n, s.frame === null ? '' : s.frame + 1, csvNum(ser.values[k])].concat(ser.threshold ? [ser.threshold] : []).join(',') : null)).filter(x => x !== null).join('\n') + '\n', z, unitWord + 's'); }
     };
   }
@@ -2382,24 +2450,30 @@
     return e < mult - 1 || (((e - (mult - 1)) % 2) + 2) % 2 ? 'Check charge and multiplicity: ' + e + ' electrons cannot have multiplicity ' + mult + '.' : '';
   }
   /** Input files for quantum-chemistry programs (BM.inputPrograms); programId preselects a program. */
-  function exportCalc(programId) {
+  /** The calculation-input dialog. pair = {Z, minus, plus, amount, mode, freq} writes two inputs instead, for the
+   *  geometries displaced along a vibration (forward and reverse optimisations from a transition state, issue #14):
+   *  name_minus and name_plus, the Task set to Optimization and a TS route or keyword line turned into an optimisation. */
+  function exportCalc(programId, pair) {
     const d = state.active; if (!d) return toast('Open a file first.', true);
-    const g = geomFor(d), f = g.f;
+    const g = pair ? { Z: pair.Z, xyz: pair.plus, f: null } : geomFor(d);
     if (!g.Z.some(z => z > 0)) return toast('There are no atoms to write yet.', true);
     const progs = BM.inputPrograms, prefs = loadCalcPrefs(), m = d.data.meta || {};
     let pid = programId || (d.data.format === 'orca-out' ? 'orca' : /^gaussian/.test(d.data.format) ? 'gaussian' : prefs.program);
     if (!progs.some(p => p.id === pid)) pid = 'gaussian';
-    const fileRoute = /^gaussian/.test(d.data.format) && m.route ? String(m.route) : null;
-    const fileKw = d.data.format === 'orca-out' && m.keywords ? String(m.keywords) : null;
+    // the route / keywords of the file; geom= and guess= would read the old geometry from a checkpoint file
+    const fileRoute = /^gaussian/.test(d.data.format) && m.route
+      ? (pair ? BM.vibtools.minimumRoute(m.route) : String(m.route).replace(/\b(geom|geometry|guess)\s*=\s*(\([^)]*\)|\S+)/gi, ' ').replace(/\s+/g, ' ').trim()) : null;
+    const fileKw = d.data.format === 'orca-out' && m.keywords
+      ? (pair ? BM.vibtools.minimumKeywords(m.keywords) : Array.isArray(m.keywords) ? m.keywords.join(' ') : String(m.keywords)) : null;
     const cd = chargeDefaults(d);
     // the Job name is the title of the input and, made safe, the name of its files (issue #3)
     const jobName = d.built ? d.name : baseName(d);
     const body = `
       <div class="two"><label class="field"><span>Program</span><select data-c="program">${progs.map(p => `<option value="${p.id}" ${p.id === pid ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>
         <label class="field"><span>Task</span><select data-c="task"></select></label></div>
-      ${fileRoute ? `<div data-c-row="gaussian" class="crow"><label class="field cw"><span></span><span class="inline"><input type="checkbox" data-c="useRoute" checked> Use the route from this file</span></label>
+      ${fileRoute ? `<div data-c-row="gaussian" class="crow"><label class="field cw"><span></span><span class="inline"><input type="checkbox" data-c="useRoute" checked> Use the route from this file${pair ? ', as an optimisation' : ''}</span></label>
         <label class="field cw" data-c-row="route"><span>Route</span><input type="text" data-c="route" value="${esc(fileRoute)}" spellcheck="false"></label></div>` : ''}
-      ${fileKw ? `<div data-c-row="orca" class="crow"><label class="field cw"><span></span><span class="inline"><input type="checkbox" data-c="useKw" checked> Use the keywords from this file</span></label>
+      ${fileKw ? `<div data-c-row="orca" class="crow"><label class="field cw"><span></span><span class="inline"><input type="checkbox" data-c="useKw" checked> Use the keywords from this file${pair ? ', as an optimisation' : ''}</span></label>
         <label class="field cw" data-c-row="kw"><span>Keywords</span><input type="text" data-c="kw" value="${esc(fileKw)}" spellcheck="false"></label></div>` : ''}
       <div class="two"><label class="field"><span>Method</span><input type="text" data-c="method" list="calc-methods" spellcheck="false"></label>
         <label class="field"><span>Basis set</span><input type="text" data-c="basis" list="calc-bases" spellcheck="false"></label></div>
@@ -2411,37 +2485,67 @@
       <div class="two"><label class="field"><span>Solvent</span><input type="text" data-c="solvent" placeholder="none (gas phase)" spellcheck="false"></label>
         <label class="field" title="Used as the file name (and the checkpoint name) and as the title of the input"><span>Job name</span><input type="text" data-c="title" value="${esc(jobName)}" spellcheck="false"></label></div>
       <label class="field cw"><span>Extra keywords</span><input type="text" data-c="extra" placeholder="optional; written where the program expects extra input" spellcheck="false"></label>
-      <textarea data-c="preview" spellcheck="false"></textarea>
+      <textarea data-c="preview" spellcheck="false"${pair ? ' readonly' : ''}></textarea>
       <p class="note" data-c="note"></p>`;
     let result = null;
     const V = (form, k) => $(`[data-c="${k}"]`, form);
     const prog = form => progs.find(p => p.id === V(form, 'program').value) || progs[0];
     const usesFile = (form, p) => (p.id === 'gaussian' && fileRoute && V(form, 'useRoute').checked) || (p.id === 'orca' && fileKw && V(form, 'useKw').checked);
     const baseOf = form => BM.writers.fileBase(V(form, 'title').value, 'job');
+    /** One input: {text, files?, command?, note?}. */
+    const make = (form, xyz, base, title) => {
+      const p = prog(form), n = s => V(form, s).value;
+      const o = { Z: g.Z, xyz, charge: parseInt(n('charge'), 10) || 0, multiplicity: parseInt(n('mult'), 10) || 1, method: n('method').trim(), basis: n('basis').trim(), task: n('task'),
+        nprocs: Math.max(1, parseInt(n('nprocs'), 10) || 1), memoryMB: Math.max(0, parseInt(n('mem'), 10) || 0), title, solvent: n('solvent').trim() || undefined, extra: n('extra').trim() || undefined, baseName: base };
+      if (p.id === 'gaussian' && usesFile(form, p)) {
+        const link0 = ['%chk=' + base + '.chk'];
+        if (o.nprocs > 1) link0.push('%nprocshared=' + o.nprocs);
+        if (o.memoryMB) link0.push('%mem=' + o.memoryMB + 'MB');
+        let text = BM.writers.gaussianInput({ Z: g.Z, xyz, route: n('route'), title, charge: o.charge, multiplicity: o.multiplicity, link0, cell: d.data.cell });
+        if (o.extra) text = text.replace(/\n\n\n$/, '\n\n' + o.extra + '\n\n');
+        return { text, command: 'g16 ' + base + '.gjf', note: parityNote(g.Z, o.charge, o.multiplicity) };
+      }
+      if (p.id === 'orca' && usesFile(form, p)) {
+        const text = BM.writers.orcaInput({ Z: g.Z, xyz, keywords: n('kw'), charge: o.charge, multiplicity: o.multiplicity, nprocs: o.nprocs,
+          maxcore: o.memoryMB ? Math.max(1, Math.floor(o.memoryMB / o.nprocs)) : null, extraBlocks: o.extra ? [o.extra] : [] });
+        return { text, command: 'orca ' + base + '.inp > ' + base + '.out', note: parityNote(g.Z, o.charge, o.multiplicity) };
+      }
+      return p.write(o);
+    };
+    /** The files of both inputs of a pair: [{name, text}]; files both share (an xcontrol) once, other names that
+     *  clash (Turbomole's coord) get _minus / _plus. */
+    const pairFiles = (p, r, base) => {
+      const list = (x, b) => (x.files && x.files.length ? x.files.map(q => ({ name: q.name, text: q.text })) : [{ name: b + '.' + (p.ext || 'inp'), text: x.text }]);
+      const a = list(r.minus, base + '_minus'), b = list(r.plus, base + '_plus'), out = a.slice();
+      for (const q of b) {
+        const k = out.findIndex(x => x.name === q.name);
+        if (k < 0) out.push(q);
+        else if (out[k].text !== q.text) { out[k] = { name: q.name + '_minus', text: out[k].text }; out.push({ name: q.name + '_plus', text: q.text }); }
+      }
+      return out;
+    };
     const build = form => {
-      const p = prog(form), n = s => V(form, s).value, base = baseOf(form);
-      const o = { Z: g.Z, xyz: g.xyz, charge: parseInt(n('charge'), 10) || 0, multiplicity: parseInt(n('mult'), 10) || 1, method: n('method').trim(), basis: n('basis').trim(), task: n('task'),
-        nprocs: Math.max(1, parseInt(n('nprocs'), 10) || 1), memoryMB: Math.max(0, parseInt(n('mem'), 10) || 0), title: n('title'), solvent: n('solvent').trim() || undefined, extra: n('extra').trim() || undefined, baseName: base };
-      const notes = [cd.note];
+      const p = prog(form), base = baseOf(form), title = V(form, 'title').value, notes = [cd.note];
       try {
-        if (p.id === 'gaussian' && usesFile(form, p)) {
-          const link0 = ['%chk=' + base + '.chk'];
-          if (o.nprocs > 1) link0.push('%nprocshared=' + o.nprocs);
-          if (o.memoryMB) link0.push('%mem=' + o.memoryMB + 'MB');
-          let text = BM.writers.gaussianInput({ Z: g.Z, xyz: g.xyz, route: n('route'), title: o.title, charge: o.charge, multiplicity: o.multiplicity, link0, cell: d.data.cell });
-          if (o.extra) text = text.replace(/\n\n\n$/, '\n\n' + o.extra + '\n\n');
-          result = { text, command: 'g16 ' + base + '.gjf', note: parityNote(g.Z, o.charge, o.multiplicity) };
-        } else if (p.id === 'orca' && usesFile(form, p)) {
-          const text = BM.writers.orcaInput({ Z: g.Z, xyz: g.xyz, keywords: n('kw'), charge: o.charge, multiplicity: o.multiplicity, nprocs: o.nprocs,
-            maxcore: o.memoryMB ? Math.max(1, Math.floor(o.memoryMB / o.nprocs)) : null, extraBlocks: o.extra ? [o.extra] : [] });
-          result = { text, command: 'orca ' + base + '.inp > ' + base + '.out', note: parityNote(g.Z, o.charge, o.multiplicity) };
-        } else result = p.write(o);
-        V(form, 'preview').value = result.text;
-        notes.push(result.note);
-        if (result.files && result.files.length > 1) notes.push('Saves ' + result.files.map(x => x.name).join(' and ') + '.');
-        else if (result.files && result.files.length) notes.push('Saves ' + result.files[0].name + '.');
-        else notes.push('Saves ' + base + '.' + (p.ext || 'inp') + '.');
-        if (result.command) notes.push('Run: <code>' + esc(result.command) + '</code>');
+        if (pair) {
+          const nu = pair.freq < 0 ? Math.abs(pair.freq).toFixed(1) + 'i' : pair.freq.toFixed(1), what = `mode ${pair.mode + 1} (${nu} cm⁻¹)`;
+          // input titles in plain ASCII (programs read them as such)
+          const t = s => `${title}, mode ${pair.mode + 1} (${nu} cm-1) displaced by ${s}${pair.amount} A`;
+          result = { minus: make(form, pair.minus, base + '_minus', t('-')), plus: make(form, pair.plus, base + '_plus', t('+')) };
+          result.files = pairFiles(p, result, base);
+          V(form, 'preview').value = result.files.map(x => `----- ${x.name} -----\n${x.text}`).join('\n');
+          notes.push(result.plus.note);
+          notes.push(`Saves ${result.files.map(x => x.name).join(', ')}: the geometry displaced by −${pair.amount} and +${pair.amount} Å (largest atom shift) along ${what}.`);
+          if (result.plus.command) notes.push('Run: <code>' + esc(result.minus.command) + '</code> and <code>' + esc(result.plus.command) + '</code>');
+        } else {
+          result = make(form, g.xyz, base, title);
+          V(form, 'preview').value = result.text;
+          notes.push(result.note);
+          if (result.files && result.files.length > 1) notes.push('Saves ' + result.files.map(x => x.name).join(' and ') + '.');
+          else if (result.files && result.files.length) notes.push('Saves ' + result.files[0].name + '.');
+          else notes.push('Saves ' + base + '.' + (p.ext || 'inp') + '.');
+          if (result.command) notes.push('Run: <code>' + esc(result.command) + '</code>');
+        }
         V(form, 'note').innerHTML = notes.filter(Boolean).map(x => (/^Run: /.test(x) ? x : esc(x))).join(' ') || `The preview is editable. Geometry ${d.frameIndex + 1} of ${d.data.frames.length} is used.`;
         V(form, 'note').classList.remove('err');
       } catch (e) {
@@ -2452,7 +2556,7 @@
       }
     };
     const setProgram = form => {
-      const p = prog(form), task = V(form, 'task'), keep = task.value || prefs.task, mi = V(form, 'method'), bi = V(form, 'basis');
+      const p = prog(form), task = V(form, 'task'), keep = task.value || (pair ? 'opt' : prefs.task), mi = V(form, 'method'), bi = V(form, 'basis');
       if (form._pid !== p.id) {
         form._pid = p.id;
         task.innerHTML = p.tasks.map(t => `<option value="${t}" ${t === (p.tasks.indexOf(keep) >= 0 ? keep : 'optfreq') ? 'selected' : ''}>${TASK_NAMES[t] || t}</option>`).join('');
@@ -2468,28 +2572,29 @@
       for (const id of ['gaussian', 'orca']) { const row = $(`[data-c-row="${id}"]`, form); if (row) row.classList.toggle('hidden', p.id !== id); }
       for (const [id, chk] of [['route', 'useRoute'], ['kw', 'useKw']]) { const row = $(`[data-c-row="${id}"]`, form), c = V(form, chk); if (row && c) row.classList.toggle('hidden', !c.checked); }
       const btn = $('[data-dbtn="2"]', form);
-      if (btn) btn.textContent = p.ext ? 'Save .' + p.ext : (p.id === 'turbomole' ? 'Save coord' : 'Save');
+      if (btn) btn.textContent = pair ? 'Save both' : p.ext ? 'Save .' + p.ext : (p.id === 'turbomole' ? 'Save coord' : 'Save');
       build(form);
     };
     const remember = form => {
       const p = prog(form);
-      prefs.program = p.id; prefs.task = V(form, 'task').value || prefs.task;
+      prefs.program = p.id;
+      if (!pair) prefs.task = V(form, 'task').value || prefs.task;   // the pair's Optimization is not a new default
       prefs.nprocs = parseInt(V(form, 'nprocs').value, 10) || prefs.nprocs; prefs.memoryMB = parseInt(V(form, 'mem').value, 10) || 0;
       if (!V(form, 'method').disabled) prefs.methods[p.id] = V(form, 'method').value.trim();
       if (!V(form, 'basis').disabled) prefs.bases[p.id] = V(form, 'basis').value.trim();
       saveCalcPrefs(prefs);
     };
-    dialog('Calculation input', body, [
-      { label: 'Copy', onClick: form => { copyText(V(form, 'preview').value, 'Input copied to the clipboard'); return true; } },
+    dialog(pair ? 'Forward and reverse inputs' : 'Calculation input', body, [
+      { label: 'Copy', onClick: form => { copyText(V(form, 'preview').value, pair ? 'Both inputs copied to the clipboard' : 'Input copied to the clipboard'); return true; } },
       { label: 'Cancel' },
       {
         label: 'Save', primary: true, onClick: form => {
           if (!result) { toast('Fix the problem shown below the preview first.', true); return true; }
-          const p = prog(form), text = V(form, 'preview').value, files = result.files, command = result.command;
+          const p = prog(form), text = V(form, 'preview').value, files = result.files, command = pair ? null : result.command;
           remember(form);
           if (files && files.length) {
             (async () => {
-              for (let k = 0; k < files.length; k++) await saveFile(files[k].name, k === 0 ? text : files[k].text);
+              for (let k = 0; k < files.length; k++) await saveFile(files[k].name, k === 0 && !pair ? text : files[k].text);
               toast('Saved ' + files.map(x => x.name).join(', ') + (command ? ' · run: ' + command : ''));
             })();
           } else saveFile(baseOf(form) + '.' + (p.ext || 'inp'), text);
@@ -2503,6 +2608,17 @@
       dbody.addEventListener('input', e => { const k = e.target.dataset.c; if (!k || k === 'preview') return; if (k === 'program' || k === 'useRoute' || k === 'useKw') setProgram(form); else build(form); });
       dbody.addEventListener('change', e => { const k = e.target.dataset.c; if (k === 'program' || k === 'useRoute' || k === 'useKw') setProgram(form); });
     });
+  }
+  /** Forward and reverse inputs: the geometry of the frequency job displaced by -/+ the Displace amount along the
+   *  selected vibration, each as an optimisation input. */
+  function vibInputs() {
+    const d = state.active, v = d && d.data.vibrations;
+    if (!v || d.vibIndex < 0) return toast('Select a vibration first (Vibrations tab).', true);
+    const box = $('#disp-amt'), amount = (box && parseFloat(box.value) > 0 ? parseFloat(box.value) : 0) || state.vib.disp || 0.15;
+    const mode = modeOf(d, d.vibIndex);
+    if (!mode) return toast(NOT_LOADED, true);
+    const eq = d.data.frames[v.frameIndex], e = BM.vibtools.ends(eq.xyz, mode, amount);
+    exportCalc(null, { Z: eq.Z, minus: e.minus, plus: e.plus, amount, mode: d.vibIndex, freq: v.freqs[d.vibIndex] });
   }
   function exportGaussian() { exportCalc('gaussian'); }
   function exportOrca() { exportCalc('orca'); }
@@ -2840,6 +2956,7 @@
       const a = e.target.closest('[data-act]');
       if (!a || a.disabled) return;
       const act = a.dataset.act;
+      if (a.tagName === 'A') e.preventDefault();
       const dd = a.closest('.dropdown'); if (dd) dd.classList.remove('open');
       const needDoc = () => { if (!state.active) { toast('Open a file first.', true); return false; } return true; };
       switch (act) {
@@ -2867,6 +2984,8 @@
         case 'displace-plus': displace(1); break;
         case 'reload-part': reloadPart(state.active); break;
         case 'displace-minus': displace(-1); break;
+        case 'vib-inputs': vibInputs(); break;
+        case 'vib-imag': { const d = state.active, v = d && d.data.vibrations, st = v ? BM.vibtools.stationary(v) : null; if (st && st.imag.length) { selectVib(d, st.imag[0]); renderPanel(); } break; }
         case 'edit-set': editSet(); break;
         case 'edit-element': editElement(); break;
         case 'edit-delete': editDelete(); break;
@@ -2907,6 +3026,11 @@
       if (t.id === 'steps-table') setFrame(d, +row.dataset.i);
       else if (t.id === 'vib-table') { const i = +row.dataset.i; if (d.vibIndex === i && state.anim.kind === 'vib') toggleVibPlay(); else { selectVib(d, i); renderPanel(); } }
       else if (t.id === 'states-table') selectState(d, +row.dataset.i);
+      else if (t.id === 'vib-bonds-table') {   // measure the pair (its distance follows the animation)
+        d.selection = row.dataset.pair.split(',').map(Number);
+        R.setSelection(d.selection); updateMeasure();
+        for (const r of $$('tr.row', t)) r.classList.toggle('on', r === row);
+      }
       else if (row.dataset.atom !== undefined) { onAtomClick(+row.dataset.atom); }
     });
     panel.addEventListener('input', e => {
@@ -2917,15 +3041,18 @@
       if (t.dataset.vib) {
         const k = t.dataset.vib;
         if (k === 'arrows') { state.vib.arrows = t.checked; refreshArrows(); renderPlaybar(); }
+        else if (k === 'ends') { state.vib.ends = t.checked; if (t.checked) holdVib(d); refreshEnds(); }
         else {
           state.vib[k] = parseFloat(t.value);
-          if (t.nextElementSibling) t.nextElementSibling.textContent = k === 'amplitude' ? state.vib.amplitude.toFixed(2) + ' Å' : state.vib.speed.toFixed(1) + '×';
-          if (k === 'amplitude' && d.vibIndex >= 0) { d._vibVec = vibVec(d, d.vibIndex, state.vib.amplitude); refreshArrows(); }
+          if (t.nextElementSibling) t.nextElementSibling.textContent = k === 'amplitude' ? state.vib.amplitude.toFixed(2) + ' Å' : k === 'arrowLen' ? state.vib.arrowLen.toFixed(1) + ' Å' : state.vib.speed.toFixed(1) + '×';
+          if (k === 'amplitude') setAmplitude(d, state.vib.amplitude);
+          if (k === 'arrowLen') refreshArrows();
           renderPlaybar();
         }
         savePrefs();
         return;
       }
+      if (t.id === 'disp-amt') { const x = parseFloat(t.value); if (x > 0) state.vib.disp = x; return; }
       if (t.dataset.s) {
         const card = t.closest('[data-surf]'), s = d.surfaces[+card.dataset.surf], k = t.dataset.s;
         if (k === 'visible') s.visible = t.checked;
@@ -2986,7 +3113,13 @@
       const t = e.target, k = t.dataset.pb, d = state.active; if (!d) return;
       if (k === 'frame') { const vis = visibleFrames(d); setFrame(d, vis[+t.value]); }
       else if (k === 'fps') state.fps = +t.value;
-      else if (k === 'amp') { state.vib.amplitude = +t.value; if (d.vibIndex >= 0) { d._vibVec = vibVec(d, d.vibIndex, state.vib.amplitude); refreshArrows(); } savePrefs(); }
+      else if (k === 'amp') {
+        state.vib.amplitude = +t.value;
+        setAmplitude(d, state.vib.amplitude);
+        const s = $('#panel [data-vib="amplitude"]');   // keep the Vibrations tab's slider in step
+        if (s) { s.value = state.vib.amplitude; if (s.nextElementSibling) s.nextElementSibling.textContent = state.vib.amplitude.toFixed(2) + ' Å'; }
+        savePrefs();
+      }
       else if (k === 'speed') { state.vib.speed = +t.value; savePrefs(); }
     });
     panel.addEventListener('keydown', e => { if (displayKey(e)) return; ui.panelKey(e); });
