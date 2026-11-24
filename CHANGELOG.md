@@ -3,6 +3,20 @@
 BlueMolecule is [vibe-coded](docs/vibe-coding.md). Each version below was written by an AI assistant from the
 author's requests and bug reports.
 
+## 2.0.2 (November 2026): ORCA 6 QM/MM energies
+
+Checked against a real ORCA 6.1 QM/MM optimisation (the synthetic example imitated another layout):
+
+- **The energies of ORCA 6 QM/MM optimisations were wrong.** Each step prints three final energies: the MM energy
+  of the full system ("FINAL SINGLE POINT ENERGY (MM)"), the QM region's, and the QM/MM total. All three were read
+  as one energy, and the MM line comes before the step's geometry, so every step showed the **next step's MM energy**
+  (about +2 Eh) and only the last step the QM/MM total: ΔE versus the final step was millions of kcal/mol and the
+  energy plots were flat. Each step now has its QM/MM total as its energy, with its own MM and QM energies as
+  components; a job still running leaves out a step whose total is not printed yet.
+- **Outputs that print only the QM region** (the usual case with `*pdbfile`) showed all of its atoms as MM. The QM
+  region is now shown as QM, with its **link atoms** marked; ORCA 6's QM/MM summary (sizes of the QM/MM system, the
+  QM subsystem and the active region) is read.
+
 ## 2.0.1 (November 2026): checked against real output files
 
 Every reader was run on the public test files of the cclib project (437 outputs of nine programs) and of the

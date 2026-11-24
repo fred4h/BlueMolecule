@@ -1497,11 +1497,12 @@
   /** Summary counts / link atom rows of the QM/MM setup print; true when the line was one of them. */
   function orcaQmmmSummary(t, q) {
     const s = q.summary;
-    let m = /number of qm atoms\s*(?:\.{2,}|:|=)\s*(\d+)/i.exec(t) || /^qm region size\s*(?:\.{2,}|:|=)\s*(\d+)/i.exec(t);
+    let m = /number of qm atoms\s*(?:\.{2,}|:|=)\s*(\d+)/i.exec(t) || /^qm region size\s*(?:\.{2,}|:|=)\s*(\d+)/i.exec(t) ||
+      /^size of qm subsystem\s*(?:\.{2,}|:|=)\s*(\d+)$/i.exec(t);   // ORCA 6 ("... plus link atoms" is another line)
     if (m) { s.nQM = int(m[1]); return true; }
     if ((m = /number of link atoms\s*(?:\.{2,}|:|=)\s*(\d+)/i.exec(t))) { s.nLink = int(m[1]); return true; }
-    if ((m = /number of active atoms\s*(?:\.{2,}|:|=)\s*(\d+)/i.exec(t))) { s.nActive = int(m[1]); return true; }
-    if ((m = /(?:total system size|total number of atoms|number of atoms in (?:the )?(?:full|total|whole|real) system)\s*(?:\.{2,}|:|=)\s*(\d+)/i.exec(t))) { s.nFull = int(m[1]); return true; }
+    if ((m = /(?:number of active atoms|optimized atoms\s*=\s*activeregion)\s*(?:\.{2,}|:|=)\s*(\d+)/i.exec(t))) { s.nActive = int(m[1]); return true; }
+    if ((m = /(?:total system size|total number of atoms|number of atoms in (?:the )?(?:full|total|whole|real) system|^size of qm\/?mm system)\s*(?:\.{2,}|:|=)\s*(\d+)/i.exec(t))) { s.nFull = int(m[1]); return true; }
     if ((m = /link atom.*?\bqm atom\s*(\d+)\b.*?\bmm atom\s*(\d+)/i.exec(t))) { s.links.push({ bondedTo: int(m[1]), atom: int(m[2]) }); return true; }
     return false;
   }
@@ -1572,6 +1573,14 @@
       if (r) { if (!qm) qm = r.qm; links = r.links; }
     }
     if (!links.length && q.summary.links.length) links = q.summary.links.filter(l => l.atom < N).map(l => ({ atom: l.atom, bondedTo: l.bondedTo, element: 'H', type: null }));
+    if (!links.length && subsystemOnly && X && q.summary.nQM > 0 && q.summary.nLink > 0 && N === q.summary.nQM + q.summary.nLink) {
+      // only the QM region is printed: its QM atoms, then its link atoms, each bonded to the nearest QM atom
+      for (let a = q.summary.nQM; a < N; a++) {
+        let best = -1, bd = Infinity;
+        for (let b = 0; b < q.summary.nQM; b++) { const d = d2(a, X, b); if (d < bd) { bd = d; best = b; } }
+        links.push({ atom: a, bondedTo: best, element: 'H', type: null });
+      }
+    }
     if (!links.length && qm && !subsystemOnly && X) {
       // covalent bonds that cross the QM boundary carry the link atoms
       const inQM = new Set(qm);
@@ -1615,8 +1624,16 @@
     let scanCur = null, cdLen = null, cdVel = null, shield = null, ccHead = -1;
     // QM/MM, QM/QM2 (multiscale): every geometry print is tagged with its step ("epoch"); after the loop each step
     // becomes one frame with the full-system geometry and all of the step's energies (QM-region prints are no steps).
-    let qmmm = null, qmmmChecked = false, epoch = 0;
+    let qmmm = null, qmmmChecked = false, epoch = 0, qmmmTotalLine = false;
     const epochOf = new Map(), zMemo = new WeakMap();
+    // ORCA 6 prints a step's MM energy ("FINAL SINGLE POINT ENERGY (MM)") before the step's geometry: an energy read
+    // after a new step began and before its geometry waits for that geometry (it was attached to the previous step)
+    let pendE = [];
+    const qE = (kind, value) => {
+      const f = sink.current();
+      if (qmmm && (!f || (epochOf.has(f) && epochOf.get(f) !== epoch))) pendE.push([kind, value, epoch]);
+      else sink.energy(kind, value);
+    };
     const checkQmmm = () => {
       if (qmmmChecked) return;
       qmmmChecked = true;
@@ -1715,7 +1732,11 @@
           sink.geometry(Z, xyz, 1);
           jobsT.geometry();
           const f = sink.current();
-          if (qmmm) epochOf.set(f, epoch);
+          if (qmmm) {
+            epochOf.set(f, epoch);
+            for (const [k, v, e] of pendE) if (e === epoch) sink.energy(k, v);
+            pendE = [];
+          }
           if (!f.label && (cycle || scan)) f.label = scan ? 'Scan step ' + scan + ', cycle ' + cycle : 'Cycle ' + cycle;
         }
         i = j - 1;
@@ -1759,10 +1780,10 @@
         if (t.indexOf('ORCA TERMINATED NORMALLY') >= 0) { status = true; continue; }
         continue;
       }
-      if (qmmm && (t.indexOf('QM') >= 0 || t.indexOf('MM') >= 0 || t.indexOf('ink') >= 0 || t.indexOf('system size') >= 0)) {
+      if (qmmm && (t.indexOf('QM') >= 0 || t.indexOf('MM') >= 0 || t.indexOf('ink') >= 0 || t.indexOf('system size') >= 0 || t.indexOf('activeRegion') >= 0)) {
         if (orcaQmmmSummary(t, qmmm)) continue;
         const q = orcaQmmmEnergy(t);
-        if (q) { sink.energy(q.key, q.value); continue; }
+        if (q) { qE(q.key, q.value); continue; }
       }
       if (t.startsWith('Program Version')) {
         const m = /^Program Version\s+(\d+\.\d+(?:\.\d+)?)/.exec(t);
@@ -1770,10 +1791,18 @@
         continue;
       }
       if (t.startsWith('Total Energy') && /^Total Energy\s*:\s*\S+\s+Eh/.test(t)) {
-        sink.energy(qmmm ? 'QM SCF' : 'SCF', num(/^Total Energy\s*:\s*(\S+)/.exec(t)[1]));
+        qE(qmmm ? 'QM SCF' : 'SCF', num(/^Total Energy\s*:\s*(\S+)/.exec(t)[1]));
         continue;
       }
-      if (t.startsWith('FINAL SINGLE POINT ENERGY')) { sink.energy('Final', num(last(tok(t)))); continue; }
+      if (t.startsWith('FINAL SINGLE POINT ENERGY')) {
+        // ORCA 6 QM/MM prints three: "(MM)" (the full system with the force field), plain (the QM region) and
+        // "(QM/MM)" (the total, the energy of the step)
+        const v = num(last(tok(t))), sfx = /^FINAL SINGLE POINT ENERGY\s*\(([^)]+)\)/.exec(t);
+        const q = qmmm && sfx ? orcaQmmmEnergy('E(' + sfx[1] + ') ... ' + v) : null;
+        if (q) { qE(q.key, q.value); if (q.key === 'QM/MM' || q.key === 'QM/QM2') qmmmTotalLine = true; }
+        else qE('Final', v);
+        continue;
+      }
       if (t.startsWith('MP2 TOTAL ENERGY:') || t.startsWith('RI-MP2 TOTAL ENERGY:')) {
         sink.energy('MP2', num(tok(t.split(':')[1])[0])); continue;
       }
@@ -2006,6 +2035,16 @@
     }
 
     let qmmmSub = null, qmmmOnlySub = false, qmmmMap = null;
+    if (qmmm && qmmmTotalLine) {
+      for (const f of ds.frames) {
+        const e = f.energies;
+        if (!e || e.Final === undefined) continue;
+        if (e.QM === undefined) e.QM = e.Final;
+        delete e.Final;
+        f.energy = null;
+        for (const k of sink.priority) if (e[k] !== undefined) { f.energy = e[k]; break; }
+      }
+    }
     if (qmmm && ds.frames.length) {
       // one frame per step: its full-system geometry (the largest print) with the energies, convergence and labels
       // of all prints of the step; a final evaluation at the stationary point merges into the last cycle

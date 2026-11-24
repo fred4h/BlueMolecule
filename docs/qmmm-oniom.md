@@ -24,10 +24,16 @@ A QM/MM or ONIOM output prints many energies in each optimisation cycle:
 A reader that treats every printed energy as a new point produces an energy graph that jumps back and forth.
 
 BlueMolecule keeps **one geometry per optimisation step**: the full system, with **one total energy**. For
-Gaussian that is the `ONIOM: extrapolated energy`; for ORCA, the total QM/MM (or QM/QM2) energy. The layer and
-component energies are read and stored with each step too. The **Energy components** plot (in the plot picker's
+Gaussian that is the `ONIOM: extrapolated energy`; for ORCA, the total QM/MM (or QM/QM2) energy: ORCA 6 prints
+`FINAL SINGLE POINT ENERGY (MM)` (the full system with the force field), then the QM region's final energy, then
+`FINAL SINGLE POINT ENERGY (QM/MM)`, the one used. The layer and component energies are read and stored with each
+step too. The **Energy components** plot (in the plot picker's
 *Optimisation* group) draws the total and each component, each relative to its own final value, so you can see
 which part of the system drives the optimisation. The Info tab lists the components of the geometry shown.
+
+ORCA usually prints only the QM region (its QM atoms, then its link atoms), not the full system: this is the case
+with `*pdbfile` inputs, where ORCA writes the full system to its trajectory and PDB files. BlueMolecule then shows the
+QM region, marks its link atoms, and says so under **Reader notes**.
 
 When an output does not echo the molecule in Cartesian form, BlueMolecule cannot assign the layers and says so
 under **Reader notes**. For example, this happens with Gaussian `geom=check`, where the molecule is taken from the
@@ -85,6 +91,6 @@ opens normally if the computer has enough memory. See [Large files](large-files-
 ## Please report problems
 
 The QM/MM and ONIOM readers were written from the programs' documented output layouts and tested on synthetic
-outputs. They have **not yet been checked against real QM/MM outputs of every program and version**. ORCA's QM/MM
-output in particular differs between versions. If the layers, link atoms or energies of one of your files look
+outputs. They have **not yet been checked against real QM/MM outputs of every program and version**; for 2.0.2 the
+ORCA reader was checked against a real ORCA 6.1 QM/MM optimisation. ORCA's QM/MM output differs between versions. If the layers, link atoms or energies of one of your files look
 wrong, please open an issue, if possible with a trimmed copy of the output ([CONTRIBUTING.md](../CONTRIBUTING.md)).

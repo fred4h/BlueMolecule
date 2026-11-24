@@ -7,7 +7,7 @@
   const HARTREE = { kcal: 627.509474, kj: 2625.49964, ev: 27.211386 };
   const UNIT_LABEL = { kcal: 'kcal/mol', kj: 'kJ/mol', ev: 'eV' };
   const BG = { navy: [0.063, 0.090, 0.133], black: [0, 0, 0], white: [1, 1, 1], gray: [0.91, 0.925, 0.945] };
-  const VERSION = '2.0.1';
+  const VERSION = '2.0.2';
   const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const isNum = v => typeof v === 'number' && isFinite(v);
   const fx = (v, d) => (isNum(v) ? v.toFixed(d) : '—');
