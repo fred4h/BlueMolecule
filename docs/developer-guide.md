@@ -44,6 +44,8 @@ without a browser. `tools/build.py` inlines the scripts and the stylesheet into 
 | `ff.js` | The clean-up force field (`BM.ff`) |
 | `templates.js` | The building library: molecules, groups, ligands, coordination geometries (`BM.templates`) |
 | `symmetry.js` | Point-group detection, symmetry operations, symmetrization (`BM.sym`) |
+| `crystal.js` | Crystal tools: lattice parameters, fractional coordinates, supercells, surface slabs from Miller indices, cell edits, boxes (`BM.crystal`) |
+| `conformers.js` | Conformer search: rotatable bonds, torsion combinations relaxed with the clean-up force field, distinct conformers by RMSD (`BM.conformers`) |
 | `analysis.js` | Convergence series, RMSD (Kabsch), scan and IRC profiles, NMR sticks, MO levels (`BM.analysis`) |
 | `isosurface.js` | Isosurfaces of volumetric data (surface nets) |
 | `orbitals.js` | Orbitals and densities from the basis set and MO coefficients of fchk and Molden files: shells of any angular momentum, the overlap matrix (Obara–Saika), each program's normalisation convention found by orthonormality, the grid kernel run in Web Workers, Molden output (`BM.orbitals`) |
@@ -262,6 +264,7 @@ Each suite can also be run alone, e.g. `node tests/test_parsers.js`.
 | `test_parsers.js`, `test_parsers2.js`, `test_readers_qc.js`, `test_readers_struct.js`, `test_qmmm.js` | Readers and format detection against `tests/fixtures/` (expected values in `expected.json` files) |
 | `test_readers_qc2.js` | The 2.3 readers: Molpro, Dalton, Turbomole programs, GAMESS punch files and point groups, fchk excited states and optimisation history; each fixture also cut at 59 places |
 | `test_orbitals.js`, `browser_orbitals_test.js` | Orbitals, densities and spin densities from fchk and Molden files against the values and overlaps of `tools/mini_scf.py`, in each program's convention; the solid harmonics up to l = 6; the Molden round trip; cut and damaged files; molecular surfaces against their analytic radii; the potential of point charges; in Chromium, the Surfaces tab, the workers and the potential colours |
+| `test_crystal_conformers.js`, `browser_build25_test.js` | Lattice parameters, supercells and slabs of rock salt and of a triclinic crystal (layer spacings, unimodular bases, bulk distances, terminations), cell edits and boxes; rotatable bonds and conformer searches (butane, hexane, decane); in Chromium, the Crystal and Conformers sections with undo and Save as |
 | `test_writers.js`, `test_writers_struct.js`, `test_audit.js` | Writers, round trips, regression tests from the code audit |
 | `test_chem.js`, `test_ff.js`, `test_templates.js`, `test_symmetry.js`, `test_analysis.js` | SMILES, bond orders, hydrogens, force field, building library, point groups, convergence analysis |
 | `test_running_jobs.js` | Outputs of jobs that are still running: every example output cut at thousands of places (line ends, inside energy numbers, at random), read as text and as lines; no energy or plotted point that the complete file does not contain |

@@ -1237,10 +1237,147 @@
         sec('edit', 'Edit', `<div data-bp="edit">${editDyn(d)}</div>`) +
         sec('align', 'Align', `<div data-bp="align">${alignDyn(d)}</div>`) +
         sec('clean', 'Clean-up', `<div class="btnrow"><label class="inline chk" title="Relax after each drawing, template or manipulation step (up to ${LIMIT.auto} atoms)"><input type="checkbox" data-bopt="autoOpt" ${B.autoOpt ? 'checked' : ''}> Auto</label><span data-bp="freeze" class="inline">${freezeDyn(d)}</span></div>`) +
+        sec('conf', 'Conformers', `<div data-bp="conf">${confDyn(d)}</div>`) +
+        sec('crystal', 'Crystal', `<div data-bp="crystal">${crystalDyn(d)}</div>`) +
         sec('sym', 'Symmetry', `<div class="inline"><select id="bp-symtol" title="Tolerance for symmetry detection">${SYM_TOLS.map(([v, t]) => `<option value="${v}" ${Math.abs(v - B.symTol) < 1e-9 ? 'selected' : ''}>${t}</option>`).join('')}</select>
             ${btn('b-sym-detect', 'Detect', n > 0 && n <= LIMIT.sym, 'Detect the point group')}${btn('b-sym-apply', 'Symmetrize', n > 1 && n <= LIMIT.sym, 'Make the structure exactly symmetric (new edited geometry)')}</div>
           <div data-bp="sym" style="margin-top:6px">${symDyn(d)}</div>${n > LIMIT.sym ? `<p class="note">Limited to ${LIMIT.sym} atoms.</p>` : ''}`) +
         sec('coords', 'Coordinates', coords);
+    }
+    // ---- conformer search and crystal tools (2.5)
+    const numIn = (id, v, step, min, max, w, title) => `<input type="number" id="${id}" value="${v}" step="${step}"${min !== undefined ? ` min="${min}"` : ''}${max !== undefined ? ` max="${max}"` : ''} style="width:${w || 64}px"${title ? ` title="${esc(title)}"` : ''}>`;
+    const val = (id, dflt) => { const e = $('#' + id); const v = e ? parseFloat(e.value) : NaN; return Number.isFinite(v) ? v : dflt; };
+    const LIMIT_CONF = 300;
+    function confDyn(d) {
+      const t = app.topoFrame(d), n = t.Z.length, c = B.conf;
+      let nr = 0;
+      try { nr = n && n <= LIMIT_CONF ? BM.conformers.rotors(t).length : 0; } catch (e) { nr = 0; }
+      const busy = d._confJob;
+      return `${row('Keep', numIn('bp-conf-max', c.max, 1, 1, 500, 64, 'Most conformers to keep') + ' <span class="dim">conformers within</span> ' + numIn('bp-conf-win', c.window, 0.5, 0, 100, 64, 'Energy window above the lowest, kcal/mol') + ' <span class="dim">kcal/mol</span>')}
+        ${row('Distinct by', numIn('bp-conf-rmsd', c.rmsd, 0.05, 0.05, 5, 64, 'Heavy-atom RMSD below which two structures are the same conformer') + ' <span class="dim">Å RMSD (heavy atoms)</span>')}
+        ${busy ? `<div class="sf-job"><span class="sf-bar"><i style="width:${Math.round(100 * (busy.progress || 0))}%"></i></span><span class="note mono" data-conf-pc>${Math.round(100 * (busy.progress || 0))}%</span>${btn('b-conf-cancel', 'Cancel')}</div>`
+          : `<div class="btnrow">${btn('b-conf', 'Search', n > 1 && n <= LIMIT_CONF, n > LIMIT_CONF ? 'Limited to ' + LIMIT_CONF + ' atoms' : 'Turn the rotatable bonds, relax each structure with the clean-up force field and keep the distinct ones. They open as a new document, lowest first; the clean-up force field ranks them only roughly (it is not a published force field or a QM method).', 'primary')}<span class="dim" data-conf-rot>${n > LIMIT_CONF ? 'limited to ' + LIMIT_CONF + ' atoms' : nr + ' rotatable bond' + (nr === 1 ? '' : 's')}</span></div>`}`;
+    }
+    function crystalDyn(d) {
+      const f = app.curFrame(d), cell = app.cellOf(d, f), c = B.crys, n = f.Z.length;
+      if (!cell) {
+        return `${row('Margin', numIn('bp-box-m', c.margin, 1, 0, 200, 64, 'Space between the molecule and each face of the box') + ' <span class="dim">Å</span>')}
+          <div class="btnrow">${btn('b-cell-box', 'Add a box', n > 0, 'Put the molecule in an orthorhombic periodic cell, centred (for CP2K, Quantum ESPRESSO, VASP)', 'primary')}<span class="dim" title="Supercells, slabs and cell edits need a unit cell (CIF, POSCAR, Quantum ESPRESSO, CP2K, XSF…)">no unit cell</span></div>`;
+      }
+      let p;
+      try { p = BM.crystal.params(cell); } catch (e) { return `<span class="dim">${esc(e.message)}</span>`; }
+      const f3 = v => (+v).toFixed(4).replace(/\.?0+$/, '');
+      return `<div class="mono dim cellp">a ${p.a.toFixed(4)} · b ${p.b.toFixed(4)} · c ${p.c.toFixed(4)} Å<br>α ${p.alpha.toFixed(3)} · β ${p.beta.toFixed(3)} · γ ${p.gamma.toFixed(3)}° · V ${p.volume.toFixed(3)} Å³</div>
+        ${row('Repeat', ['1', '2', '3'].map((k, i) => numIn('bp-sc-' + k, c.n[i], 1, 1, 50, 46, ['a', 'b', 'c'][i] + ' repeats')).join(' × ') + ' ' + btn('b-cell-super', 'Supercell', n > 0, 'Repeat the cell along a, b and c'), 'A supercell: the cell repeated along a, b and c')}
+        ${row('Slab', '<span class="dim">(</span>' + ['h', 'k', 'l'].map((k, i) => numIn('bp-hkl-' + k, c.hkl[i], 1, -20, 20, 46, 'Miller index ' + k)).join(' ') + '<span class="dim">)</span> ' + btn('b-cell-slab', 'Make slab', n > 0, 'A surface slab of the (hkl) planes, with the normal along z'), 'A surface slab of the (h k l) lattice planes')}
+        ${row('', numIn('bp-layers', c.layers, 1, 1, 100, 46, 'Layers: repeats of the oriented cell') + ' <span class="dim">layers</span> ' + numIn('bp-vac', c.vacuum, 1, 0, 200, 52, 'Vacuum: the gap between the slab and its periodic image (Å)') + ' <span class="dim">Å vacuum</span>')}
+        ${row('', numIn('bp-shift', c.shift, 0.05, 0, 1, 52, 'Termination: moves the slab boundary by this fraction of a layer') + ' <span class="dim">shift of the termination (fraction of a layer)</span>')}
+        ${row('Lengths', ['a', 'b', 'c'].map(k => numIn('bp-cell-' + k, f3(p[k]), 'any', 0, undefined, 72, k + ' (Å)')).join(' ') + ' <span class="dim">Å</span>')}
+        ${row('Angles', ['alpha', 'beta', 'gamma'].map((k, i) => numIn('bp-cell-' + k, f3(p[k]), 'any', 1, 179, 72, ['α', 'β', 'γ'][i] + ' (°)')).join(' ') + ' <span class="dim">°</span>')}
+        <div class="btnrow"><label class="inline chk" title="Keep the fractional coordinates (the atoms move with the cell); off: keep the atoms where they are"><input type="checkbox" id="bp-cell-scale" ${c.scale ? 'checked' : ''}> scale atoms with the cell</label>${btn('b-cell-set', 'Apply', n > 0, 'Change the cell lengths and angles')}</div>
+        <div class="btnrow">${btn('b-cell-wrap', 'Wrap atoms into the cell', n > 0, 'Move every atom into the cell (fractional coordinates 0 to 1)')}${btn('b-cell-del', 'Remove the cell', true, 'Make the structure a molecule (no periodicity)')}</div>`;
+    }
+    /** Read the crystal and conformer inputs back into the preferences (they survive re-rendering). */
+    function readCrys() {
+      const c = B.crys;
+      c.n = ['1', '2', '3'].map((k, i) => Math.max(1, Math.round(val('bp-sc-' + k, c.n[i]))));
+      c.hkl = ['h', 'k', 'l'].map((k, i) => Math.round(val('bp-hkl-' + k, c.hkl[i])));
+      c.layers = Math.max(1, Math.round(val('bp-layers', c.layers)));
+      c.vacuum = Math.max(0, val('bp-vac', c.vacuum));
+      c.shift = Math.min(1, Math.max(0, val('bp-shift', c.shift)));
+      c.margin = Math.max(0, val('bp-box-m', c.margin));
+      const sc = $('#bp-cell-scale'); if (sc) c.scale = sc.checked;
+      app.savePrefs();
+      return c;
+    }
+    /** An edit that replaces the atoms (and the cell) of the edited frame; map[k] is the source atom of atom k. */
+    function cellEdit(build, msg) {
+      return app.doEdit((f, d) => {
+        const r = build(f, d);
+        if (!r) return false;
+        if (r.Z) {
+          const old = { Z: f.Z, names: f.atomNames, res: f.resNames, ids: f.resIds, bonds: f.bonds, fc: f.formalCharges };
+          const m = r.map || r.Z.map((_, k) => k);
+          f.Z = r.Z.slice(); f.xyz = Float64Array.from(r.xyz);
+          const take = a => (a ? m.map(k => (k >= 0 ? a[k] : null)) : null);
+          f.atomNames = take(old.names); f.resNames = take(old.res); f.resIds = take(old.ids);
+          f.formalCharges = old.fc ? m.map(k => old.fc[k] || 0) : new Array(r.Z.length).fill(0);
+          // copies of the bonds of each copy of the cell (a diagonal supercell); otherwise found again from distances
+          f.bonds = r.bonds || null;
+          d.selection = []; d.frozen = [];
+        } else if (r.xyz) f.xyz = Float64Array.from(r.xyz);
+        if (r.cell !== undefined) f.cell = r.cell ? r.cell.map(v => v.slice()) : null;
+        return true;
+      }, msg);
+    }
+    function crystalAction(act) {
+      const d = doc(), c = readCrys();
+      if (!d) return;
+      const C = BM.crystal;
+      try {
+        if (act === 'b-cell-box') {
+          if (cellEdit(f => { const b = C.box({ Z: f.Z, xyz: f.xyz }, c.margin); return { xyz: b.xyz, cell: b.cell }; }, 'Periodic box added: ' + c.margin + ' Å around the molecule')) R().fit();
+        } else if (act === 'b-cell-super') {
+          const n3 = c.n;
+          cellEdit((f, dd) => {
+            const cell = app.cellOf(dd, f), r = C.supercell({ Z: f.Z, xyz: f.xyz }, cell, n3), nat = f.Z.length;
+            // the bonds of each copy (atoms of copy t are t·nat … t·nat + nat − 1)
+            const bonds = f.bonds ? [] : null;
+            if (bonds) for (let t = 0; t < r.Z.length / nat; t++) for (const b of f.bonds) bonds.push([b[0] + t * nat, b[1] + t * nat, b[2]]);
+            return Object.assign(r, { bonds });
+          }, 'Supercell ' + n3.join(' × ')) && R().fit();
+        } else if (act === 'b-cell-slab') {
+          if (cellEdit((f, dd) => C.slab({ Z: f.Z, xyz: f.xyz }, app.cellOf(dd, f), c.hkl, { layers: c.layers, vacuum: c.vacuum, shift: c.shift }),
+            () => 'Slab (' + c.hkl.join(' ') + '): ' + c.layers + ' layer' + (c.layers > 1 ? 's' : '') + ', ' + c.vacuum + ' Å vacuum, normal along z')) R().fit();
+        } else if (act === 'b-cell-set') {
+          const get = k => val('bp-cell-' + k, NaN);
+          const nc0 = C.fromParams(get('a'), get('b'), get('c'), get('alpha'), get('beta'), get('gamma'));
+          cellEdit((f, dd) => {
+            const cell = app.cellOf(dd, f), nc = C.oriented(cell, nc0);
+            return { xyz: C.setCell({ Z: f.Z, xyz: f.xyz }, cell, nc, c.scale), cell: nc };
+          }, c.scale ? 'Cell changed; atoms scaled with it' : 'Cell changed; atoms kept in place');
+        } else if (act === 'b-cell-wrap') {
+          cellEdit((f, dd) => ({ xyz: C.wrap(app.cellOf(dd, f), f.xyz) }), 'Atoms wrapped into the cell');
+        } else if (act === 'b-cell-del') {
+          cellEdit(() => ({ cell: null }), 'Unit cell removed');
+        }
+      } catch (e) { toast(e.message, true); }
+    }
+    function confAction(act) {
+      const d = doc();
+      if (!d) return;
+      if (act === 'b-conf-cancel') { if (d._confJob) d._confJob.cancel(); return; }
+      const c = B.conf;
+      c.max = Math.max(1, Math.round(val('bp-conf-max', c.max))); c.window = Math.max(0, val('bp-conf-win', c.window)); c.rmsd = Math.max(0.01, val('bp-conf-rmsd', c.rmsd));
+      app.savePrefs();
+      if (d._confJob) return;
+      const t = app.topoFrame(d), mol = { Z: Array.from(t.Z), xyz: Float64Array.from(t.xyz), bonds: t.bonds.map(b => [b[0], b[1], b[2] === undefined ? 1 : b[2]]), formalCharges: Array.from(t.formalCharges || []) };
+      let job;
+      try { job = BM.conformers.search(mol, { maxConformers: c.max, window: c.window || 1e-9, rmsd: c.rmsd, onProgress: (fr, found) => { if (d._confJob) { d._confJob.progress = fr; const b = $('[data-bp="conf"] .sf-bar i'), tx = $('[data-conf-pc]'); if (b) b.style.width = Math.round(100 * fr) + '%'; if (tx) tx.textContent = Math.round(100 * fr) + '% · ' + found + ' tried'; } } }); }
+      catch (e) { toast('Conformer search: ' + e.message, true); return; }
+      const t0 = Date.now(), f = app.curFrame(d);
+      d._confJob = { cancel: job.cancel, progress: 0 };
+      app.renderPanel();
+      job.promise.then(r => {
+        d._confJob = null;
+        if (app.state.active === d && d.tab === 'build') app.renderPanel();
+        const ds = BM.emptyDataset('built', d.name + ' conformers');
+        ds.program = 'BlueMolecule conformer search';
+        ds.title = d.name + ' conformers';
+        ds.bonds = mol.bonds.map(b => b.slice());
+        ds.meta.charge = d.data.meta ? d.data.meta.charge : null; ds.meta.multiplicity = d.data.meta ? d.data.meta.multiplicity : null;
+        ds.frames = r.conformers.map((cf, k) => ({ Z: mol.Z.slice(), xyz: cf.xyz, energy: cf.energy / 627.509474, energies: { 'Clean-up force field (kcal/mol)': cf.energy },
+          label: 'Conformer ' + (k + 1) + ' · ΔE ' + cf.rel.toFixed(2) + ' kcal/mol · RMSD ' + cf.rmsd.toFixed(2) + ' Å', converged: true, opt: null,
+          atomNames: f.atomNames ? f.atomNames.slice() : null, resNames: f.resNames ? f.resNames.slice() : null, resIds: f.resIds ? f.resIds.slice() : null }));
+        ds.warnings.push('Energies from the clean-up force field (a generic model, not a published force field or a quantum-chemical method): a guide for picking starting structures. ' +
+          r.rotors.length + ' rotatable bond' + (r.rotors.length === 1 ? '' : 's') + ', ' + (r.mode === 'systematic' ? 'every combination of turns' : r.tried + ' random combinations of turns') + ', ' + r.tried + ' structures relaxed.');
+        app.openData(d.name + ' conformers', ds);
+        status(r.conformers.length + ' conformer' + (r.conformers.length === 1 ? '' : 's') + ' of ' + r.tried + ' relaxed structures (' + r.rotors.length + ' rotatable bonds) in ' + ((Date.now() - t0) / 1000).toFixed(1) + ' s');
+      }).catch(e => {
+        d._confJob = null;
+        if (app.state.active === d && d.tab === 'build') app.renderPanel();
+        if (e && e.message !== 'cancelled') toast('Conformer search failed: ' + e.message, true);
+      });
     }
     function refreshSelection(d) {
       if (!d) return;
@@ -1265,6 +1402,8 @@
       if (act === 'b-lib') { const [kind, ...rest] = elm.dataset.lib.split(':'); useLibrary(kind, rest.join(':')); return true; }
       if (act === 'b-smiles') { const inp = $('#bp-smiles'); insertSmiles(inp ? inp.value : B.inputs.smiles); return true; }
       if (!d) return false;
+      if (act.startsWith('b-cell-')) { crystalAction(act); return true; }
+      if (act === 'b-conf' || act === 'b-conf-cancel') { confAction(act); return true; }
       const f = cur();
       switch (act) {
         case 'b-copy-smiles': {

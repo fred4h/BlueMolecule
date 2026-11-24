@@ -17,7 +17,7 @@
     cartoon: { bg: 'white', material: 'flat', ao: 0, outline: 2, dof: 0, shadows: false, floor: false, gradient: false, fog: false }
   };
   const FX_KEYS = ['material', 'ao', 'outline', 'dof', 'shadows', 'floor', 'gradient'];
-  const VERSION = '2.4.0';
+  const VERSION = '2.5.0';
   const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const isNum = v => typeof v === 'number' && isFinite(v);
   const fx = (v, d) => (isNum(v) ? v.toFixed(d) : '—');
@@ -39,7 +39,9 @@
     build: {
       tool: 'navigate', element: 6, order: 1, adjustH: true, autoOpt: false, symTol: 0.1,
       tpl: { mode: 'molecules', molecule: 'benzene', group: 'methyl', ligand: 'NH3', metalZ: 78, geometry: 'square-planar', metalLigand: 'Cl' },
-      fold: { align: true, clean: true, sym: true, coords: true }, inputs: { el: '', smiles: '', libq: '', expand: '3' }
+      fold: { align: true, clean: true, sym: true, coords: true, conf: true, crystal: true }, inputs: { el: '', smiles: '', libq: '', expand: '3' },
+      conf: { max: 20, window: 10, rmsd: 0.5 },
+      crys: { n: [2, 2, 2], hkl: [1, 0, 0], layers: 4, vacuum: 15, shift: 0, margin: 10, scale: true }
     }
   };
   let R = null, plot = null, ui = null;
@@ -55,6 +57,9 @@
         for (const k of ['element', 'order', 'adjustH', 'autoOpt', 'symTol']) if (p.build[k] !== undefined) b[k] = p.build[k];
         if (p.build.tpl) Object.assign(b.tpl, p.build.tpl);
         if (p.build.fold) Object.assign(b.fold, p.build.fold);
+        // (numbers only: a damaged preference must not reach the tools)
+        const nums = (dst, src) => { if (src && typeof src === 'object') for (const k of Object.keys(dst)) { const v = src[k]; if (Array.isArray(dst[k]) ? Array.isArray(v) && v.length === dst[k].length && v.every(Number.isFinite) : typeof dst[k] === 'boolean' ? typeof v === 'boolean' : Number.isFinite(v)) dst[k] = Array.isArray(v) ? v.slice() : v; } };
+        nums(b.conf, p.build.conf); nums(b.crys, p.build.crys);
       }
       if (p.sidebar) document.documentElement.style.setProperty('--sidebar-w', p.sidebar);
       if (p.plotH) document.documentElement.style.setProperty('--plot-h', p.plotH);
@@ -64,7 +69,7 @@
     try {
       const cs = document.documentElement.style, b = state.build;
       localStorage.setItem('bluemolecule.prefs', JSON.stringify({ view: state.view, vib: { amplitude: state.vib.amplitude, speed: state.vib.speed, arrows: state.vib.arrows, arrowLen: state.vib.arrowLen },
-        build: { element: b.element, order: b.order, adjustH: b.adjustH, autoOpt: b.autoOpt, symTol: b.symTol, tpl: b.tpl, fold: b.fold },
+        build: { element: b.element, order: b.order, adjustH: b.adjustH, autoOpt: b.autoOpt, symTol: b.symTol, tpl: b.tpl, fold: b.fold, conf: b.conf, crys: b.crys },
         sidebar: cs.getPropertyValue('--sidebar-w'), plotH: cs.getPropertyValue('--plot-h') }));
     } catch (e) { /* ignore */ }
   }
@@ -227,6 +232,8 @@
   }
 
   const curFrame = d => d.data.frames[d.frameIndex];
+  /** The unit cell of a frame: an edited frame's own (null once removed), otherwise the frame's or the file's. */
+  const cellOf = (d, f) => { f = f || curFrame(d); return f && f.edited && f.cell !== undefined ? f.cell : ((f && f.cell) || d.data.cell || null); };
 
   /** Topology of frame fi, cached per frame: one stable flat pairs array plus orders.
    *  Edited frames use their explicit bonds; frame 0 of MOL/SDF files the file's bonds; others distance bonds
@@ -844,7 +851,7 @@
       const c = [cx / n, cy / n, cz / n], s = 0.6;
       R.setExtraArrows([{ from: c, to: [c[0] + dp.x * s, c[1] + dp.y * s, c[2] + dp.z * s], color: [1.0, 0.58, 0.18], radius: 0.06 }]);
     } else R.setExtraArrows([]);
-    const cell = f.cell || d.data.cell;
+    const cell = cellOf(d, f);
     R.setCell(v.cell && cell ? cell : null, d.data.cellOrigin || [0, 0, 0]);
     R.setAtomMarkers(d.frozen.filter(i => i < n));
   }
@@ -2204,6 +2211,7 @@
     const nf = {
       Z: f.Z.slice(), xyz: Float64Array.from(d._animXyz && state.anim.kind === 'vib' ? d._animXyz : f.xyz), energy: null, energies: null, label: 'Edited', converged: false, opt: null,
       atomNames: f.atomNames ? f.atomNames.slice() : null, resNames: f.resNames ? f.resNames.slice() : null, resIds: f.resIds ? f.resIds.slice() : null, edited: true,
+      cell: (c => (c ? c.map(v => v.slice()) : null))(cellOf(d, f)),
       bonds: bonds || kit.pairsToList(t.pairs, null), formalCharges: fc ? fc.slice() : new Array(f.Z.length).fill(0)
     };
     d.data.frames.push(nf);
@@ -2214,11 +2222,13 @@
   function snapshotFrame(d) {
     const f = curFrame(d);
     return { fi: d.frameIndex, Z: f.Z.slice(), xyz: Float64Array.from(f.xyz), bonds: f.bonds ? f.bonds.map(b => b.slice()) : null, formalCharges: copyArr(f.formalCharges),
-      atomNames: copyArr(f.atomNames), resNames: copyArr(f.resNames), resIds: copyArr(f.resIds), selection: d.selection.slice() };
+      atomNames: copyArr(f.atomNames), resNames: copyArr(f.resNames), resIds: copyArr(f.resIds), selection: d.selection.slice(),
+      cell: f.cell === undefined ? undefined : f.cell ? f.cell.map(v => v.slice()) : null };
   }
   function restoreFrame(d, s) {
     const f = d.data.frames[s.fi];
     f.Z = s.Z; f.xyz = s.xyz; f.bonds = s.bonds; f.formalCharges = s.formalCharges; f.atomNames = s.atomNames; f.resNames = s.resNames; f.resIds = s.resIds;
+    if (s.cell !== undefined) f.cell = s.cell;
     d.frameIndex = s.fi;
     const n = f.Z.length;
     d.selection = (s.selection || d.selection).filter(i => i < n);
@@ -2761,7 +2771,7 @@
         const link0 = ['%chk=' + base + '.chk'];
         if (o.nprocs > 1) link0.push('%nprocshared=' + o.nprocs);
         if (o.memoryMB) link0.push('%mem=' + o.memoryMB + 'MB');
-        let text = BM.writers.gaussianInput({ Z: g.Z, xyz, route: n('route'), title, charge: o.charge, multiplicity: o.multiplicity, link0, cell: d.data.cell });
+        let text = BM.writers.gaussianInput({ Z: g.Z, xyz, route: n('route'), title, charge: o.charge, multiplicity: o.multiplicity, link0, cell: cellOf(d) });
         if (o.extra) text = text.replace(/\n\n\n$/, '\n\n' + o.extra + '\n\n');
         return { text, command: 'g16 ' + base + '.gjf', note: parityNote(g.Z, o.charge, o.multiplicity) };
       }
@@ -2986,7 +2996,7 @@
       if (kind === 'xyz') saveFile(baseName(d) + (f.edited ? '_edited' : '') + '.xyz', BM.writers.xyz({ Z: g.Z, xyz: g.xyz, comment: `${d.name} geometry ${d.frameIndex + 1}${isNum(f.energy) ? ' E = ' + f.energy.toFixed(10) : ''}` }));
       else if (kind === 'xyz-all') saveFile(baseName(d) + '_all.xyz', BM.writers.xyzMulti(d.data.frames.map((x, i) => ({ Z: x.Z, xyz: x.xyz, comment: `${d.name} geometry ${i + 1}${isNum(x.energy) ? ' E = ' + x.energy.toFixed(10) : ''}` }))));
       else if (kind === 'mol') saveFile(baseName(d) + '.mol', BM.writers.mol({ Z: g.Z, xyz: g.xyz, bonds: bondPairs(d), title: baseName(d) }));
-      else if (kind === 'pdb') saveFile(baseName(d) + '.pdb', BM.writers.pdb({ Z: g.Z, xyz: g.xyz, atomNames: f.atomNames, resNames: f.resNames, resIds: f.resIds, cell: d.data.cell }));
+      else if (kind === 'pdb') saveFile(baseName(d) + '.pdb', BM.writers.pdb({ Z: g.Z, xyz: g.xyz, atomNames: f.atomNames, resNames: f.resNames, resIds: f.resIds, cell: cellOf(d) }));
     } catch (e) { toast(e.message, true); }
   }
   /** Bonds of the current frame with orders (explicit, from the file, or perceived) for MOL export. */
@@ -3015,7 +3025,7 @@
   const SA_NEEDS = { cell: 'needs a unit cell', volume: 'needs volume data', vibrations: 'needs vibrations', frames: 'needs several geometries', mos: 'needs orbitals' };
   function saveNeeds(d, f) {
     for (const n of f.needs || []) {
-      if (n === 'cell' && !(curFrame(d).cell || d.data.cell)) return SA_NEEDS.cell;
+      if (n === 'cell' && !cellOf(d)) return SA_NEEDS.cell;
       if (n === 'volume' && !d.surfaces.length) return SA_NEEDS.volume;
       if (n === 'vibrations' && !d.data.vibrations) return SA_NEEDS.vibrations;
       if (n === 'frames' && visibleFrames(d).length < 2) return SA_NEEDS.frames;
@@ -3030,7 +3040,7 @@
     const surf = d.surfaces.find(x => x.visible) || d.surfaces[0];
     return {
       Z: g.Z, xyz: g.xyz, bonds: topo.bonds.map(b => [b[0], b[1], b[2] === undefined ? 1 : b[2]]), formalCharges: topo.formalCharges,
-      cell: f.cell || d.data.cell || null, title: d.built ? d.name : (d.data.title || baseName(d)), atomNames: f.atomNames, resNames: f.resNames, resIds: f.resIds, chains: f.chains || null,
+      cell: cellOf(d, f), title: d.built ? d.name : (d.data.title || baseName(d)), atomNames: f.atomNames, resNames: f.resNames, resIds: f.resIds, chains: f.chains || null,
       frames: list.map(x => ({ Z: x.Z, xyz: x.xyz, energy: x.energy, label: x.label, cell: x.cell || null })), frameIndex: all ? Math.max(0, vis.indexOf(d.frameIndex)) : d.frameIndex,
       volume: surf ? surf.vol : null, vibrations: d.data.vibrations, charges: d.data.charges, meta: d.data.meta, baseName: baseName(d), mos: d.data.mos || null,
       orbitalModel: BM.orbitals ? BM.orbitals.model(d.data) : null
@@ -3304,7 +3314,7 @@
     $('#set-orders').onchange = e => setView({ bondOrders: e.target.checked }, true);
     $('#set-hbonds').onchange = e => setView({ hbonds: e.target.checked });
     $('#set-dipole').onchange = e => { setView({ dipole: e.target.checked }); const d = state.active; if (e.target.checked && d && !d.data.dipole) toast('This file has no dipole moment.'); else if (e.target.checked && d && curFrame(d).edited) toast('The dipole arrow is shown for file geometries only.'); };
-    $('#set-cell').onchange = e => { setView({ cell: e.target.checked }); const d = state.active; if (e.target.checked && d && !d.data.cell) toast('This file has no unit cell.'); };
+    $('#set-cell').onchange = e => { setView({ cell: e.target.checked }); const d = state.active; if (e.target.checked && d && !cellOf(d)) toast('This structure has no unit cell.'); };
     // scene: a preset, or each effect by hand (which makes the scene "custom")
     $('#set-scene').onchange = e => { if (SCENES[e.target.value]) applyScene(e.target.value); else setView({ scene: 'custom' }); };
     $('#set-material').onchange = e => setView({ material: e.target.value, scene: 'custom' });
@@ -3619,8 +3629,8 @@
     plot = new BM.Plot($('#plot'));
     plot.onZoom = onPlotZoom;
     ui = BM.buildUI.create({
-      state, R: () => R, esc, fx, toast, status, setHint, curFrame, topoFor, bondsFor, ordersFor, topoFrame, measurement,
-      doEdit, beginContinuousEdit, endContinuousEdit, afterPositions, frameMol, commitMol, addBuiltDoc,
+      state, R: () => R, esc, fx, toast, status, setHint, curFrame, cellOf, topoFor, bondsFor, ordersFor, topoFrame, measurement,
+      doEdit, beginContinuousEdit, endContinuousEdit, afterPositions, frameMol, commitMol, addBuiltDoc, openData,
       renderPanel, updateMeasure, savePrefs, editSet, editElement, copyText
     });
     syncToolbar();
@@ -3643,7 +3653,7 @@
     BM.app = {
       state, openText, openFile, openFiles, openDialog, loadLaunchFiles, openData, activate, selectVib, setFrame, setView, R: () => R, plot: () => plot, exportSimple, exportGaussian, exportOrca, exportCalc, plotCSV, displace, onAtomClick, editSet, undo,
       saveAs, saveFile, saveContext, plotTypes, plotGroups, renderPlot, goTo, setJob, convFor, version: VERSION,
-      curFrame, topoFor, bondsFor, ordersFor, topoFrame, selectAll, editDelete, newMolecule: () => ui.newMolecule(), setTool: id => ui.setTool(id), ui: () => ui, kit,
+      curFrame, cellOf, topoFor, bondsFor, ordersFor, topoFrame, selectAll, editDelete, newMolecule: () => ui.newMolecule(), setTool: id => ui.setTool(id), ui: () => ui, kit,
       applyPreset, refreshReps, repCtx, selectBy, renderPanel, renderTabs
     };
   }

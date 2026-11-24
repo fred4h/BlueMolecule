@@ -169,6 +169,7 @@ input[type=color] { width: 30px; height: 24px; border: 1px solid var(--line-2); 
 .surf-head .t { flex: 1; font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .surf .field { grid-template-columns: 74px 1fr auto; }
 .sf-job { display: flex; align-items: center; gap: 8px; }
+.cellp { font-size: 11.5px; margin: 2px 0 8px; line-height: 1.5; }
 .sf-bar { flex: 1; height: 8px; border-radius: 4px; background: var(--panel-2); border: 1px solid var(--line-2); overflow: hidden; }
 .sf-bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.15s; }
 .sf-bar.busy i { opacity: 0.45; animation: sf-pulse 1.2s ease-in-out infinite alternate; }

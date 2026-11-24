@@ -340,7 +340,7 @@ function dcd(natoms, frames) {
   await page.evaluate(() => { const a = BM.app; a.setTool('select'); a.onAtomClick(1); a.onAtomClick(2); });
   await page.waitForTimeout(150);
   const folded = await page.evaluate(() => [...document.querySelectorAll('.bsec')].map(s => s.dataset.sec + (s.classList.contains('folded') ? '-' : '+')).join(' '));
-  check(folded === 'insert+ edit+ align- clean- sym- coords-', 'Build sections: first two open, rest collapsed: ' + folded);
+  check(folded === 'insert+ edit+ align- clean- conf- crystal- sym- coords-', 'Build sections: first two open, rest collapsed: ' + folded);
   check(await page.evaluate(() => !document.querySelector('#panel .note')), 'no prose paragraphs in the Build tab');
   await shot('04_build_compact');
 
