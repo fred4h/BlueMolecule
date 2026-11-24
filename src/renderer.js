@@ -150,24 +150,36 @@
   }
 
   // ---------- shaders ----------
+  // shadow-map lookup shared by the lit shaders: uShadowP = (on, texel size, normal offset in eye units)
+  const SHADOW_GLSL = `
+uniform highp sampler2DShadow uShadowMap; uniform mat4 uShadowMat; uniform vec3 uShadowP;
+float shadowAt(vec3 P, vec3 N, float spread) {   // 4 x 4 filtered lookups, spread texels apart
+  vec4 s = uShadowMat * vec4(P + N * uShadowP.z, 1.0);
+  if (s.x <= 0.0 || s.x >= 1.0 || s.y <= 0.0 || s.y >= 1.0 || s.z >= 1.0) return 1.0;
+  float v = 0.0;
+  for (int i = 0; i < 4; i++) for (int j = 0; j < 4; j++) v += texture(uShadowMap, vec3(s.xy + (vec2(float(i), float(j)) - 1.5) * spread * uShadowP.y, s.z - 0.0006));
+  return v / 16.0;
+}`;
   const FRAG = `#version 300 es
 precision highp float;
 in vec3 vNormal; in vec3 vEye; in vec3 vColor;
-uniform vec3 uLight; uniform float uAmbient; uniform float uSpec; uniform float uShine;
+uniform vec3 uLight; uniform float uAmbient; uniform float uSpec; uniform float uShine; uniform float uRim; uniform float uToon;
 uniform vec3 uFogColor; uniform vec2 uFogRange; uniform float uFogOn;
 uniform float uAlpha; uniform float uOrtho; uniform float uTwoSided;
 in float vAlpha;
-out vec4 outColor;
+out vec4 outColor;${SHADOW_GLSL}
 void main(){
   vec3 N = normalize(vNormal);
   vec3 V = uOrtho > 0.5 ? vec3(0.0,0.0,1.0) : normalize(-vEye);
   if (uTwoSided > 0.5 && dot(N, V) < 0.0) N = -N;
   float diff = max(dot(N, uLight), 0.0);
-  float fill = max(dot(N, normalize(vec3(-0.6, -0.2, 0.7))), 0.0) * 0.22;
-  float rim = pow(1.0 - max(dot(N, V), 0.0), 3.0) * 0.12;
+  float vis = uShadowP.x > 0.5 && diff > 0.0 ? 0.3 + 0.7 * shadowAt(vEye, N, 1.0) : 1.0;   // light bounced around softens shadows
+  if (uToon > 0.5) diff = smoothstep(0.16, 0.22, diff) * 0.5 + smoothstep(0.55, 0.61, diff) * 0.5;
+  float fill = max(dot(N, normalize(vec3(-0.6, -0.2, 0.7))), 0.0) * 0.22 * (1.0 - uToon);
+  float rim = pow(1.0 - max(dot(N, V), 0.0), 3.0) * uRim;
   vec3 H = normalize(uLight + V);
-  float sp = pow(max(dot(N, H), 0.0), uShine) * uSpec;
-  vec3 c = vColor * (uAmbient + (1.0 - uAmbient) * diff + fill) + vec3(sp) + vColor * rim;
+  float sp = pow(max(dot(N, H), 0.0), uShine) * uSpec * vis;
+  vec3 c = vColor * (uAmbient + (1.0 - uAmbient) * diff * vis + fill) + vec3(sp) + vColor * rim;
   float depth = -vEye.z;
   float f = clamp((depth - uFogRange.x) / max(uFogRange.y - uFogRange.x, 1e-3), 0.0, 1.0) * uFogOn;
   c = mix(c, uFogColor, f * 0.7);
@@ -305,6 +317,175 @@ void main(){
   outColor = vec4(c * a, a);
 }`;
 
+  // ---------- scene effects (issue #15): shadow depth, background gradient, floor, ambient occlusion, outlines, depth of field
+  const FS_DEPTH = `#version 300 es
+precision highp float;
+void main(){}`;
+  const VS_FULL = `#version 300 es
+layout(location=0) in vec2 aPos;
+out vec2 vUV;
+void main(){ vUV = aPos * 0.5 + 0.5; gl_Position = vec4(aPos, 0.0, 1.0); }`;
+  const FS_GRADIENT = `#version 300 es
+precision highp float;
+in vec2 vUV;
+uniform vec3 uTop; uniform vec3 uBottom; uniform vec4 uWin;
+out vec4 outColor;
+void main(){
+  float y = mix(uWin.y, uWin.w, vUV.y) * 0.5 + 0.5;
+  outColor = vec4(mix(uBottom, uTop, smoothstep(0.0, 1.0, y)), 1.0);
+}`;
+  const VS_FLOOR = `#version 300 es
+layout(location=0) in vec2 aPos;
+uniform mat4 uProj; uniform vec4 uFloor;
+out vec3 vEye; out vec2 vXZ;
+void main(){
+  vec3 e = vec3(uFloor.x + aPos.x * uFloor.w, uFloor.y, uFloor.z + aPos.y * uFloor.w);
+  vEye = e; vXZ = aPos;
+  gl_Position = uProj * vec4(e, 1.0);
+}`;
+  const FS_FLOOR = `#version 300 es
+precision highp float;
+in vec3 vEye; in vec2 vXZ;
+uniform vec3 uFloorColor; uniform float uShade;
+uniform vec3 uFogColor; uniform vec2 uFogRange; uniform float uFogOn;
+out vec4 outColor;${SHADOW_GLSL}
+void main(){
+  float vis = uShadowP.x > 0.5 ? shadowAt(vEye, vec3(0.0, 1.0, 0.0), 3.0) : 1.0;
+  vec3 c = uFloorColor * mix(uShade, 1.0, vis);
+  float depth = -vEye.z;
+  float f = clamp((depth - uFogRange.x) / max(uFogRange.y - uFogRange.x, 1e-3), 0.0, 1.0) * uFogOn;
+  c = mix(c, uFogColor, f * 0.7);
+  float a = 1.0 - smoothstep(0.3, 1.0, length(vXZ));
+  outColor = vec4(c * a, a);
+}`;
+  // view-space position from the depth texture (any projection, any tile)
+  const VIEWPOS_GLSL = `
+uniform highp sampler2D uDepth; uniform mat4 uInvProj;
+vec3 viewPos(vec2 uv) {
+  float d = texture(uDepth, uv).r;
+  vec4 p = uInvProj * vec4(uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
+  return p.xyz / p.w;
+}`;
+  const FS_AO = `#version 300 es
+precision highp float;
+in vec2 vUV;
+uniform mat4 uProj; uniform vec2 uTexel; uniform float uRadius; uniform vec3 uKernel[16]; uniform vec2 uPixOff;
+out vec4 outColor;${VIEWPOS_GLSL}
+void main(){
+  if (texture(uDepth, vUV).r >= 1.0) { outColor = vec4(1.0); return; }
+  vec3 P = viewPos(vUV);
+  vec3 Pr = viewPos(vUV + vec2(uTexel.x, 0.0)), Pl = viewPos(vUV - vec2(uTexel.x, 0.0));
+  vec3 Pu = viewPos(vUV + vec2(0.0, uTexel.y)), Pd = viewPos(vUV - vec2(0.0, uTexel.y));
+  vec3 dx = abs(Pr.z - P.z) < abs(P.z - Pl.z) ? Pr - P : P - Pl;
+  vec3 dy = abs(Pu.z - P.z) < abs(P.z - Pd.z) ? Pu - P : P - Pd;
+  vec3 N = normalize(cross(dx, dy));
+  if (N.z < 0.0) N = -N;
+  // 16 rotations in a 4 x 4 pattern of the whole image's pixels (tiles agree): the 4 x 4 blur that follows averages them
+  vec2 px = floor(mod(gl_FragCoord.xy + uPixOff, 4.0));
+  float a = (px.x * 4.0 + px.y + 0.5) / 16.0 * 6.2831853;
+  vec3 rv = vec3(cos(a), sin(a), 0.0);
+  vec3 T = normalize(rv - N * dot(rv, N)), B = cross(N, T);
+  float occ = 0.0;
+  for (int i = 0; i < 16; i++) {
+    vec3 S = P + (T * uKernel[i].x + B * uKernel[i].y + N * uKernel[i].z) * uRadius;
+    vec4 c = uProj * vec4(S, 1.0);
+    vec2 q = c.xy / c.w * 0.5 + 0.5;
+    if (q.x < 0.0 || q.x > 1.0 || q.y < 0.0 || q.y > 1.0 || texture(uDepth, q).r >= 1.0) continue;
+    float z = viewPos(q).z;
+    occ += (z >= S.z + 0.02 * uRadius ? 1.0 : 0.0) * smoothstep(0.0, 1.0, uRadius / max(abs(P.z - z), 1e-4));
+  }
+  outColor = vec4(vec3(1.0 - clamp(occ / 16.0 * 1.6, 0.0, 1.0)), 1.0);
+}`;
+  const FS_COMPOSITE = `#version 300 es
+precision highp float;
+in vec2 vUV;
+uniform sampler2D uColor; uniform sampler2D uAO; uniform vec2 uTexel;
+uniform float uAOStrength; uniform float uOutline; uniform vec3 uOutlineColor; uniform float uEdge;
+out vec4 outColor;${VIEWPOS_GLSL}
+void main(){
+  vec4 c = texture(uColor, vUV);
+  if (texture(uDepth, vUV).r < 1.0) {
+    float z0 = viewPos(vUV).z;
+    if (uAOStrength > 0.0) {   // depth-aware blur of the occlusion
+      float s = 0.0, w = 0.0;
+      for (int i = -2; i <= 1; i++) for (int j = -2; j <= 1; j++) {
+        vec2 q = vUV + (vec2(float(i), float(j)) + 0.5) * uTexel;
+        float wt = 1.0 / (1.0 + abs(viewPos(q).z - z0) * 8.0);
+        s += texture(uAO, q).r * wt; w += wt;
+      }
+      c.rgb *= mix(1.0, s / w, uAOStrength);
+    }
+    if (uOutline > 0.0) {   // a line on the near side of every jump in depth
+      float e = 0.0;
+      for (int k = 0; k < 8; k++) {
+        float t = float(k) * 0.7853982;
+        vec2 q = vUV + vec2(cos(t), sin(t)) * uOutline * uTexel;
+        float dz = texture(uDepth, q).r >= 1.0 ? 1e6 : z0 - viewPos(q).z;
+        e = max(e, smoothstep(uEdge, uEdge * 2.0, dz));
+      }
+      c.rgb = mix(c.rgb, uOutlineColor * c.a, e);
+    }
+  }
+  outColor = c;
+}`;
+  const FS_DOF = `#version 300 es
+precision highp float;
+in vec2 vUV;
+uniform sampler2D uColor; uniform vec2 uTexel; uniform float uFocus; uniform float uRange; uniform float uMaxPx;
+out vec4 outColor;${VIEWPOS_GLSL}
+float coc(vec2 uv) { float z = texture(uDepth, uv).r >= 1.0 ? uFocus - 1e4 : viewPos(uv).z; return clamp(abs(z - uFocus) / uRange, 0.0, 1.0) * uMaxPx; }
+void main(){
+  float c0 = coc(vUV);
+  vec4 acc = texture(uColor, vUV); float w = 1.0;
+  for (int i = 0; i < 24; i++) {
+    float r = sqrt((float(i) + 0.5) / 24.0) * c0, th = float(i) * 2.39996323;
+    vec2 q = vUV + vec2(cos(th), sin(th)) * r * uTexel;
+    float wt = coc(q) >= r * 0.8 ? 1.0 : 0.2;
+    acc += texture(uColor, q) * wt; w += wt;
+  }
+  outColor = acc / w;
+}`;
+  // materials: ambient, specular strength, shininess, rim light, cartoon shading
+  const MATERIALS = {
+    standard: [0.28, 0.38, 48, 0.12, 0], glossy: [0.24, 0.85, 110, 0.16, 0], matte: [0.32, 0.05, 10, 0.06, 0], flat: [0.45, 0, 1, 0, 1]
+  };
+  const LIGHT_KEY = [0.35, 0.55, 0.75], LIGHT_TOP = [0.3, 0.85, 0.45], IDENTITY = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+  const m4mul = (a, b) => { const o = new Float32Array(16); for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) { let s = 0; for (let k = 0; k < 4; k++) s += a[4 * k + r] * b[4 * c + k]; o[4 * c + r] = s; } return o; };
+  function m4inv(m) {
+    const a = Array.from(m), inv = new Float32Array(16);
+    inv[0] = a[5] * a[10] * a[15] - a[5] * a[11] * a[14] - a[9] * a[6] * a[15] + a[9] * a[7] * a[14] + a[13] * a[6] * a[11] - a[13] * a[7] * a[10];
+    inv[4] = -a[4] * a[10] * a[15] + a[4] * a[11] * a[14] + a[8] * a[6] * a[15] - a[8] * a[7] * a[14] - a[12] * a[6] * a[11] + a[12] * a[7] * a[10];
+    inv[8] = a[4] * a[9] * a[15] - a[4] * a[11] * a[13] - a[8] * a[5] * a[15] + a[8] * a[7] * a[13] + a[12] * a[5] * a[11] - a[12] * a[7] * a[9];
+    inv[12] = -a[4] * a[9] * a[14] + a[4] * a[10] * a[13] + a[8] * a[5] * a[14] - a[8] * a[6] * a[13] - a[12] * a[5] * a[10] + a[12] * a[6] * a[9];
+    inv[1] = -a[1] * a[10] * a[15] + a[1] * a[11] * a[14] + a[9] * a[2] * a[15] - a[9] * a[3] * a[14] - a[13] * a[2] * a[11] + a[13] * a[3] * a[10];
+    inv[5] = a[0] * a[10] * a[15] - a[0] * a[11] * a[14] - a[8] * a[2] * a[15] + a[8] * a[3] * a[14] + a[12] * a[2] * a[11] - a[12] * a[3] * a[10];
+    inv[9] = -a[0] * a[9] * a[15] + a[0] * a[11] * a[13] + a[8] * a[1] * a[15] - a[8] * a[3] * a[13] - a[12] * a[1] * a[11] + a[12] * a[3] * a[9];
+    inv[13] = a[0] * a[9] * a[14] - a[0] * a[10] * a[13] - a[8] * a[1] * a[14] + a[8] * a[2] * a[13] + a[12] * a[1] * a[10] - a[12] * a[2] * a[9];
+    inv[2] = a[1] * a[6] * a[15] - a[1] * a[7] * a[14] - a[5] * a[2] * a[15] + a[5] * a[3] * a[14] + a[13] * a[2] * a[7] - a[13] * a[3] * a[6];
+    inv[6] = -a[0] * a[6] * a[15] + a[0] * a[7] * a[14] + a[4] * a[2] * a[15] - a[4] * a[3] * a[14] - a[12] * a[2] * a[7] + a[12] * a[3] * a[6];
+    inv[10] = a[0] * a[5] * a[15] - a[0] * a[7] * a[13] - a[4] * a[1] * a[15] + a[4] * a[3] * a[13] + a[12] * a[1] * a[7] - a[12] * a[3] * a[5];
+    inv[14] = -a[0] * a[5] * a[14] + a[0] * a[6] * a[13] + a[4] * a[1] * a[14] - a[4] * a[2] * a[13] - a[12] * a[1] * a[6] + a[12] * a[2] * a[5];
+    inv[3] = -a[1] * a[6] * a[11] + a[1] * a[7] * a[10] + a[5] * a[2] * a[11] - a[5] * a[3] * a[10] - a[9] * a[2] * a[7] + a[9] * a[3] * a[6];
+    inv[7] = a[0] * a[6] * a[11] - a[0] * a[7] * a[10] - a[4] * a[2] * a[11] + a[4] * a[3] * a[10] + a[8] * a[2] * a[7] - a[8] * a[3] * a[6];
+    inv[11] = -a[0] * a[5] * a[11] + a[0] * a[7] * a[9] + a[4] * a[1] * a[11] - a[4] * a[3] * a[9] - a[8] * a[1] * a[7] + a[8] * a[3] * a[5];
+    inv[15] = a[0] * a[5] * a[10] - a[0] * a[6] * a[9] - a[4] * a[1] * a[10] + a[4] * a[2] * a[9] + a[8] * a[1] * a[6] - a[8] * a[2] * a[5];
+    const det = a[0] * inv[0] + a[1] * inv[4] + a[2] * inv[8] + a[3] * inv[12];
+    for (let k = 0; k < 16; k++) inv[k] /= det || 1;
+    return inv;
+  }
+  const AO_KERNEL = (() => {   // 16 directions in the upper hemisphere, longer towards the end (fixed, so images repeat)
+    const k = new Float32Array(48);
+    let s = 1;
+    const r = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+    for (let i = 0; i < 16; i++) {
+      let v;
+      do { v = [r() * 2 - 1, r() * 2 - 1, r()]; } while (Math.hypot(...v) > 1 || v[2] < 0.15);
+      const l = Math.hypot(...v), t = i / 16, sc = 0.15 + 0.85 * t * t;
+      k[3 * i] = v[0] / l * sc; k[3 * i + 1] = v[1] / l * sc; k[3 * i + 2] = v[2] / l * sc;
+    }
+    return k;
+  })();
+
   function compile(gl, vs, fs) {
     const mk = (type, src) => {
       const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
@@ -324,8 +505,13 @@ void main(){
   const DEFAULTS = {
     style: 'ballstick', atomScale: 0.25, bondRadius: 0.11, spacefillScale: 1.0, showH: true, showDummies: true,
     bg: [0.063, 0.090, 0.133], perspective: true, fog: true, axes: true, fov: 30,
-    selectionColor: [1.0, 0.80, 0.25], arrowColor: [0.15, 0.85, 0.45], measureColor: '#ffd04a'
+    selectionColor: [1.0, 0.80, 0.25], arrowColor: [0.15, 0.85, 0.45], measureColor: '#ffd04a',
+    // scene effects (issue #15): material, shadows, ambient occlusion (0-1), outlines (CSS px), depth of field (0-1),
+    // floor, background gradient (bg2 at the top), and whether the heavy ones stay on for very large systems
+    material: 'standard', shadows: false, ao: 0, outline: 0, dof: 0, floor: false, gradient: false, bg2: null, effectsLarge: false
   };
+  const EFFECT_KEYS = ['material', 'shadows', 'ao', 'outline', 'dof', 'floor', 'gradient', 'bg2', 'effectsLarge', 'bg', 'fog', 'axes', 'measureColor'];
+  const LARGE_SYSTEM = 60000;   // atoms: above this, shadows, ambient occlusion and depth of field wait to be asked for
   const DEFAULT_DASH = [0.45, 0.75, 1.0], DEFAULT_MARKER = [0.25, 0.80, 1.0], DEFAULT_EXTRA_ARROW = [1.0, 0.58, 0.18];
   // per-atom style codes (BM.reps.CODE uses the same numbers)
   const STYLE = { hidden: 0, ballstick: 1, sticks: 2, spacefill: 3, wireframe: 4, lines: 5, ghost: 6 };
@@ -375,6 +561,18 @@ void main(){
       this.progCylA = compile(gl, vsCyl(true), FRAG);
       this.progCMesh = compile(gl, VS_CMESH, FRAG);
       this.progLine = compile(gl, VS_LINE, FS_LINE);
+      // scene effects
+      this.progSphereD = compile(gl, VS_SPHERE, FS_DEPTH); this.progCylD = compile(gl, VS_CYL, FS_DEPTH);
+      this.progMeshD = compile(gl, VS_MESH, FS_DEPTH); this.progCMeshD = compile(gl, VS_CMESH, FS_DEPTH);
+      this.progGradient = compile(gl, VS_FULL, FS_GRADIENT); this.progFloor = compile(gl, VS_FLOOR, FS_FLOOR);
+      this.progAO = compile(gl, VS_FULL, FS_AO); this.progComposite = compile(gl, VS_FULL, FS_COMPOSITE); this.progDOF = compile(gl, VS_FULL, FS_DOF);
+      // the shadow map lives on texture unit 3; a 1x1 depth texture stands in when shadows are off
+      this._dummyShadow = this._depthTexture(1);
+      for (const p of [this.progSphere, this.progCyl, this.progMesh, this.progSphereA, this.progCylA, this.progCMesh, this.progFloor]) { gl.useProgram(p.p); gl.uniform1i(p.u.uShadowMap, 3); }
+      gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, this._dummyShadow); gl.activeTexture(gl.TEXTURE0);
+      this.fullVAO = this._makeQuadVAO([-1, -1, 3, -1, -1, 3], null);
+      this.floorVAO = this._makeQuadVAO([-1, -1, 1, -1, 1, 1, -1, 1], [0, 2, 1, 0, 3, 2]);
+      this._fx = {};
       this.sphereInst = gl.createBuffer(); this.cylInst = gl.createBuffer(); this.haloInst = gl.createBuffer();
       this.arrowCylInst = gl.createBuffer(); this.arrowConeInst = gl.createBuffer();
       this.multiInst = gl.createBuffer(); this.decoInst = gl.createBuffer(); this.xConeInst = gl.createBuffer();
@@ -457,6 +655,75 @@ void main(){
       vao.count = 6;
       return vao;
     }
+    _makeQuadVAO(pos, idx) {
+      const gl = this.gl, vao = gl.createVertexArray();
+      gl.bindVertexArray(vao);
+      const vb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vb); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(pos), gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+      if (idx) { const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(idx), gl.STATIC_DRAW); }
+      gl.bindVertexArray(null);
+      vao.count = idx ? idx.length : pos.length / 2;
+      return vao;
+    }
+    _depthTexture(size) {
+      const gl = this.gl, t = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.texStorage2D(gl.TEXTURE_2D, 1, gl.DEPTH_COMPONENT24, size, size);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_MODE, gl.COMPARE_REF_TO_TEXTURE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_FUNC, gl.LEQUAL);
+      gl.bindTexture(gl.TEXTURE_2D, null);
+      return t;
+    }
+    /** Colour (and optionally depth) textures of w x h in a framebuffer, kept in this._fx[name] and remade when the size changes. */
+    _target(name, w, h, depth) {
+      const gl = this.gl, old = this._fx[name];
+      if (old && old.w === w && old.h === h) return old;
+      if (old) { gl.deleteFramebuffer(old.fbo); gl.deleteTexture(old.color); if (old.depth) gl.deleteTexture(old.depth); }
+      const tex = (fmt, filter) => {
+        const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t); gl.texStorage2D(gl.TEXTURE_2D, 1, fmt, w, h);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        return t;
+      };
+      const t = { w, h, fbo: gl.createFramebuffer(), color: tex(gl.RGBA8, gl.LINEAR), depth: depth ? tex(gl.DEPTH_COMPONENT24, gl.NEAREST) : null };
+      gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t.color, 0);
+      if (t.depth) gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, t.depth, 0);
+      gl.bindTexture(gl.TEXTURE_2D, null);
+      return (this._fx[name] = t);
+    }
+    /** The multisampled framebuffer the scene is drawn into when post-processing follows. */
+    _msTarget(w, h) {
+      const gl = this.gl, old = this._fx.ms;
+      if (old && old.w === w && old.h === h) return old;
+      if (old) { gl.deleteFramebuffer(old.fbo); gl.deleteRenderbuffer(old.color); gl.deleteRenderbuffer(old.depth); }
+      const samples = Math.min(4, gl.getParameter(gl.MAX_SAMPLES) || 0);
+      const rb = fmt => { const r = gl.createRenderbuffer(); gl.bindRenderbuffer(gl.RENDERBUFFER, r); gl.renderbufferStorageMultisample(gl.RENDERBUFFER, samples, fmt, w, h); return r; };
+      const t = { w, h, fbo: gl.createFramebuffer(), color: rb(gl.RGBA8), depth: rb(gl.DEPTH_COMPONENT24) };
+      gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo);
+      gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.RENDERBUFFER, t.color);
+      gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, t.depth);
+      gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+      return (this._fx.ms = t);
+    }
+    /** Which effects are drawn now: heavy ones wait for very large systems unless effectsLarge. */
+    effectsPlan() {
+      const o = this.opt, large = this.Z.length > LARGE_SYSTEM && !o.effectsLarge;
+      const p = { shadows: !!o.shadows && !large, ao: large ? 0 : +o.ao || 0, outline: +o.outline || 0, dof: large ? 0 : +o.dof || 0, floor: !!o.floor, gradient: !!o.gradient,
+        material: MATERIALS[o.material] || MATERIALS.standard, suspended: large && (!!o.shadows || o.ao > 0 || o.dof > 0) };
+      p.post = p.ao > 0 || p.outline > 0 || p.dof > 0;
+      p.light = p.shadows || p.floor ? LIGHT_TOP : LIGHT_KEY;
+      return p;
+    }
+    /** Image pixels that a tile must draw beyond its edges so that blurs and occlusion near the edges match. */
+    effectsMargin(pxPerCss, cssH) {
+      const p = this.effectsPlan();
+      if (!p.post) return 0;
+      const pxPerA = cssH * pxPerCss / (2 * Math.max(1e-3, this.dist * Math.tan(this.opt.fov / 2 * Math.PI / 180)));
+      return Math.min(256, Math.ceil(Math.max(p.ao ? this._aoRadius() * pxPerA * 1.5 + 4 : 0, p.dof ? p.dof * 0.015 * cssH * pxPerCss + 2 : 0, p.outline * pxPerCss + 2)));
+    }
+    _aoRadius() { return Math.max(0.8, Math.min(3.0, 0.06 * this.radius + 0.9)); }
     _makeRingVAO(inst) {
       const gl = this.gl, vao = gl.createVertexArray();
       gl.bindVertexArray(vao);
@@ -496,7 +763,14 @@ void main(){
     setBondOrders(orders) { this.bondOrders = orders || null; this._topo = null; this._rebuild(); this.requestRender(); }
     setOptions(o) {
       const styleChanged = o.style !== undefined && o.style !== this.opt.style;
+      const same = (a, b) => a === b || (Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((v, k) => v === b[k]));
+      const geometry = Object.keys(o).some(k => EFFECT_KEYS.indexOf(k) < 0 && !same(o[k], this.opt[k])), bgChanged = o.bg !== undefined && !same(o.bg, this.opt.bg);
       Object.assign(this.opt, o);
+      if (!geometry) {   // effects, background, fog: no rebuild of the instances (the cell edges follow the background)
+        if (bgChanged) this._rebuildDeco();
+        this.requestRender();
+        return;
+      }
       this._rebuild();
       if (styleChanged && this.opt.style === 'spacefill') this._updateRadius();
       this.requestRender();
@@ -1209,23 +1483,62 @@ void main(){
     }
 
     // ---------- drawing ----------
-    _drawScene(wPx, hPx, transparent) {
+    /** Draw the scene into the canvas (wPx x hPx device pixels). view (image export): {cssW, cssH} the view size in
+     *  CSS pixels, tile [x0, y0, x1, y1] the part of the image to draw in normalised device coordinates, pxScale the
+     *  image pixels per CSS pixel (screen-space line widths). Returns the matrices of the whole view. */
+    _drawScene(wPx, hPx, transparent, view) {
       const gl = this.gl, o = this.opt;
-      const cssW = this.canvas.clientWidth || wPx, cssH = this.canvas.clientHeight || hPx;
+      const cssW = view ? view.cssW : this.canvas.clientWidth || wPx, cssH = view ? view.cssH : this.canvas.clientHeight || hPx;
       const m = this._matrices(cssW, cssH);
+      let proj = m.proj;
+      if (view && view.tile) {   // a window of the projection: the tile's rectangle becomes the whole viewport
+        const [x0, y0, x1, y1] = view.tile, sx = 2 / (x1 - x0), sy = 2 / (y1 - y0), tx = -(x1 + x0) / (x1 - x0), ty = -(y1 + y0) / (y1 - y0);
+        proj = Float32Array.from(m.proj);
+        for (let c = 0; c < 4; c++) { const w = m.proj[4 * c + 3]; proj[4 * c] = sx * m.proj[4 * c] + tx * w; proj[4 * c + 1] = sy * m.proj[4 * c + 1] + ty * w; }
+      }
+      // scene effects (issue #15): the shadow map first; with post-processing the scene goes to a multisampled framebuffer
+      const fx = this.effectsPlan();
+      this.effectsSuspended = fx.suspended;
+      const light = (() => { const v = fx.light, l = Math.hypot(...v); return [v[0] / l, v[1] / l, v[2] / l]; })();
+      const mat = fx.material;
+      if (fx.shadows) this._shadowPass(m, light);
+      const shadowMat = fx.shadows ? this._shadowMat : IDENTITY, shadowP = fx.shadows ? this._shadowP : [0, 0, 0];
+      gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, fx.shadows ? this._fx.shadow.tex : this._dummyShadow); gl.activeTexture(gl.TEXTURE0);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fx.post ? this._msTarget(wPx, hPx).fbo : null);
       gl.viewport(0, 0, wPx, hPx);
       const bg = o.bg;
       gl.clearColor(transparent ? 0 : bg[0], transparent ? 0 : bg[1], transparent ? 0 : bg[2], transparent ? 0 : 1);
+      gl.depthMask(true);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      const win = view && view.tile ? view.tile : [-1, -1, 1, 1];
+      if (fx.gradient && !transparent) {   // background gradient: o.bg2 at the top, the background colour at the bottom
+        const p = this.progGradient, top = o.bg2 || bg.map(c => Math.min(1, c * 1.3 + 0.07));
+        gl.disable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE); gl.disable(gl.BLEND);
+        gl.useProgram(p.p); gl.uniform3fv(p.u.uTop, top); gl.uniform3fv(p.u.uBottom, bg); gl.uniform4fv(p.u.uWin, win);
+        gl.bindVertexArray(this.fullVAO); gl.drawArrays(gl.TRIANGLES, 0, 3);
+      }
       gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(true);
       gl.disable(gl.BLEND);
       gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK); gl.frontFace(gl.CCW);
-      const light = (() => { const v = [0.35, 0.55, 0.75], l = Math.hypot(...v); return [v[0] / l, v[1] / l, v[2] / l]; })();
       const fogNear = this.dist - this.radius * 0.3, fogFar = this.dist + this.radius * 1.1;
+      if (fx.floor) {   // a soft round floor just below the structure, in camera space, receiving its shadows
+        const p = this.progFloor, lum = 0.2126 * bg[0] + 0.7152 * bg[1] + 0.0722 * bg[2];
+        gl.useProgram(p.p);
+        gl.uniformMatrix4fv(p.u.uProj, false, proj); gl.uniform4f(p.u.uFloor, 0, -this.radius * 1.08, -this.dist, this.radius * 4);
+        gl.uniform3fv(p.u.uFloorColor, lum > 0.5 ? bg.map(c => c * 0.95) : bg.map(c => Math.min(1, c + 0.07))); gl.uniform1f(p.u.uShade, lum > 0.5 ? 0.74 : 0.6);
+        gl.uniform3fv(p.u.uFogColor, bg); gl.uniform2f(p.u.uFogRange, fogNear, fogFar); gl.uniform1f(p.u.uFogOn, o.fog ? 1 : 0);
+        gl.uniformMatrix4fv(p.u.uShadowMat, false, shadowMat); gl.uniform3fv(p.u.uShadowP, shadowP);
+        // no depth: the floor lies below everything, and occlusion, outlines and blur then leave it alone
+        gl.disable(gl.CULL_FACE); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
+        gl.bindVertexArray(this.floorVAO); gl.drawElements(gl.TRIANGLES, this.floorVAO.count, gl.UNSIGNED_SHORT, 0);
+        gl.depthMask(true); gl.disable(gl.BLEND); gl.enable(gl.CULL_FACE);
+      }
       const common = (prog, alpha, twoSided) => {
         gl.useProgram(prog.p);
-        gl.uniformMatrix4fv(prog.u.uView, false, m.view); gl.uniformMatrix4fv(prog.u.uProj, false, m.proj);
-        gl.uniform3fv(prog.u.uLight, light); gl.uniform1f(prog.u.uAmbient, 0.28); gl.uniform1f(prog.u.uSpec, 0.38); gl.uniform1f(prog.u.uShine, 48);
+        gl.uniformMatrix4fv(prog.u.uView, false, m.view); gl.uniformMatrix4fv(prog.u.uProj, false, proj);
+        gl.uniform3fv(prog.u.uLight, light); gl.uniform1f(prog.u.uAmbient, mat[0]); gl.uniform1f(prog.u.uSpec, mat[1]); gl.uniform1f(prog.u.uShine, mat[2]);
+        gl.uniform1f(prog.u.uRim, mat[3]); gl.uniform1f(prog.u.uToon, mat[4]);
+        gl.uniformMatrix4fv(prog.u.uShadowMat, false, shadowMat); gl.uniform3fv(prog.u.uShadowP, shadowP);
         gl.uniform3fv(prog.u.uFogColor, bg); gl.uniform2f(prog.u.uFogRange, fogNear, fogFar); gl.uniform1f(prog.u.uFogOn, o.fog ? 1 : 0);
         gl.uniform1f(prog.u.uAlpha, alpha); gl.uniform1f(prog.u.uOrtho, o.perspective ? 0 : 1); gl.uniform1f(prog.u.uTwoSided, twoSided ? 1 : 0);
       };
@@ -1257,9 +1570,9 @@ void main(){
       if (this.nLine) {
         const p = this.progLine;
         gl.useProgram(p.p);
-        gl.uniformMatrix4fv(p.u.uView, false, m.view); gl.uniformMatrix4fv(p.u.uProj, false, m.proj);
+        gl.uniformMatrix4fv(p.u.uView, false, m.view); gl.uniformMatrix4fv(p.u.uProj, false, proj);
         gl.uniform2f(p.u.uViewport, wPx / 2, hPx / 2);
-        gl.uniform1f(p.u.uWidth, (o.lineWidth || 1.6) * (wPx / Math.max(1, cssW)));
+        gl.uniform1f(p.u.uWidth, (o.lineWidth || 1.6) * (view && view.pxScale ? view.pxScale : wPx / Math.max(1, cssW)));
         gl.uniform1f(p.u.uNear, o.perspective ? m.near * 1.001 : -1e9);
         gl.uniform3fv(p.u.uFogColor, bg); gl.uniform2f(p.u.uFogRange, fogNear, fogFar); gl.uniform1f(p.u.uFogOn, o.fog ? 1 : 0);
         gl.disable(gl.CULL_FACE);
@@ -1342,20 +1655,114 @@ void main(){
         const p = this.progRing;
         gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); gl.disable(gl.CULL_FACE);
         gl.useProgram(p.p);
-        gl.uniformMatrix4fv(p.u.uView, false, m.view); gl.uniformMatrix4fv(p.u.uProj, false, m.proj);
+        gl.uniformMatrix4fv(p.u.uView, false, m.view); gl.uniformMatrix4fv(p.u.uProj, false, proj);
         gl.uniform1f(p.u.uInner, 0.8); gl.uniform1f(p.u.uDashes, 8); gl.uniform1f(p.u.uAlpha, 0.95);
         gl.uniform3fv(p.u.uFogColor, bg); gl.uniform2f(p.u.uFogRange, fogNear, fogFar); gl.uniform1f(p.u.uFogOn, o.fog ? 1 : 0);
         gl.bindVertexArray(this.markerVAO);
         gl.drawElementsInstanced(gl.TRIANGLES, this.markerVAO.count, gl.UNSIGNED_SHORT, 0, this.nMarker);
         gl.enable(gl.CULL_FACE); gl.depthMask(true); gl.disable(gl.BLEND);
       }
+      if (fx.post) this._postProcess(wPx, hPx, proj, fx, view, cssW, cssH);
       gl.bindVertexArray(null);
       return m;
     }
+    /** Depth of the scene seen from the light (an orthographic box around the structure and the floor under it). */
+    _shadowPass(m, light) {
+      const gl = this.gl, S = 2048;
+      if (!this._fx.shadow) {
+        const tex = this._depthTexture(S), fbo = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, tex, 0);
+        gl.drawBuffers([gl.NONE]); gl.readBuffer(gl.NONE);
+        this._fx.shadow = { tex, fbo };
+      }
+      const sh = this._fx.shadow, r = this.radius, E = r * 1.7, E2 = r * 4, C = [0, 0, -this.dist];
+      const z = light, up = Math.abs(z[1]) > 0.99 ? [1, 0, 0] : [0, 1, 0];
+      let x = [up[1] * z[2] - up[2] * z[1], up[2] * z[0] - up[0] * z[2], up[0] * z[1] - up[1] * z[0]];
+      const lx = Math.hypot(...x); x = x.map(v => v / lx);
+      const y = [z[1] * x[2] - z[2] * x[1], z[2] * x[0] - z[0] * x[2], z[0] * x[1] - z[1] * x[0]];
+      const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+      const LV = new Float32Array([x[0], y[0], z[0], 0, x[1], y[1], z[1], 0, x[2], y[2], z[2], 0, -dot(x, C), -dot(y, C), -dot(z, C), 1]);
+      const LP = new Float32Array([1 / E, 0, 0, 0, 0, 1 / E, 0, 0, 0, 0, -1 / E2, 0, 0, 0, 0, 1]), view = m4mul(LV, m.view);
+      // the texture on unit 3 is the one drawn into: unbind it first
+      gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, this._dummyShadow); gl.activeTexture(gl.TEXTURE0);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, sh.fbo);
+      gl.viewport(0, 0, S, S);
+      gl.depthMask(true); gl.clear(gl.DEPTH_BUFFER_BIT);
+      gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.disable(gl.BLEND); gl.disable(gl.CULL_FACE);
+      gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(1.5, 3.0);
+      const use = p => { gl.useProgram(p.p); gl.uniformMatrix4fv(p.u.uView, false, view); gl.uniformMatrix4fv(p.u.uProj, false, LP); };
+      if (this.nSphere) {
+        use(this.progSphereD); gl.uniform1f(this.progSphereD.u.uGrow, 1); gl.uniform1f(this.progSphereD.u.uGrowAbs, 0);
+        gl.bindVertexArray(this.sphereVAO); gl.drawElementsInstanced(gl.TRIANGLES, this.sphereVAO.count, gl.UNSIGNED_SHORT, 0, this.nSphere);
+      }
+      use(this.progCylD);
+      for (const [vao, n] of [[this.cylVAO, this.nMainCyl], [this.multiVAO, this.nMultiCyl], [this.arrowCylVAO, this.nArrowCyl], [this.coneVAO, this.nCone], [this.decoVAO, this.nDeco], [this.xConeVAO, this.nXCone]]) {
+        if (n) { gl.bindVertexArray(vao); gl.drawElementsInstanced(gl.TRIANGLES, vao.count, gl.UNSIGNED_SHORT, 0, n); }
+      }
+      use(this.progCMeshD);
+      for (const ov of this.overlays) if (ov.opacity >= 0.999) { gl.bindVertexArray(ov._vao); gl.drawElements(gl.TRIANGLES, ov._count, gl.UNSIGNED_INT, 0); }
+      use(this.progMeshD);
+      for (const s of this.surfaces) if (s._vao && s.visible !== false && (s.opacity === undefined ? 1 : s.opacity) >= 0.999) { gl.bindVertexArray(s._vao); gl.drawElements(gl.TRIANGLES, s._count, gl.UNSIGNED_INT, 0); }
+      gl.disable(gl.POLYGON_OFFSET_FILL); gl.enable(gl.CULL_FACE);
+      gl.bindVertexArray(null);
+      this._shadowMat = m4mul(new Float32Array([0.5, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 0.5, 0, 0.5, 0.5, 0.5, 1]), m4mul(LP, LV));
+      this._shadowP = [1, 1 / S, 2 * (2 * E / S)];
+    }
+    /** Ambient occlusion, outlines and depth of field from the multisampled scene, into the canvas. */
+    _postProcess(w, h, proj, fx, view, cssW, cssH) {
+      const gl = this.gl, ms = this._fx.ms, rs = this._target('resolve', w, h, true);
+      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, ms.fbo); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, rs.fbo);
+      gl.blitFramebuffer(0, 0, w, h, 0, 0, w, h, gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT, gl.NEAREST);
+      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+      gl.disable(gl.DEPTH_TEST); gl.disable(gl.BLEND); gl.disable(gl.CULL_FACE); gl.depthMask(false);
+      const inv = m4inv(proj), texel = [1 / w, 1 / h], pxScale = view && view.pxScale ? view.pxScale : w / Math.max(1, cssW);
+      const full = () => { gl.bindVertexArray(this.fullVAO); gl.drawArrays(gl.TRIANGLES, 0, 3); };
+      const tex = (unit, t) => { gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t); };
+      let ao = null;
+      if (fx.ao > 0) {
+        ao = this._target('ao', w, h, false);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, ao.fbo); gl.viewport(0, 0, w, h);
+        const p = this.progAO;
+        gl.useProgram(p.p);
+        tex(1, rs.depth); gl.uniform1i(p.u.uDepth, 1);
+        gl.uniformMatrix4fv(p.u.uProj, false, proj); gl.uniformMatrix4fv(p.u.uInvProj, false, inv);
+        gl.uniform2fv(p.u.uTexel, texel); gl.uniform1f(p.u.uRadius, this._aoRadius()); gl.uniform3fv(p.u['uKernel[0]'], AO_KERNEL);
+        const t = view && view.tile;
+        gl.uniform2f(p.u.uPixOff, t ? Math.round((t[0] + 1) / (t[2] - t[0]) * w) : 0, t ? Math.round((t[1] + 1) / (t[3] - t[1]) * h) : 0);
+        full();
+      }
+      const comp = fx.dof > 0 ? this._target('comp', w, h, false) : null;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, comp ? comp.fbo : null); gl.viewport(0, 0, w, h);
+      let p = this.progComposite;
+      gl.useProgram(p.p);
+      tex(0, rs.color); gl.uniform1i(p.u.uColor, 0);
+      tex(1, rs.depth); gl.uniform1i(p.u.uDepth, 1);
+      tex(2, ao ? ao.color : rs.color); gl.uniform1i(p.u.uAO, 2);
+      gl.uniformMatrix4fv(p.u.uInvProj, false, inv); gl.uniform2fv(p.u.uTexel, texel);
+      gl.uniform1f(p.u.uAOStrength, ao ? fx.ao : 0);
+      gl.uniform1f(p.u.uOutline, fx.outline > 0 ? Math.max(1, fx.outline * pxScale) : 0);   // at least one pixel in a small image
+      gl.uniform3fv(p.u.uOutlineColor, [0.03, 0.035, 0.05]); gl.uniform1f(p.u.uEdge, Math.max(0.25, 0.02 * this.radius));
+      full();
+      if (comp) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, w, h);
+        p = this.progDOF;
+        gl.useProgram(p.p);
+        tex(0, comp.color); gl.uniform1i(p.u.uColor, 0);
+        tex(1, rs.depth); gl.uniform1i(p.u.uDepth, 1);
+        gl.uniformMatrix4fv(p.u.uInvProj, false, inv); gl.uniform2fv(p.u.uTexel, texel);
+        gl.uniform1f(p.u.uFocus, -this.dist); gl.uniform1f(p.u.uRange, Math.max(1, this.radius)); gl.uniform1f(p.u.uMaxPx, fx.dof * 0.015 * cssH * pxScale);
+        full();
+      }
+      tex(2, null); tex(1, null); tex(0, null);
+      gl.depthMask(true); gl.enable(gl.DEPTH_TEST); gl.enable(gl.CULL_FACE);
+    }
 
-    _drawOverlay(ctx, m, w, h, scale, noHook) {
+    /** Labels, measurement lines and the legend on the 2D canvas; (ox, oy): the image pixel at the canvas's corner
+     *  (a tile of an exported image). */
+    _drawOverlay(ctx, m, w, h, scale, noHook, ox, oy) {
       ctx.save();
-      ctx.setTransform(scale, 0, 0, scale, 0, 0);
+      ctx.setTransform(scale, 0, 0, scale, -(ox || 0), -(oy || 0));
       ctx.clearRect(0, 0, w, h);
       const light = this._isLightBg();
       const txt = light ? '#111827' : '#f3f6fb', halo = light ? 'rgba(255,255,255,0.85)' : 'rgba(5,10,20,0.75)';
@@ -1452,6 +1859,42 @@ void main(){
       this._drawOverlay(this.ctx2d, m, this.canvas.clientWidth, this.canvas.clientHeight, this.dpr);
     }
 
+    /** The view as an image of width x height pixels (the view's proportions), with labels and legend:
+     *  {width, height, data: RGBA bytes (not premultiplied), tiles}. Drawn in tiles of at most opts.tile pixels (and
+     *  what the GPU allows), so images larger than the GPU's limit can be made. opts: width, height, transparent,
+     *  tile (2048), onProgress(done, total) (may return a promise: called between tiles). */
+    async renderImage(opts) {
+      const gl = this.gl, cssW = Math.max(1, this.canvas.clientWidth), cssH = Math.max(1, this.canvas.clientHeight);
+      const W = Math.max(1, Math.round(opts.width)), H = Math.max(1, Math.round(opts.height)), s = W / cssW;
+      const dims = gl.getParameter(gl.MAX_VIEWPORT_DIMS), maxT = Math.max(64, Math.min(opts.tile || 2048, gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) || 4096, dims ? dims[0] : 4096, dims ? dims[1] : 4096));
+      // effects that look at neighbouring pixels (occlusion, blur, outlines): each tile is drawn with a margin, then cut
+      const M = Math.min(this.effectsMargin(s, cssH), Math.floor(maxT / 4)), inner = Math.max(32, maxT - 2 * M);
+      const nx = Math.ceil(W / inner), ny = Math.ceil(H / inner), tw = Math.ceil(W / nx), th = Math.ceil(H / ny);
+      const out = new Uint8ClampedArray(W * H * 4), oldW = this.canvas.width, oldH = this.canvas.height;
+      const tc = document.createElement('canvas'), ov = document.createElement('canvas');
+      tc.width = ov.width = tw + 2 * M; tc.height = ov.height = th + 2 * M;
+      const ctx = tc.getContext('2d', { willReadFrequently: true }), octx = ov.getContext('2d');
+      try {
+        for (let ty = 0; ty < ny; ty++) for (let tx = 0; tx < nx; tx++) {
+          const x0 = tx * tw, y0 = ty * th, w = Math.min(tw, W - x0), h = Math.min(th, H - y0);
+          this.canvas.width = w + 2 * M; this.canvas.height = h + 2 * M;
+          const tile = [2 * (x0 - M) / W - 1, 1 - 2 * (y0 + h + M) / H, 2 * (x0 + w + M) / W - 1, 1 - 2 * (y0 - M) / H];   // NDC: y up
+          const m = this._drawScene(w + 2 * M, h + 2 * M, !!opts.transparent, { cssW, cssH, tile, pxScale: s });
+          ctx.clearRect(0, 0, tc.width, tc.height);
+          ctx.drawImage(this.canvas, 0, 0);
+          this._drawOverlay(octx, m, cssW, cssH, s, true, x0 - M, y0 - M);
+          ctx.drawImage(ov, 0, 0);
+          const px = ctx.getImageData(M, M, w, h).data;
+          for (let r = 0; r < h; r++) out.set(px.subarray(r * w * 4, (r + 1) * w * 4), ((y0 + r) * W + x0) * 4);
+          if (opts.onProgress) await opts.onProgress(ty * nx + tx + 1, nx * ny);
+        }
+      } finally {
+        this.canvas.width = oldW; this.canvas.height = oldH;
+        this.render();
+      }
+      return { width: W, height: H, data: out, tiles: nx * ny };
+    }
+
     /** Render at higher resolution and return a PNG Blob. */
     snapshot(scale, transparent) {
       scale = scale || 2;
@@ -1475,6 +1918,8 @@ void main(){
   }
 
   Renderer.STYLE = STYLE;
+  Renderer.LARGE_SYSTEM = LARGE_SYSTEM;
+  Renderer.MATERIALS = Object.keys(MATERIALS);
   BM.Renderer = Renderer;
   BM.quat = { mul: quatMul, axis: quatAxis, mat: quatMat, norm: quatNorm };
 })(typeof window !== 'undefined' ? (window.BM = window.BM || {}) : (globalThis.BM = globalThis.BM || {}));

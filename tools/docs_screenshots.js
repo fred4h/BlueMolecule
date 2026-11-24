@@ -79,6 +79,19 @@ const OUT = path.join(ROOT, 'docs', 'images');
   await shot('transition-state');
   await closeAll();
 
+  // 3c. scenes: the Studio look on a molecule built from SMILES, with the display settings open
+  await page.fill('#empty-smiles', 'CC(C)CCCC(C)C1CCC2C1(CCC3C2CC=C4C3(CCC(C4)O)C)C');
+  await page.click('#btn-smiles-2');
+  await page.waitForFunction(() => BM.app.state.active && BM.app.curFrame(BM.app.state.active).Z.length > 70, null, { timeout: 30000 });
+  await ev(() => { BM.app.setTool('navigate'); BM.app.R().fit(); });
+  await page.click('#dd-settings [data-dd]');
+  await page.selectOption('#set-scene', 'studio');
+  await settle(800);
+  await shot('scene-studio');
+  await page.keyboard.press('Escape');
+  await ev(() => BM.app.setView({ scene: 'default', bg: 'navy', material: 'standard', ao: 0, outline: 0, dof: 0, shadows: false, floor: false, gradient: false, fog: true }));
+  await closeAll();
+
   // 4. excited states and the UV-Vis spectrum
   await open('orca5_water_tddft.out');
   await tab('states');

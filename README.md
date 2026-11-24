@@ -38,11 +38,12 @@
   - Lipids: tails as lines with phosphorus and nitrogen spheres.
   - Carbohydrates: filled rings and the standard glycan symbols (SNFG). Sugars are recognised by name or, for six-membered rings, by their stereochemistry.
   - Each kind has a ready-made view, and a [VMD-like selection language](docs/selection-language.md) gives finer control (`within 5 of ligand`, `layer H`, `resname POPC`…).
+- **Scenes and effects.** Ready-made scenes for publication figures, a studio look, a dark background and cartoons, or each effect on its own: glossy, matte or flat materials, ambient occlusion, outlines, depth of field, shadows on a floor and a background gradient.
 - **Building and editing.**
   - Avogadro-style tools: draw, select, templates, bond-centric and manipulate.
   - SMILES input and a library of molecules, groups, ligands and coordination geometries.
   - Hydrogen and bond-order handling, a clean-up force field, point-group detection and symmetrization, and a coordinate editor.
-- **Exports.** Writes 24 structure, crystal and MD formats and calculation inputs for 10 programs. Other formats go through Open Babel when it is installed. Images can be saved at higher resolution.
+- **Exports.** Writes 24 structure, crystal and MD formats and calculation inputs for 10 programs. Other formats go through Open Babel when it is installed. Images are saved as PNG, JPEG, WebP, TIFF or PDF at a print size and resolution, with an sRGB or Display P3 colour profile, up to poster size.
 - **Large files.** Outputs of hundreds of megabytes are read in chunks, and Gaussian and ORCA outputs of several gigabytes (QM/MM jobs on whole proteins) are condensed while they are read. For files of 1 GB and more, a dialog lets you choose what to load: every Nth step or frame, a range, or the last N, and which vibrations to animate.
 - **MD trajectories.** Amber (prmtop with text or NetCDF coordinates and trajectories), CHARMM/NAMD (PSF, DCD), GROMACS (GRO, TRR, XTC) and LAMMPS, read in slices when they are long.
 - **Its own window.** On Linux it opens a Qt WebEngine window, or a browser app window if Qt is missing, with its own name and icon. On macOS it is a small native app, and on Windows an Edge app window started by its own launcher. Both are experimental. The single HTML file also works in any modern browser.
@@ -106,8 +107,8 @@ not available.
 
 ## Status
 
-BlueMolecule 2.1.0 is the current release (1.4.1 was the first public one). The automated test suite has about
-35,500 checks in 36 suites, 24,500 of them from cutting example outputs as a running job would leave them:
+BlueMolecule 2.2.0 is the current release (1.4.1 was the first public one). The automated test suite has about
+35,700 checks in 37 suites, 24,500 of them from cutting example outputs as a running job would leave them:
 - format readers and writers against example files;
 - chemistry routines;
 - the selection language;

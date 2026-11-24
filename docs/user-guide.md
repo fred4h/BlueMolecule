@@ -112,18 +112,51 @@ Press **?** in the window to see this list.
 - **Axes**: the axes indicator.
 - **Bg**: navy, black, white or grey background.
 - **View menu**: reset, look along X, Y or Z, centre on the selection.
-- **Camera icon**: save an image of the view.
+- **Camera icon**: save an image of the view (PNG, JPEG, WebP, TIFF or PDF; see [Saving images](#saving-images)).
 - **Display settings (gear icon)**:
   - sizes: atom size, bond radius, spacefill scale;
   - the bond tolerance used to find bonds;
   - dummy and ghost atoms;
   - bond orders (double, triple and aromatic bonds drawn as such);
-  - hydrogen bonds, the dipole-moment arrow and the unit cell.
+  - hydrogen bonds, the dipole-moment arrow and the unit cell;
+  - the scene: a preset look, the material and the effects (see [Scenes and effects](#scenes-and-effects)).
 - **Sun/moon icon**: light or dark interface.
 - **?**: help and shortcuts.
 
 BlueMolecule remembers these settings between sessions, along with the vibration-animation settings, the build-tool
 options, the panel sizes and your last choices in the Save as and Calculation input dialogs.
+
+### Scenes and effects
+
+![The Studio scene: a background gradient, glossy atoms, ambient occlusion, and a floor with the molecule's shadow](images/scene-studio.png)
+
+The **Scene** menu in the display settings (gear icon) gives the picture a ready-made look. Each scene sets the background, the
+material and the effects together:
+
+| Scene | Background | Material | Effects |
+|---|---|---|---|
+| Default | navy | standard | none (depth cueing on) |
+| Publication | white | matte | ambient occlusion, thin outlines |
+| Studio | grey, lighter at the top | glossy | ambient occlusion, shadows, floor |
+| Dark | black, lighter at the top | glossy | ambient occlusion (depth cueing on) |
+| Cartoon | white | flat | thick outlines |
+
+Every effect can also be set by hand (the scene then shows **Custom**):
+- **Material**: standard, glossy (strong highlights), matte (almost none) or flat (cartoon shading in bands).
+- **Ambient occlusion**: soft shading where atoms crowd each other, in crevices and between neighbouring atoms. It is
+  strongest in spacefill.
+- **Outlines**: dark lines around atoms and bonds, from 0.5 to 4 pixels wide.
+- **Depth of field**: blur in front of and behind the centre of the view (the point the view turns around).
+- **Shadows**: shadows cast by the structure on itself and on the floor. The light then comes from above.
+- **Floor**: a soft round floor under the structure, which follows the view.
+- **Background gradient**: the background colour at the bottom, lighter (or, on white, cooler) at the top.
+
+Saved images have the same scene. The effects are worked out on the screen's pixels (ambient occlusion, outlines
+and depth of field are screen-space approximations): they make a picture look better, but they are not a physical
+rendering.
+
+Above 60,000 atoms, shadows, ambient occlusion and depth of field are paused, because they slow the view down. The
+menu then says so. Tick **Effects on very large systems too** to keep them on.
 
 ## The tabs
 
@@ -200,10 +233,35 @@ The **Export** menu offers:
 - **Calculation input…**: an input file for Gaussian, ORCA, Psi4, Q-Chem, NWChem, GAMESS, MOPAC, xtb, Molpro or
   Turbomole, with task, method, basis, charge, multiplicity, implicit solvent, cores and memory. See
   [Building and editing](building-and-editing.md#calculation-inputs).
-- **Image…**: a PNG of the current view, labels included. Choose 1× (screen) to 4× (print) resolution and,
-  optionally, a transparent background. For publications, choose a white background in the toolbar first.
+- **Image…** (or the camera icon): the current view with its labels and legend, in the proportions of the view.
+  For publications, choose a white background in the toolbar first. See [Saving images](#saving-images).
 - **Vibration animation**: the selected mode as a multi-frame XYZ file, which other viewers can play.
 
 Saving opens the system's Save dialog: in the Linux, Windows and macOS versions, and in Chrome or Edge. Firefox and
 Safari save to the downloads folder. Geometries changed in the Build tab are saved as edited. The original file is
 never modified.
+
+### Saving images
+
+| Format | Notes |
+|---|---|
+| PNG | Lossless; transparency; compression from none to best |
+| JPEG | Quality 1 to 100; no transparency (the background of the view is kept); at most 65,535 pixels wide or high |
+| WebP | Lossless; transparency; at most 16,384 pixels wide or high |
+| TIFF | Lossless (Deflate or uncompressed); transparency |
+| PDF | One page of the print size, with the image (lossless, transparency kept); for documents and posters |
+
+- **Size**: a width in pixels, centimetres or inches; the height follows the proportions of the view. For a print
+  size, **Resolution** gives the number of pixels: 8.5 cm at 300 DPI is 1,004 pixels. The resolution is also written
+  into the file, so that other programs show it at that size. The dialog shows the size in pixels, centimetres and
+  inches as you type.
+- **Large images** (posters) are drawn in tiles of 2,048 pixels and put together, so they can be larger than your
+  graphics card allows in one piece. The limit is 250 million pixels, for example 20,000 × 12,500.
+- **Colour profile**: **sRGB** (recommended) tags the file as sRGB, the colours BlueMolecule draws in.
+  **Display P3** stores the same colours as Display P3 values, with the P3 profile, for documents set up in P3 (it
+  does not add colours). **None** writes no profile. CMYK for print is not offered: convert in your layout program.
+- BlueMolecule writes every format itself, so an image is the same file in every browser and in the desktop
+  program.
+- The scene and its effects are part of the image (see [Scenes and effects](#scenes-and-effects)); the tiles are
+  drawn with a margin, so ambient occlusion and blur match across their edges.
+
