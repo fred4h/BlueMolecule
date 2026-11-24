@@ -1,0 +1,77 @@
+{
+  "checks": {
+    "bridge": true,
+    "files": true,
+    "picture": true,
+    "save": true,
+    "webgl2": true
+  },
+  "downloads": {
+    "missing": {
+      "error": "The PDB has no entry 0XXX.",
+      "ms": 149,
+      "ok": false
+    },
+    "pdb": {
+      "atoms": 327,
+      "bytes": 69506,
+      "ms": 56,
+      "ok": true,
+      "title": "WATER STRUCTURE OF A HYDROPHOBIC PROTEIN AT ATOMIC RESOLUTION. PENTAGON RINGS OF WATER MOLECULES IN CRYSTALS OF CRAMBIN"
+    },
+    "pdbAssembly": {
+      "atoms": 327,
+      "ms": 16,
+      "ok": true
+    },
+    "pubchem": {
+      "atoms": 21,
+      "cid": "2244",
+      "formula": "C9H8O4",
+      "ms": 326,
+      "ok": true
+    },
+    "pubchemSmiles": {
+      "cid": "5234",
+      "conformer": false,
+      "ms": 445,
+      "ok": true,
+      "smiles": "[Na+].[Cl-]"
+    }
+  },
+  "errors": [],
+  "files": [
+    {
+      "atoms": 11,
+      "energy": null,
+      "frames": 1,
+      "name": "cisplatin.xyz",
+      "vibrations": 0,
+      "warnings": []
+    },
+    {
+      "atoms": 64,
+      "energy": -925.4183124,
+      "frames": 310,
+      "name": "big-opt.log",
+      "vibrations": 0,
+      "warnings": []
+    }
+  ],
+  "gpu": "ANGLE (Microsoft, Microsoft Basic Render Driver (0x0000008C) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "imageBytes": 65955,
+  "maxTexture": 16384,
+  "memory": {
+    "available": 13650247680,
+    "jsHeapLimit": 4395630592,
+    "total": 17174360064
+  },
+  "nativeKind": "tauri-app",
+  "ok": true,
+  "openSeconds": 9.21,
+  "seconds": 12.59,
+  "startSeconds": 0.8,
+  "started": "2026-11-24T20:44:42.666Z",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+  "version": "2.6.0"
+}
