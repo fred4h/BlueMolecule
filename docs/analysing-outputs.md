@@ -218,9 +218,25 @@ rotatory strengths and orbital contributions) and ricc2 (CC2, ADC(2)) outputs.
 ## Orbitals and volumes
 
 - **MO energy levels**: the plot picker's *Orbitals* group draws a level diagram of the orbital energies, with
-  occupied and virtual levels and α and β separately for open-shell jobs. Click a level to select it. The HOMO,
+  occupied and virtual levels and α and β separately for open-shell jobs. Click a level to select it. When the file
+  holds the orbitals themselves (fchk and Molden files, below), **Show orbital** draws the selected one. The HOMO,
   LUMO and gap are also in the Info tab.
-- **Isosurfaces** come from volumetric files:
+- **Orbitals and densities from fchk and Molden files**, in the **Surfaces** tab. BlueMolecule computes them from the
+  basis set and MO coefficients in the file, as `cubegen` and `orca_plot` do, so no cube file is needed.
+  - **Show**: an orbital, the electron density, or the spin density (open-shell jobs). For an orbital, pick it in the
+    menu (with its energy, occupation and HOMO/LUMO label; α or β for open-shell jobs), or use **HOMO** and
+    **LUMO**.
+  - **Grid**: coarse, medium or fine (0.45, 0.3 or 0.2 Bohr between points), over the molecule plus 4 Å.
+  - **Compute** runs in the background, on several processor cores when there are some, with a progress bar, the
+    time left and **Cancel**. Each result joins the list of surfaces below and is shown alone. Its check box shows
+    it again later without computing it again.
+  - Shells of any angular momentum, pure or Cartesian, are read. Programs write Molden files in different
+    conventions. BlueMolecule checks that the orbitals are orthonormal, which also checks the reading, and
+    recognises the conventions of ORCA, Psi4 (before 1.0, and 1.0 to 1.3.2), CFOUR and Turbomole. The tab says which
+    convention it found, or warns when the orbitals are orthonormal in none of them.
+  - **Save as → Molden** writes the basis set and orbitals in the standard Molden convention, so an fchk file can be
+    opened by programs that read Molden files.
+- **Isosurfaces** also come from volumetric files:
   - Gaussian cube, including cubes with several orbitals;
   - XSF data grids.
 
@@ -230,11 +246,20 @@ rotatory strengths and orbital contributions) and ricc2 (CC2, ADC(2)) outputs.
   - **opacity**;
   - colours of the positive and negative lobes, and whether to show both (**± lobes**).
 
-  The grid size and the value range are printed below.
-- **Making a cube:** to view an orbital, density or electrostatic potential, write a cube file with your program.
-  Use `cubegen` (Gaussian) or `orca_plot` (ORCA), then open it. Formatted checkpoint (fchk) files give the
-  structure, vibrations, charges, dipole and orbital energies; Molden files give the structure and vibrations.
-  BlueMolecule does **not yet compute orbitals on a grid** from either ([limitations](limitations.md)).
+  The grid size and the value range are printed below. A computed volume has a **×** to remove it. The visible
+  volume can be saved as a cube file (**Save as → Gaussian cube**).
+- **Molecular surfaces**, in the Surfaces tab of any structure:
+  - **van der Waals**: the atoms' spheres;
+  - **solvent accessible**: the surface traced by the centre of a probe sphere rolling over the atoms;
+  - **solvent excluded** (Connolly): the surface its front touches, which fills the grooves between atoms.
+
+  The probe radius is 1.4 Å (water) unless you change it. The surface is computed for the geometry shown.
+- **Electrostatic potential on a surface.** The **Colour** menu of a density surface or a molecular surface colours it
+  by the potential: red where it is negative (electron rich), white near zero, blue where it is positive. The range is
+  in atomic units, with kcal/mol printed too. The potential comes from:
+  - the file's atomic charges (Mulliken, ESP, NPA…), as point charges at the atoms, which is an approximation;
+  - a potential cube (from `cubegen potential`, for example) opened for the same atoms, in the same document or
+    another one.
 
 ## Atomic charges
 

@@ -167,7 +167,7 @@ menu then says so. Tick **Effects on very large systems too** to keep them on.
 | **Steps** | More than one geometry | Every geometry with its energy and ΔE, the convergence criteria of the current one, and a job selector |
 | **Vibrations** | Frequencies in the file | Frequencies, symmetries and intensities; minimum or transition state; animation, arrows, both ends of a mode, bonds that form and break, displacing along a mode, forward and reverse inputs |
 | **States** | Excited states in the file | Energies, wavelengths, oscillator strengths and the orbital transitions of each state |
-| **Surfaces** | Volumetric data (cube, XSF grid) | Isosurfaces: isovalue, opacity, colours of the positive and negative lobes |
+| **Surfaces** | Always | Orbitals and densities computed from fchk and Molden files, molecular surfaces, the electrostatic potential on a surface, and the isosurfaces of volumes (cube, XSF grid): isovalue, opacity, colours. See [Analysing outputs](analysing-outputs.md#orbitals-and-volumes) |
 | **Build** | Always | Building and editing tools. See [Building and editing](building-and-editing.md) |
 
 ## Selecting and measuring

@@ -127,6 +127,9 @@
         jobTypes: [], normalTermination: null, solvent: null },
       frames: [], vibrations: null, excitedStates: null, charges: null, spins: null, dipole: null,
       orbitals: null, thermo: null, volumes: null, bonds: null, cell: null, warnings: [],
+      // basis: {source: 'fchk' | 'molden', shells: [{atom, center (Bohr), l, pure, exps, coefs}], nbf} and
+      // mos: {restricted, alpha: {energies, occupations, symmetries, coeffs (orbital after orbital)}, beta}: BM.orbitals
+      basis: null, mos: null,
       // jobs: [{index, label, kinds: subset of opt/freq/sp/td/scan/irc/nmr, frameStart, frameEnd, normalTermination}]
       // nmr: {iso: ppm per atom (NaN = not computed), aniso: number[]|null, method, couplings?: [{i, j, J (Hz)}] (0-based)}
       // optSteps: [{step, energy, opt}] when an output reports optimisation cycles without their geometries
@@ -2669,6 +2672,7 @@
     const head = (c1 + ' ' + c2).toLowerCase();
     let kind = 'other';
     if (hasMO || /\bmo\b|orbital/.test(head)) kind = 'orbital';
+    else if (/potential|\besp\b/.test(head)) kind = 'potential';   // ("Electrostatic potential from Total SCF Density")
     else if (/density|rho/.test(head)) kind = 'density';
     const base = c1.trim() || stripExt(fileName) || 'volume';
     ds.volumes = vols.map((data, v) => ({
@@ -2786,12 +2790,118 @@
       ds.vibrations = { frameIndex: fi, freqs: freqs.slice(0, nm), ir, raman, depol: null, redMass: null,
         forceConst: null, sym: null, modes: mv };
     }
-    if (sec('MO')) ds.warnings.push('Molden orbitals ([GTO]/[MO]) are not evaluated; load a cube file to display orbitals.');
+    if (sec('MO')) moldenOrbitals(ds, sections, sec);
     if (!ds.frames.length) throw err('Molden file contains no [Atoms], [GEOMETRIES] or [FR-COORD] geometry.');
     return ds;
   }
 
+  /** The [GTO] basis and the [MO] orbitals of a Molden file as ds.basis and ds.mos (the layout of BM.orbitals:
+   *  sp shells split into s + p, centres in Bohr, MO coefficients one orbital after the other), and the orbital
+   *  energies as ds.orbitals. [5D] and [5D7F] make d and f pure, [7F] f, [5D10F] d, [9G] g and higher. A set whose
+   *  energies are not in ascending order (symmetry blocks: Molpro, Molcas) is sorted, with each orbital's place in
+   *  the file kept as fileIndex. */
+  function moldenOrbitals(ds, sections, sec) {
+    const bad = why => { ds.warnings.push('The orbitals of this Molden file cannot be computed: ' + why + '.'); };
+    const gto = sec('GTO'), mo = sec('MO'), atoms = sec('ATOMS');
+    if (!gto) return bad(sec('STO') ? 'Slater-type orbitals ([STO]) are not supported' : 'it has no [GTO] basis set');
+    if (!atoms) return bad('it has no [Atoms] section');
+    const fa = /au|bohr/i.test(atoms.arg) ? 1 : 1 / BOHR;
+    const centre = new Map();
+    let na = 0;
+    for (const s of atoms.lines) {
+      const t = tok(s);
+      if (t.length < 6) continue;
+      const id = isIntTok(t[1]) ? int(t[1]) : na + 1;
+      if (!centre.has(id)) centre.set(id, { index: na, xyz: [num(t[3]) * fa, num(t[4]) * fa, num(t[5]) * fa] });
+      na++;
+    }
+    const has = n => sections.some(s => s.name === n);
+    const pure = [false, false, has('5D') || has('5D7F') || has('5D10F'), has('5D') || has('5D7F') || has('7F')];
+    const pureHigh = has('9G');
+    const shells = [];
+    const L = gto.lines;
+    let atom = null, scaled = false;
+    for (let k = 0; k < L.length; k++) {
+      const t = tok(L[k]);
+      if (!t.length) continue;
+      if (isIntTok(t[0]) && (t.length === 1 || (t.length === 2 && isIntTok(t[1])))) {   // "n 0": the atom of the shells below
+        atom = centre.get(int(t[0]));
+        if (!atom) return bad('[GTO] names atom ' + t[0] + ', which [Atoms] does not list');
+        continue;
+      }
+      const lab = t[0].toLowerCase(), sp = lab === 'sp' || lab === 'l';
+      const l = sp ? 0 : 'spdfghik'.indexOf(lab), np = t.length > 1 && isIntTok(t[1]) ? int(t[1]) : -1;
+      if (lab.length > 2 || l < 0 || np < 1) return bad('line ' + (k + 1) + ' of [GTO] is not a shell ("' + L[k].trim().slice(0, 40) + '")');
+      if (!atom) return bad('a shell comes before its atom in [GTO]');
+      // the third number scales the exponents (by its square, as in Gaussian basis input); it is almost always 1
+      const sc = t.length > 2 && isNumTok(t[2]) ? num(t[2]) : 1, f2 = sc > 0 && Math.abs(sc - 1) > 1e-12 ? sc * sc : 1;
+      if (f2 !== 1) scaled = true;
+      const exps = [], c1 = [], c2 = [];
+      for (let q = 1; q <= np; q++) {
+        const u = tok(L[k + q] || '');
+        if (u.length < (sp ? 3 : 2) || !isNumTok(u[0]) || !isNumTok(u[1])) return bad('a shell of [GTO] has fewer primitives than it declares');
+        exps.push(num(u[0]) * f2); c1.push(num(u[1])); if (sp) c2.push(num(u[2]));
+      }
+      k += np;
+      if (sp) {
+        shells.push({ atom: atom.index, center: atom.xyz.slice(), l: 0, pure: false, exps, coefs: c1 });
+        shells.push({ atom: atom.index, center: atom.xyz.slice(), l: 1, pure: false, exps: exps.slice(), coefs: c2 });
+      } else shells.push({ atom: atom.index, center: atom.xyz.slice(), l, pure: l >= 2 && (l >= 4 ? pureHigh : pure[l]), exps, coefs: c1 });
+    }
+    if (!shells.length) return bad('[GTO] lists no shells');
+    if (scaled) ds.warnings.push('The [GTO] shells of this Molden file scale their exponents (a factor other than 1.00); the exponents were scaled by its square.');
+    if (shells.some(s => s.l >= 5 && !s.pure)) ds.warnings.push('Cartesian h (and higher) functions have no defined order in the Molden format; the orbitals may be wrong.');
+    let nbf = 0;
+    for (const s of shells) nbf += s.pure ? 2 * s.l + 1 : (s.l + 1) * (s.l + 2) / 2;
+    // [MO]: "Key= value" lines (Sym, Ene, Spin, Occup), then "index coefficient" lines
+    const list = [];
+    let cur = null, over = 0;
+    for (const s of mo.lines) {
+      const m = /^\s*([A-Za-z]+)\s*=\s*(.*?)\s*$/.exec(s);
+      if (m) {
+        if (!cur || cur.n) { cur = { sym: null, e: NaN, beta: false, occ: NaN, c: new Float64Array(nbf), n: 0 }; list.push(cur); }
+        const key = m[1].toLowerCase(), v = m[2];
+        if (key === 'sym') cur.sym = v;
+        else if (key === 'ene') cur.e = num(v.split(/\s+/)[0]);
+        else if (key === 'spin') cur.beta = /^beta/i.test(v);
+        else if (key === 'occup') cur.occ = num(v.split(/\s+/)[0]);
+        continue;
+      }
+      const t = tok(s);
+      if (!cur || t.length < 2 || !isIntTok(t[0])) continue;
+      for (let q = 0; q + 1 < t.length; q += 2) {
+        const i = int(t[q]);
+        if (i >= 1 && i <= nbf) cur.c[i - 1] = num(t[q + 1]); else over = Math.max(over, i);
+        cur.n++;
+      }
+    }
+    if (over) return bad('[MO] has coefficients for ' + over + ' basis functions, but [GTO] gives ' + nbf);
+    const orbs = list.filter(o => o.n);
+    if (!orbs.length) return bad('[MO] lists no orbital coefficients');
+    const set = arr => {
+      if (!arr.length) return null;
+      let order = arr.map((o, i) => i);
+      const asc = arr.every((o, i) => i === 0 || !(o.e < arr[i - 1].e));
+      if (!asc && arr.every(o => Number.isFinite(o.e))) order = order.sort((a, b) => arr[a].e - arr[b].e || a - b);
+      else order = null;
+      const pick = order ? order.map(i => arr[i]) : arr;
+      const coeffs = new Float64Array(pick.length * nbf);
+      pick.forEach((o, k) => coeffs.set(o.c, k * nbf));
+      const out = { energies: pick.map(o => o.e), occupations: pick.map(o => (Number.isFinite(o.occ) ? o.occ : 0)),
+        symmetries: pick.map(o => o.sym), coeffs };
+      if (order) out.fileIndex = order.map(i => i + 1);
+      return out;
+    };
+    const alpha = set(orbs.filter(o => !o.beta)), beta = set(orbs.filter(o => o.beta));
+    if (!alpha) return bad('[MO] has beta orbitals only');
+    ds.basis = { source: 'molden', shells, nbf, program: /orca_2mkl|\bORCA\b/i.test(ds.title || '') ? 'orca' : null };
+    ds.mos = { restricted: !beta, alpha, beta };
+    const lev = s => s && { energies: s.energies.slice(), nOcc: s.occupations.filter(x => x > 0.5).length, occupations: s.occupations.slice() };
+    if (alpha.energies.some(Number.isFinite)) ds.orbitals = { alpha: lev(alpha), beta: lev(beta) };
+  }
+
   // ------------------------------------------------------------------ fchk
+  const FCHK_NUM = /[-+]?(?:\d+\.?\d*|\.\d+)(?:[eEdD][-+]?\d+)?/g;
   function parseFchk(text, fileName) {
     const ds = newDataset('fchk', fileName);
     const L = splitLines(text);
@@ -2804,6 +2914,7 @@
     if (mb) { method = mb[1]; basis = mb[2]; } else method = l2.slice(10).trim();
     if (!method) { const t = tok(l2); jobType = t[0] || ''; method = t[1] || ''; basis = t[2] || ''; }
     const D = Object.create(null), coordSets = [];
+    let moGeom = null;
     for (let i = 2; i < L.length; i++) {
       const s = L[i];
       if (!s || s[0] === ' ') continue;
@@ -2816,8 +2927,9 @@
         const vals = [];
         let j = i + 1;
         if (type === 'I' || type === 'R') {
-          while (j < L.length && vals.length < cnt && L[j][0] === ' ') {
-            const t = tok(L[j]);
+          while (j < L.length && vals.length < cnt && (L[j][0] === ' ' || L[j][0] === '-')) {
+            // (Psi4 writes 16-column numbers with three-digit exponents that touch: 1.1e+00-3.4e-118)
+            const t = /\d[-+]/.test(L[j]) ? L[j].match(FCHK_NUM) || [] : tok(L[j]);
             for (const x of t) vals.push(type === 'I' ? int(x) : num(x));
             j++;
           }
@@ -2837,6 +2949,7 @@
         }
         D[name] = vals.length > cnt ? vals.slice(0, cnt) : vals;
         if (name === 'Current cartesian coordinates' && vals.length === cnt) coordSets.push(D[name]);   // (Q-Chem repeats it per step)
+        if (name === 'Alpha MO coefficients') moGeom = coordSets[coordSets.length - 1] || null;   // (the orbitals' geometry)
         i = j - 1;
       } else D[name] = type === 'I' ? int(m[4]) : type === 'R' ? num(m[4]) : m[4];
     }
@@ -2919,6 +3032,7 @@
       ds.orbitals = { alpha: { energies: ae, nOcc: typeof na === 'number' ? na : 0 },
         beta: Array.isArray(be) && be.length ? { energies: be, nOcc: typeof nb === 'number' ? nb : 0 } : null };
     }
+    fchkBasis(D, ds, nat, moGeom && moGeom.length === C.length ? moGeom : C, coordSets[0]);
     const E2 = D['Vib-E2'], VM = D['Vib-Modes'];
     if (Array.isArray(E2) || Array.isArray(VM)) {
       const nm = Array.isArray(VM) ? VM.length / (3 * nat) : 0;
@@ -2963,6 +3077,56 @@
     const lastG = out[out.length - 1].xyzBohr;
     for (let q = 0; q < cur.length; q++) if (Math.abs(lastG[q] - cur[q]) > 1e-4) return null;
     return { frames: out, points };
+  }
+  /** The basis set and MO coefficients of an fchk file as ds.basis and ds.mos (the layout of BM.orbitals: SP shells
+   *  split into s + p, negative shell types pure, centres in Bohr). Occupations come from the electron counts. */
+  function fchkBasis(D, ds, nat, cur, first) {
+    const st = D['Shell types'], npr = D['Number of primitives per shell'], sa = D['Shell to atom map'],
+      ex = D['Primitive exponents'], cc = D['Contraction coefficients'], pc = D['P(S=P) Contraction coefficients'],
+      sc = D['Coordinates of each shell'], ca = D['Alpha MO coefficients'], cb = D['Beta MO coefficients'];
+    if (!Array.isArray(st) || !Array.isArray(ca)) return;
+    const bad = why => { ds.warnings.push('The orbitals of this fchk file cannot be computed: ' + why + '.'); };
+    const ns = st.length;
+    if (![npr, sa, ex, cc].every(Array.isArray) || npr.length !== ns || sa.length !== ns) return bad('its shell arrays are incomplete');
+    const shells = [];
+    let p = 0, nbf = 0;
+    for (let k = 0; k < ns; k++) {
+      const t = st[k], n = npr[k], atom = sa[k] - 1;
+      if (!Number.isInteger(t) || !(n >= 1) || p + n > ex.length || p + n > cc.length || !(atom >= 0 && atom < nat)) return bad('shell ' + (k + 1) + ' is malformed');
+      let center = Array.isArray(sc) && sc.length === 3 * ns ? [sc[3 * k], sc[3 * k + 1], sc[3 * k + 2]]
+        : [cur[3 * atom], cur[3 * atom + 1], cur[3 * atom + 2]];
+      // Q-Chem writes the shells once, at the first geometry, and the orbitals after a later one (optimisations)
+      if (first && first !== cur && first.length === cur.length && [0, 1, 2].every(a => Math.abs(center[a] - first[3 * atom + a]) < 1e-5)) {
+        center = [cur[3 * atom], cur[3 * atom + 1], cur[3 * atom + 2]];
+      }
+      const exps = ex.slice(p, p + n), coefs = cc.slice(p, p + n);
+      if (t === -1) {
+        if (!Array.isArray(pc) || pc.length < p + n) return bad('an SP shell has no P(S=P) coefficients');
+        shells.push({ atom, center, l: 0, pure: false, exps, coefs });
+        shells.push({ atom, center: center.slice(), l: 1, pure: false, exps: exps.slice(), coefs: pc.slice(p, p + n) });
+        nbf += 4;
+      } else {
+        const l = Math.abs(t), pure = t < -1;
+        shells.push({ atom, center, l, pure, exps, coefs });
+        nbf += pure ? 2 * l + 1 : (l + 1) * (l + 2) / 2;
+      }
+      p += n;
+    }
+    if (typeof D['Number of basis functions'] === 'number' && D['Number of basis functions'] !== nbf) return bad('its shells make ' + nbf + ' basis functions, but it declares ' + D['Number of basis functions']);
+    const nmo = ca.length / nbf;
+    if (!Number.isInteger(nmo) || nmo < 1) return bad('the MO coefficients do not fit the basis set');
+    const na = typeof D['Number of alpha electrons'] === 'number' ? D['Number of alpha electrons'] : 0;
+    const nb = typeof D['Number of beta electrons'] === 'number' ? D['Number of beta electrons'] : na;
+    let unres = Array.isArray(cb) && cb.length === ca.length;
+    if (unres && cb.every((v, i) => v === ca[i])) unres = false;   // (some writers repeat restricted orbitals as beta)
+    const ea = D['Alpha Orbital Energies'], eb = D['Beta Orbital Energies'];
+    const occ = f => Array.from({ length: nmo }, (_, i) => f(i));
+    const spin = (C, E, o) => ({ energies: Array.isArray(E) && E.length === nmo ? E.slice() : new Array(nmo).fill(NaN),
+      occupations: o, symmetries: null, coeffs: Float64Array.from(C) });
+    ds.basis = { source: 'fchk', shells, nbf };
+    ds.mos = unres
+      ? { restricted: false, alpha: spin(ca, ea, occ(i => (i < na ? 1 : 0))), beta: spin(cb, eb, occ(i => (i < nb ? 1 : 0))) }
+      : { restricted: true, alpha: spin(ca, ea, occ(i => (i < nb ? 2 : i < na ? 1 : 0))), beta: null };
   }
   /** Excited states of an fchk file (Gaussian ETran arrays, Q-Chem excitation arrays), or null. */
   function fchkStates(D) {

@@ -852,9 +852,11 @@ void main(){
     setRepMarkers(list) { this.repMarkers = Array.isArray(list) ? list.filter(m => m && m.indices) : []; this._rebuildMarkers(); this.requestRender(); }
     /** Legend box in the top-right corner: {title, items: [{label, sub, glyph: style id, color: '#hex'}]} or null. */
     setLegend(legend) { this.legend = legend && legend.items && legend.items.length ? legend : null; this.requestRender(); }
+    /** Isosurfaces: [{mesh: {positions, normals, indices}, color: [r,g,b], opacity?, colors?: Float32Array (3 per
+     *  vertex, e.g. the electrostatic potential mapped on the surface; replaces color)}]. */
     setSurfaces(list) {
       const gl = this.gl;
-      for (const s of this.surfaces) { if (s._vao) { gl.deleteVertexArray(s._vao); gl.deleteBuffer(s._pb); gl.deleteBuffer(s._nb); gl.deleteBuffer(s._ib); } }
+      for (const s of this.surfaces) { if (s._vao) { gl.deleteVertexArray(s._vao); gl.deleteBuffer(s._pb); gl.deleteBuffer(s._nb); gl.deleteBuffer(s._ib); if (s._cb) gl.deleteBuffer(s._cb); } }
       this.surfaces = [];
       for (const s of list || []) {
         if (!s.mesh || !s.mesh.indices.length) { this.surfaces.push(Object.assign({}, s)); continue; }
@@ -863,9 +865,14 @@ void main(){
         gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
         const nb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, nb); gl.bufferData(gl.ARRAY_BUFFER, s.mesh.normals, gl.STATIC_DRAW);
         gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, 0);
+        let cb = null;
+        if (s.colors && s.colors.length === s.mesh.positions.length) {
+          cb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, cb); gl.bufferData(gl.ARRAY_BUFFER, s.colors, gl.STATIC_DRAW);
+          gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 3, gl.FLOAT, false, 0, 0);
+        }
         const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, s.mesh.indices, gl.STATIC_DRAW);
         gl.bindVertexArray(null);
-        this.surfaces.push(Object.assign({}, s, { _vao: vao, _pb: pb, _nb: nb, _ib: ib, _count: s.mesh.indices.length }));
+        this.surfaces.push(Object.assign({}, s, { _vao: vao, _pb: pb, _nb: nb, _ib: ib, _cb: cb, _count: s.mesh.indices.length }));
       }
       this.requestRender();
     }
@@ -1236,6 +1243,17 @@ void main(){
       this.requestRender();
     }
     resetView() { this.q = [0, 0, 0, 1]; this.fit(); }
+    /** Zoom out (never in), keeping the centre and orientation, so that points (flat xyz, e.g. a new surface) fit. */
+    include(points) {
+      if (!points || !points.length) return;
+      const c = this.center;
+      let r2 = 0;
+      for (let p = 0; p < points.length; p += 3) { const dx = points[p] - c[0], dy = points[p + 1] - c[1], dz = points[p + 2] - c[2], v = dx * dx + dy * dy + dz * dz; if (v > r2) r2 = v; }
+      const r = Math.sqrt(r2) * 1.05, half = (this.opt.fov / 2) * Math.PI / 180;
+      const aspect = Math.max(0.2, this.canvas.clientWidth / Math.max(1, this.canvas.clientHeight));
+      const need = Math.max(r / Math.sin(half), r / Math.sin(Math.atan(Math.tan(half) * aspect)));
+      if (need > this.dist) { this.dist = need; this.requestRender(); }
+    }
     setOrientation(q) { this.q = quatNorm(q); this.requestRender(); }
     viewAlong(axis) {
       // look down +axis: rotate so that axis maps to +z (towards viewer)
@@ -1592,11 +1610,13 @@ void main(){
       // surfaces
       const surfs = this.surfaces.filter(s => s._vao && s.visible !== false);
       gl.disable(gl.CULL_FACE);
-      for (const s of surfs.filter(s => (s.opacity === undefined ? 1 : s.opacity) >= 0.999)) {
-        common(this.progMesh, 1, true);
-        gl.uniform3fv(this.progMesh.u.uColor, s.color);
+      // a surface with per-vertex colours uses the coloured-mesh program
+      const surfDraw = (s, alpha) => {
+        if (s._cb) common(this.progCMesh, alpha, true);
+        else { common(this.progMesh, alpha, true); gl.uniform3fv(this.progMesh.u.uColor, s.color); }
         gl.bindVertexArray(s._vao); gl.drawElements(gl.TRIANGLES, s._count, gl.UNSIGNED_INT, 0);
-      }
+      };
+      for (const s of surfs.filter(s => (s.opacity === undefined ? 1 : s.opacity) >= 0.999)) surfDraw(s, 1);
       gl.enable(gl.CULL_FACE);
       // translucent atoms and bonds (ghosts): depth pre-pass, then only the front-most layer is blended
       if (this.nGhostSph || this.nGhostCyl) {
@@ -1626,10 +1646,10 @@ void main(){
       if (trans.length) {
         // depth pre-pass so only the front-most layer is blended
         gl.colorMask(false, false, false, false);
-        for (const s of trans) { common(this.progMesh, 1, true); gl.uniform3fv(this.progMesh.u.uColor, s.color); gl.bindVertexArray(s._vao); gl.drawElements(gl.TRIANGLES, s._count, gl.UNSIGNED_INT, 0); }
+        for (const s of trans) surfDraw(s, 1);
         gl.colorMask(true, true, true, true);
         gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
-        for (const s of trans) { common(this.progMesh, s.opacity, true); gl.uniform3fv(this.progMesh.u.uColor, s.color); gl.bindVertexArray(s._vao); gl.drawElements(gl.TRIANGLES, s._count, gl.UNSIGNED_INT, 0); }
+        for (const s of trans) surfDraw(s, s.opacity);
         gl.depthMask(true); gl.disable(gl.BLEND);
       }
       gl.enable(gl.CULL_FACE);

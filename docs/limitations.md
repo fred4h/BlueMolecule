@@ -6,7 +6,7 @@ been checked, what has not, and what the program does not do yet.
 
 ## What has been checked
 
-- **About 35,900 automated checks in 38 test suites** (24,500 of them cut example outputs as a running job would
+- **About 36,700 automated checks in 40 test suites** (24,500 of them cut example outputs as a running job would
   leave them), all passing for this release
   ([how to run them](developer-guide.md#tests)). They cover:
   - every reader and writer, including format detection and the units and conventions of each program;
@@ -36,6 +36,19 @@ been checked, what has not, and what the program does not do yet.
   energies, frequencies (the imaginary one of a transition state included) and normal modes. The differences left are
   cclib's (it reads the punch files' AIMPAC coordinates as Ångström, and Molpro's MP4(SDQ) instead of MP4(SDTQ)).
   `tests/test_readers_qc2.js` keeps their layouts.
+- **Orbitals and densities (2.4):** the values were compared with other programs for the same wavefunctions (the
+  public test files of the IOData, ChemTools and cclib projects, not included here):
+  - the density of Gaussian 09's `cubegen` at its points (to the 6 digits it prints), a density cube written by
+    NCIPLOT (to its 5 digits), and the densities of HORTON and Multiwfn (differences below 10⁻⁷ of the value);
+  - orbital values of a Fortran code (differences below 10⁻⁸);
+  - the overlap matrices that Q-Chem writes into its fchk files, pure d to g functions included (differences below
+    10⁻⁷);
+  - the orthonormality of the orbitals of 170 files: 139 Gaussian, Q-Chem and Psi4 fchk files, and 31 Molden files
+    from ORCA, Psi4 (before 1.0, 1.0, 1.3.2 and others), CFOUR, Turbomole, Molpro and Molden itself, with up to h
+    functions.
+
+  The tests in the repository use fixtures from an independent Hartree–Fock code (`tools/mini_scf.py`): orbital
+  values, densities and overlaps, in each program's convention.
 - **Gaussian frequencies:** real Gaussian 09 and 16 frequency outputs (public test files of the cclib project, not
   included here, with up to 18 blocks of normal modes and the hpmodes layout) read the same in full and condensed.
   `tests/test_freq_sections.js` adds layouts seen in big jobs: values too wide for their column (asterisks), unknown
@@ -72,8 +85,9 @@ been checked, what has not, and what the program does not do yet.
 
 | Area | Limitation |
 |---|---|
-| Orbitals | Orbitals, densities and potentials are **not computed** from fchk or Molden basis sets. Isosurfaces need a cube or XSF grid from your program (`cubegen`, `orca_plot`) |
-| Surfaces | No molecular surfaces (solvent-accessible or solvent-excluded) and no electrostatic potential mapped on a surface |
+| Orbitals | Computed from fchk and Molden files only, not from `.wfn` or `.wfx` files, ORCA's `.gbw` or the coefficients printed in outputs. The density is that of the orbitals in the file, so the SCF density for most jobs: the MP2, CC or CI densities that some fchk files hold are not used. Files with more than 4,000 basis functions are not checked for orthonormality. A density takes longer the more occupied orbitals there are: minutes for hundreds of atoms |
+| Electrostatic potential | Taken from point charges or from a potential cube; it is not computed from the wavefunction |
+| Molecular surfaces | Computed on a grid (0.25 Å apart up to 300 atoms, 0.4 Å up to 3,000, 0.6 Å beyond), for the geometry shown when they are computed. Cavities smaller than the grid spacing are filled |
 | Secondary structure | A simplified DSSP: α-helices and β-ladders only (no 3₁₀ or π helices, no turns), computed once per structure rather than per trajectory frame. Records in PDB or mmCIF files are used when present |
 | Cartoons | Rebuilt during trajectory playback only for systems up to 20,000 atoms |
 | Glycans | Identification by shape works for six-membered (pyranose) rings; unknown five-membered (furanose) rings get white symbols |
@@ -96,8 +110,7 @@ been checked, what has not, and what the program does not do yet.
 ## Ideas for future versions
 
 Not promised, and in no particular order:
-- orbitals and densities computed from fchk and Molden files;
-- molecular surfaces and electrostatic potentials;
+- the electrostatic potential computed from the wavefunction;
 - ASCII Amber trajectories (`mdcrd`);
 - conformer search and crystal tools.
 

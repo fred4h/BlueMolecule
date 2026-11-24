@@ -49,6 +49,7 @@ button { cursor: pointer; }
 .sel { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
 .sel select { max-width: 118px; }
 .sel select, .field select { height: 28px; border-radius: 7px; border: 1px solid var(--line-2); background: var(--panel-2); padding: 0 6px; color: var(--text); }
+.field select { min-width: 0; max-width: 100%; }
 .dropdown { position: relative; }
 .menu { display: none; position: absolute; top: 34px; left: 0; min-width: 230px; background: var(--panel); border: 1px solid var(--line-2); border-radius: 10px; padding: 6px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35); z-index: 50; }
 .dropdown.open .menu { display: block; }
@@ -167,6 +168,14 @@ input[type=color] { width: 30px; height: 24px; border: 1px solid var(--line-2); 
 .surf-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .surf-head .t { flex: 1; font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .surf .field { grid-template-columns: 74px 1fr auto; }
+.sf-job { display: flex; align-items: center; gap: 8px; }
+.sf-bar { flex: 1; height: 8px; border-radius: 4px; background: var(--panel-2); border: 1px solid var(--line-2); overflow: hidden; }
+.sf-bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.15s; }
+.sf-bar.busy i { opacity: 0.45; animation: sf-pulse 1.2s ease-in-out infinite alternate; }
+@keyframes sf-pulse { from { opacity: 0.25; } to { opacity: 0.7; } }
+.esp-scale { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 6px; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.esp-scale i { height: 8px; border-radius: 4px; background: linear-gradient(90deg, rgb(214, 48, 38), rgb(247, 247, 247), rgb(43, 89, 219)); }
+.note .warn { color: var(--warn); }
 .inline { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .inline input[type=checkbox] { width: auto; height: auto; }
 .trans { margin: 6px 0 0 6px; font-family: var(--mono); font-size: 12px; color: var(--muted); }

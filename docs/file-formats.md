@@ -62,13 +62,13 @@ Opened for their geometry (and charge, multiplicity, route or keywords where pre
 
 | Format | Files | What is read |
 |---|---|---|
-| Gaussian formatted checkpoint | `.fchk` `.fch` `.fck` | Structure, energy, vibrations with IR, charges, orbital energies, dipole; every geometry of an optimisation or relaxed scan (Gaussian) or of an optimisation or MD run (Q-Chem); excited states with oscillator strengths (Gaussian TD and CIS, Q-Chem) |
-| Molden | `.molden` `.mold` `.molf` | Structure, optimisation geometries and energies, vibrations with IR and Raman |
-| Gaussian cube | `.cube` `.cub` | Volumetric data for isosurfaces, including cubes with several orbitals; Bohr and Å grids |
+| Gaussian formatted checkpoint | `.fchk` `.fch` `.fck` | Structure, energy, vibrations with IR, charges, orbital energies, dipole; every geometry of an optimisation or relaxed scan (Gaussian) or of an optimisation or MD run (Q-Chem); excited states with oscillator strengths (Gaussian TD and CIS, Q-Chem); the basis set and MO coefficients, from which orbitals and densities are computed (Gaussian, Q-Chem and Psi4 files) |
+| Molden | `.molden` `.mold` `.molf` | Structure, optimisation geometries and energies, vibrations with IR and Raman; the basis set and orbitals (`[GTO]`, `[MO]`), from which orbitals and densities are computed, in the conventions of Molden, ORCA, Psi4, CFOUR, Turbomole and Molpro |
+| Gaussian cube | `.cube` `.cub` | Volumetric data for isosurfaces, including cubes with several orbitals; Bohr and Å grids. A potential cube can colour a density surface |
 | XCrySDen XSF / AXSF | `.xsf` `.axsf` | Structure, cell, animation steps and `DATAGRID_3D` volumes |
 
-Isosurfaces need a cube or XSF grid. BlueMolecule does not yet compute orbitals on a grid from fchk or Molden
-files ([limitations](limitations.md)).
+Orbitals and densities are computed from fchk and Molden files ([Analysing outputs](analysing-outputs.md#orbitals-and-volumes)).
+Other volumes, such as electrostatic potentials, need a cube or XSF grid from the program.
 
 ## Structures and crystals
 
@@ -126,8 +126,8 @@ binary trajectories are read with a stride so that they fit in memory. See
 | XCrySDen XSF | `.xsf` | With the volume when the document has one |
 | GROMACS .gro | `.gro` | With residues and the box |
 | LAMMPS data (atomic) | `.data` | Atoms and box |
-| Molden | `.molden` | Atoms and vibrations |
-| Gaussian cube | `.cube` | The volume (Bohr) |
+| Molden | `.molden` | Atoms and vibrations, and the basis set and orbitals of an fchk or Molden file (in the standard Molden convention) |
+| Gaussian cube | `.cube` | The volume (Bohr): from a cube file, or an orbital or density computed by BlueMolecule |
 | Gaussian input | `.gjf` | Current geometry; for full control use Calculation input |
 | ORCA input | `.inp` | Current geometry |
 | Turbomole coord | `coord` | Bohr |

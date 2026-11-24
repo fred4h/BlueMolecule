@@ -783,6 +783,19 @@ def permute_to_molden(shells, C):
 
 
 # --------------------------------------------------------------------------- jobs
+def add_density(expect, shells, ints, res, pts, unrestricted):
+    """The electron density (and spin density) at the points, and the AO overlap matrix (lower triangle)."""
+    na, nb = res['na'], res['nb']
+    va = eval_mos(shells, ints, res['Ca'][:, :na], pts)
+    vb = eval_mos(shells, ints, res['Cb'][:, :nb], pts) if nb else np.zeros((0, len(pts)))
+    rho_a, rho_b = np.sum(va ** 2, axis=0), np.sum(vb ** 2, axis=0)
+    expect['density'] = (rho_a + rho_b).tolist()
+    if unrestricted or na != nb:
+        expect['spin_density'] = (rho_a - rho_b).tolist()
+    S = ints['S']
+    expect['overlap'] = [float(S[i, j]) for i in range(S.shape[0]) for j in range(i + 1)]
+
+
 def sample_points(xyz, n=24, seed=7):
     rng = np.random.default_rng(seed)
     pts = []
@@ -839,6 +852,7 @@ def run_molecule(tag, Zs, xyz_ang, basis, d_pol, pure_d, charge, mult, variants,
               'points_bohr': pts.tolist(),
               'values': {sp: {str(m): vals[sp][m].tolist() for m in sorted({0, 1, homo_a, homo_a + 1, nbf - 1})}
                          for sp in vals}}
+    add_density(expect, shells, ints, res, pts, unres)
     for v in variants:
         name, kind = v['file'], v['kind']
         exp = dict(expect)
@@ -899,6 +913,7 @@ def random_fg(log):
         expect = {'energy': None, 'nelec': 2 * nocc, 'nalpha': nocc, 'nbeta': nocc, 'homo': nocc - 1, 'nbf': n,
                   'points_bohr': pts.tolist(),
                   'values': {'alpha': {str(m): vals[m].tolist() for m in (0, 3, nocc - 1, nocc, n - 1)}}}
+        add_density(expect, shells, ints, res, pts, False)
         log.append('random f/g basis %-9s nbf %d, |CSC-1| %.1e' % ('pure' if pure else 'Cartesian', n, dev))
         tag = 'fg_pure' if pure else 'fg_cart'
         exp = dict(expect)

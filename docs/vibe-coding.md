@@ -22,16 +22,16 @@ with some AI help":
 | Set the goals: a free viewer with the everyday functions of desktop quantum-chemistry viewers, plus building tools | Wrote all the code: about 47,000 lines of JavaScript, Python, Rust, Swift, C#, PowerShell, HTML and CSS, tests included |
 | Chose the features, using public feature lists of programs such as Chemcraft and Avogadro | Designed the architecture, the file readers and writers, the renderer and the interface |
 | Tried each version on their own computers and reported problems, such as "a 600 MB ORCA log opens as empty" or "the ONIOM energy graph jumps back and forth" | Investigated each report, fixed the cause and added a test for it |
-| Decided to publish the project and chose the license | Generated the synthetic example files, wrote about 35,900 automated checks, wrote the documentation and checked the code before publication |
+| Decided to publish the project and chose the license | Generated the synthetic example files, wrote about 36,700 automated checks, wrote the documentation and checked the code before publication |
 
 Claude worked in a sandboxed workspace with an editor, a terminal and a headless browser, so it could run the tests
 and look at screenshots of the interface. The versions from 1.0 to 1.4.1 were made between 4 and 10 November 2026,
-1.4.2 and 1.5.0 on 16 November, 2.0.0 on 17 November, 2.0.1 on 18 November, and 2.0.2 to 2.3.0 on 22 November (see
+1.4.2 and 1.5.0 on 16 November, 2.0.0 on 17 November, 2.0.1 on 18 November, 2.0.2 to 2.3.0 on 22 November, and 2.4.0 on 24 November (see
 the [changelog](../CHANGELOG.md)).
 
 ## How the program was checked
 
-- **Automated tests.** Every feature came with tests: about 35,900 checks in 38 suites, run with
+- **Automated tests.** Every feature came with tests: about 36,700 checks in 40 suites, run with
   `python3 tests/run_all.py --browser` ([developer guide](developer-guide.md#tests)). They cover:
   - the readers and writers of each format;
   - format detection;
