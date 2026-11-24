@@ -3,6 +3,28 @@
 BlueMolecule is [vibe-coded](docs/vibe-coding.md). Each version below was written by an AI assistant from the
 author's requests and bug reports.
 
+## 2.6.0 (November 2026): downloads from PubChem and the PDB
+
+**Download** (issue #22), in the toolbar (the cloud icon) and on the start screen (**PubChem or PDB…**):
+- **PubChem**: a molecule by name (`caffeine`, `acetic acid`) or CID, as PubChem's 3D conformer in an SD file. A name
+  that matches several compounds gives the first. For a compound without a 3D conformer (salts, mixtures, large or
+  very flexible molecules), BlueMolecule asks for its SMILES and builds the structure itself, and the Info tab says
+  so.
+- **Protein Data Bank**: an entry by its ID (`1CRN`, or the extended form `pdb_00001crn`) as mmCIF, with its chains,
+  residues, secondary structure and models, or its first biological assembly instead of the deposited coordinates.
+- **Off until you allow it.** The dialog sends nothing until you tick **Allow downloads from PubChem and the Protein
+  Data Bank**. Then, when you press **Download**, it sends only what you typed, as part of the address, to
+  `pubchem.ncbi.nlm.nih.gov` or `files.rcsb.org`, without cookies. Untick the box to turn downloads off again.
+- The download's progress, **Cancel**, and errors said in the dialog (an unknown name or ID, a busy service, no
+  network), which stays open for another try. The Info tab shows where each structure came from, and when.
+- The cloud builds' self-test tries real downloads in the web engine of each system and reports them.
+
+Also:
+- The toolbar no longer runs past the edge of the window at some widths: its labels give way to icons a little
+  earlier, and below 1,220 pixels it wraps onto two rows.
+- README: the description of the window follows the desktop program of 2.0 (it still described 1.x), and the
+  privacy note names both uses of the network.
+
 ## 2.5.0 (November 2026): conformers and crystal tools
 
 **Conformer search** (issue #20), in the Build tab:

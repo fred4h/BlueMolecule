@@ -344,7 +344,8 @@ label.chk { gap: 6px; color: var(--text); font-size: 12px; cursor: pointer; marg
 .dlg-body .crow { display: grid; gap: 10px; }
 .bbody select { height: 28px; border-radius: 7px; border: 1px solid var(--line-2); background: var(--panel-2); padding: 0 6px; color: var(--text); }
 .dlg-body input:disabled, .dlg-body select:disabled { opacity: 0.5; }
-.empty-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.empty-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: 0 -60px; }
+@media (max-width: 1000px) { .empty-actions { margin: 0; } }
 .empty-card button.secondary { height: 38px; padding: 0 16px; border-radius: 9px; display: inline-flex; align-items: center; gap: 8px; font-weight: 550; background: rgba(79, 140, 255, 0.1); border: 1px solid #34507e; color: #dbe6f8; }
 .empty-card button.secondary:hover { border-color: var(--accent); }
 .smiles-start { display: flex; gap: 8px; max-width: 470px; margin: 12px auto 0; }
@@ -353,11 +354,12 @@ label.chk { gap: 6px; color: var(--text); font-size: 12px; cursor: pointer; marg
 .smiles-start button { height: 34px; padding: 0 14px; border-radius: 8px; border: 1px solid #2b3c59; background: rgba(79, 140, 255, 0.16); color: #dbe6f8; }
 .smiles-start button:hover { border-color: var(--accent); }
 
+@media (max-width: 1759px) { #btn-fetch span { display: none; } #btn-fetch { padding: 0 7px; } }
 @media (max-width: 1680px) { .sel span, #btn-new span { display: none; } #btn-new { padding: 0 7px; } .seg button { padding: 0 8px; } .tb-group { padding: 0 5px; } #toolbar { gap: 4px; } }
-@media (max-width: 1400px) { #btn-open span, #dd-export .tb > span { display: none; } #btn-open, #dd-export .tb { padding: 0 7px; } }
+@media (max-width: 1480px) { #btn-open span, #dd-export .tb > span { display: none; } #btn-open, #dd-export .tb { padding: 0 7px; } }
 @media (max-width: 1320px) { .brand span { display: none; } .seg button { padding: 0 7px; } .tg { padding: 0 6px; } .tb-group { padding: 0 4px; } }
 @media (max-width: 1240px) { .sel select { max-width: 100px; } }
-@media (max-width: 1179px) { #app { grid-template-rows: auto minmax(0, 1fr) 26px; } #toolbar { flex-wrap: wrap; row-gap: 4px; padding: 5px 10px; min-height: 46px; } }
+@media (max-width: 1219px) { #app { grid-template-rows: auto minmax(0, 1fr) 26px; } #toolbar { flex-wrap: wrap; row-gap: 4px; padding: 5px 10px; min-height: 46px; } }
 
 /* ---------- Save as ---------- */
 .sa { display: grid; gap: 8px; }
@@ -368,6 +370,15 @@ label.chk { gap: 6px; color: var(--text); font-size: 12px; cursor: pointer; marg
 .sa-seg { display: inline-flex; gap: 14px; color: var(--text); }
 .sa-seg label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
 .dlg-body textarea.sa-prev { min-height: 170px; height: 210px; white-space: pre; font-size: 11.5px; color: var(--muted); }
+
+/* ---------- Download (PubChem, PDB) ---------- */
+.fdb { display: grid; gap: 9px; }
+.fdb .field { grid-template-columns: 96px 1fr; }
+.fdb input[type=text] { height: 30px; width: 100%; border-radius: 7px; border: 1px solid var(--line-2); background: var(--panel-2); padding: 0 9px; color: var(--text); font-size: 13px; }
+.fdb .sa-seg { flex-wrap: wrap; row-gap: 4px; }
+.fdb-allow { display: flex; gap: 8px; align-items: center; margin-top: 4px; font-weight: 550; cursor: pointer; }
+.fdb .note { margin: 0; }
+.fdb [data-fdb=msg]:empty { display: none; }
 
 /* ---------- Build tab: compact rows ---------- */
 .bhead { margin: 2px 0 10px; }

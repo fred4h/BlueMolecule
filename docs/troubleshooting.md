@@ -47,6 +47,20 @@ with `./uninstall.sh` from the unpacked 1.x folder ([details](installation.md#co
 - **The check did not succeed:** the computer may be offline, or GitHub unreachable. Try again later, or download
   the new version from the Releases page.
 
+## Downloads from PubChem or the PDB
+
+- **Download is greyed out:** tick **Allow downloads from PubChem and the Protein Data Bank** in the dialog first.
+- **"The server could not be reached":** the computer is offline, or a firewall or proxy blocks
+  `pubchem.ncbi.nlm.nih.gov` or `files.rcsb.org`. BlueMolecule uses the system's network settings (the browser's for
+  the HTML file).
+- **"PubChem has no compound named …":** PubChem did not recognise the name. Try another name, or look the compound up
+  on the PubChem website and type its CID.
+- **"PubChem is busy" or "The PDB is busy":** the service asked for a pause. Try again in a moment.
+- **A different compound than expected:** a name can match several compounds, and the first one is used. Type the CID
+  instead.
+- **"The PDB has no entry …, or no biological assembly for it":** check the ID; for an assembly, untick
+  **biological assembly 1** to get the deposited coordinates.
+
 ## "Open With BlueMolecule" is missing for a file type
 
 On Linux and macOS, the installer registers `.xyz .cube .cub .fchk .fch .molden .mol .sdf .mol2 .pdb .ent .cif

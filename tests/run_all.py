@@ -21,10 +21,10 @@ NODE_UNIT = ['test_parsers.js', 'test_parsers2.js', 'test_readers_qc.js', 'test_
              'test_writers_struct.js', 'test_chem.js', 'test_ff.js', 'test_templates.js', 'test_symmetry.js', 'test_analysis.js',
              'test_audit.js', 'test_qmmm.js', 'test_native_bridge.js', 'test_reps.js', 'test_cartoon.js', 'test_running_jobs.js',
              'test_condense.js', 'test_netcdf.js', 'test_freq_sections.js', 'test_real_layouts.js', 'test_vibtools.js', 'test_imagex.js',
-             'test_readers_qc2.js', 'test_orbitals.js', 'test_crystal_conformers.js']
+             'test_readers_qc2.js', 'test_orbitals.js', 'test_crystal_conformers.js', 'test_fetchdb.js']
 PY_UNIT = ['test_launcher.py', 'test_native_packaging.py', 'test_windows_package.py']
 BROWSER = ['test_renderer.js', 'browser_test.js', 'browser_build_test.js', 'browser_formats_test.js', 'browser_reps_test.js',
-           'browser_ui_test.js', 'browser_15_test.js', 'browser_tauri_bridge_test.js', 'browser_xss_test.js', 'browser_windows_launch_test.js', 'browser_orbitals_test.js', 'browser_build25_test.js', 'test_bigfiles.js']
+           'browser_ui_test.js', 'browser_15_test.js', 'browser_tauri_bridge_test.js', 'browser_xss_test.js', 'browser_windows_launch_test.js', 'browser_orbitals_test.js', 'browser_build25_test.js', 'browser_fetch_test.js', 'test_bigfiles.js']
 
 
 def run(cmd, label):

@@ -13,7 +13,7 @@ geometries, using the plot panel and exporting. The specialised topics have thei
 
 | Area | What it holds |
 |---|---|
-| **Toolbar** (top) | New, Open, Export, display style, labels, colouring, toggles, background, view menu, image, display settings, light/dark theme, help |
+| **Toolbar** (top) | New, Open, Download, Export, display style, labels, colouring, toggles, background, view menu, image, display settings, light/dark theme, help |
 | **Document list** (top left) | Every open file, with a badge for its format. Click one to switch; **×** closes it |
 | **Tabs** (left) | Only the tabs that apply to the file: **Info**, **Display**, **Steps**, **Vibrations**, **States**, **Surfaces**, **Build** |
 | **3D view** (centre) | The molecule. The build tools are at its left edge, the measurement chip at the top and the playbar near the bottom when there are several geometries or an animated mode |
@@ -32,6 +32,7 @@ panel collapses it.
 - From the **start screen**:
   - **Open files…**;
   - **New molecule** (an empty document for building);
+  - **PubChem or PDB…** (see [Downloading from PubChem and the PDB](#downloading-from-pubchem-and-the-pdb));
   - a SMILES box that builds a 3D structure;
   - four built-in examples: a Gaussian optimisation + frequency job, an ORCA TD-DFT job, a benzene π-orbital cube
     and cisplatin.
@@ -56,6 +57,34 @@ frames.
 - A trajectory opened without a matching topology is refused, with a message saying what to open first.
 
 See [Large files and trajectories](large-files-and-trajectories.md).
+
+## Downloading from PubChem and the PDB
+
+**Download** in the toolbar (the cloud icon), or **PubChem or PDB…** on the start screen, fetches a structure from a
+public database. It is **off until you allow it**: tick **Allow downloads from PubChem and the Protein Data Bank** in
+the dialog. BlueMolecule remembers the tick; untick it to turn downloads off again.
+
+| Database | Type | You get |
+|---|---|---|
+| **PubChem** | a name (`caffeine`, `acetic acid`) or a CID (`2519`, `CID 2519`) | PubChem's 3D conformer, as an SD file |
+| **Protein Data Bank** | a PDB ID (`1CRN`, or the extended form `pdb_00001crn`) | the entry as mmCIF, with its chains, residues, secondary structure and models |
+
+- **Biological assembly**: for the PDB, tick **biological assembly 1** to get the first assembly defined for the
+  entry instead of the deposited coordinates (the asymmetric unit). It is often the functional molecule, for example
+  a dimer when the deposited coordinates hold one chain. Copies of a chain are named like `A-2`.
+- **No 3D conformer**: PubChem has none for some compounds (salts and mixtures, large or very flexible molecules,
+  some elements). BlueMolecule then asks for the compound's SMILES and builds a 3D structure with its own builder and
+  clean-up force field. The Info tab says so under **Reader notes**; check such a structure before you use it.
+- **Several matches**: a name that matches several PubChem compounds gives the first one. Use the CID to choose.
+- **Where it came from**: the Info tab shows the database, the ID and the date under **Downloaded**; the address is in
+  its tooltip.
+- **Errors**: an unknown name or ID, a busy server or no network connection are said in the dialog, which stays open
+  so you can try again. **Cancel** or **Esc** stops a download.
+
+What is sent: what you typed, as part of the address, to `pubchem.ncbi.nlm.nih.gov` or `files.rcsb.org`, and only
+when you press **Download**. The request carries what every web request does (your network address, and the name and
+version of the web engine), but no files, cookies or other data. Please cite the databases, and the publication of
+each PDB entry, when you use their data.
 
 ## Moving around
 
@@ -100,6 +129,8 @@ Press **?** in the window to see this list.
 
 - **New**: an empty document for building a molecule.
 - **Open**: open files.
+- **Download**: a molecule from PubChem or a structure from the Protein Data Bank (see
+  [Downloading from PubChem and the PDB](#downloading-from-pubchem-and-the-pdb)). Narrow windows show only its icon.
 - **Export**: Save as…, Calculation input…, Image…, Vibration animation (see [Saving and exporting](#saving-and-exporting)).
 - **Ball & stick / Sticks / Spacefill / Wire**: the basic display style for the whole document. With display rows
   (the Display tab), these set the style of the "All atoms" view; see [representations](representations.md).

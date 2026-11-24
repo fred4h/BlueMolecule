@@ -46,6 +46,7 @@ without a browser. `tools/build.py` inlines the scripts and the stylesheet into 
 | `symmetry.js` | Point-group detection, symmetry operations, symmetrization (`BM.sym`) |
 | `crystal.js` | Crystal tools: lattice parameters, fractional coordinates, supercells, surface slabs from Miller indices, cell edits, boxes (`BM.crystal`) |
 | `conformers.js` | Conformer search: rotatable bonds, torsion combinations relaxed with the clean-up force field, distinct conformers by RMSD (`BM.conformers`) |
+| `fetchdb.js` | Downloads from PubChem (PUG REST: the 3D conformer as SDF, or the SMILES) and the RCSB PDB (mmCIF entries and assemblies): queries checked, time-outs, cancelling, progress, errors in plain words (`BM.fetchdb`). The app's dialog keeps the user's permission |
 | `analysis.js` | Convergence series, RMSD (Kabsch), scan and IRC profiles, NMR sticks, MO levels (`BM.analysis`) |
 | `isosurface.js` | Isosurfaces of volumetric data (surface nets) |
 | `orbitals.js` | Orbitals and densities from the basis set and MO coefficients of fchk and Molden files: shells of any angular momentum, the overlap matrix (Obara–Saika), each program's normalisation convention found by orthonormality, the grid kernel run in Web Workers, Molden output (`BM.orbitals`) |
@@ -179,8 +180,17 @@ page can read only files the user named. Web links open in the default browser. 
 `BM.native.updates` exist only there. `window.BM_TAURI` gives the version, the system, the free memory and whether
 this build can update itself.
 
+**The network.** The page itself makes requests in two places only, both started by the user:
+- the update check, through the host (`BM.native.updates`, desktop program only);
+- **Download** (`src/fetchdb.js`), with the page's own `fetch`: plain GET requests without cookies or a referrer to
+  `pubchem.ncbi.nlm.nih.gov` and `files.rcsb.org`, which answer any origin (CORS), so it works the same in the
+  desktop window, in a browser and from `file://`. The dialog sends nothing until the user has ticked **Allow
+  downloads** (stored as `bluemolecule.downloads.allow` in `localStorage`), and then one to three requests per
+  download, well within PubChem's limit of five a second. No Tauri permission is involved, and the desktop window
+  sets no content security policy.
+
 **The launcher** chooses the window (Qt, Chromium-family app window or Firefox; see
-[installation](installation.md#its-own-window-the-native-qt-window)). For the browser windows it runs a small
+[the 1.5 installation guide](https://github.com/fred4h/BlueMolecule/blob/v1.5.0/docs/installation.md#its-own-window-the-native-qt-window)). For the browser windows it runs a small
 server:
 - The server binds to `127.0.0.1` only, on port 47591 or the next free one.
 - All paths are under a random per-session token: `GET /TOKEN/` serves the page, `GET /TOKEN/file/N/name` the
@@ -215,7 +225,9 @@ The desktop program is built with Rust and Node.js; see [desktop/README.md](../d
 
 `.github/workflows/desktop.yml` runs for every push that touches the page or the desktop program. On Linux, Windows
 and macOS it builds the installers and starts the program once with `--self-test`: the page and its WebGL 2 view,
-a small molecule and a 900 MB log opened through the native bridge, a save, and a picture of the view. The
+a small molecule and a 900 MB log opened through the native bridge, a save, and a picture of the view. It also
+downloads aspirin and sodium chloride from PubChem and 1CRN from the PDB in each system's web engine, and reports
+the results under `downloads` without requiring them to pass (the runner's network is not BlueMolecule's). The
 installers are kept as artifacts of the run (on its Actions page). The reports (build log, self-test results and
 pictures, package contents) are copied to the `ci-reports` branch, `runs/<run id>/`, newest in `latest.txt`.
 
@@ -264,6 +276,7 @@ Each suite can also be run alone, e.g. `node tests/test_parsers.js`.
 | `test_parsers.js`, `test_parsers2.js`, `test_readers_qc.js`, `test_readers_struct.js`, `test_qmmm.js` | Readers and format detection against `tests/fixtures/` (expected values in `expected.json` files) |
 | `test_readers_qc2.js` | The 2.3 readers: Molpro, Dalton, Turbomole programs, GAMESS punch files and point groups, fchk excited states and optimisation history; each fixture also cut at 59 places |
 | `test_orbitals.js`, `browser_orbitals_test.js` | Orbitals, densities and spin densities from fchk and Molden files against the values and overlaps of `tools/mini_scf.py`, in each program's convention; the solid harmonics up to l = 6; the Molden round trip; cut and damaged files; molecular surfaces against their analytic radii; the potential of point charges; in Chromium, the Surfaces tab, the workers and the potential colours |
+| `test_fetchdb.js`, `browser_fetch_test.js` | Downloads with a stand-in for the network: the addresses asked for (names encoded), no cookies, the 3D conformer and SMILES paths, the older SMILES property, errors, time-outs, cancelling, progress across pieces of UTF-8; in Chromium, the dialog: nothing sent before the permission or for a bad ID, PubChem, the SMILES path, the PDB and its assembly, Cancel, unticking, the Info tab's source |
 | `test_crystal_conformers.js`, `browser_build25_test.js` | Lattice parameters, supercells and slabs of rock salt and of a triclinic crystal (layer spacings, unimodular bases, bulk distances, terminations), cell edits and boxes; rotatable bonds and conformer searches (butane, hexane, decane); in Chromium, the Crystal and Conformers sections with undo and Save as |
 | `test_writers.js`, `test_writers_struct.js`, `test_audit.js` | Writers, round trips, regression tests from the code audit |
 | `test_chem.js`, `test_ff.js`, `test_templates.js`, `test_symmetry.js`, `test_analysis.js` | SMILES, bond orders, hydrogens, force field, building library, point groups, convergence analysis |
@@ -279,7 +292,7 @@ Each suite can also be run alone, e.g. `node tests/test_parsers.js`.
 | `test_windows_package.py`, `browser_windows_launch_test.js` | The Windows package without Windows: C# 5 and PowerShell 5.1 syntax limits, delimiter balance, registry symmetry of install and uninstall, the icon, and the launch page opened from `file://` in Chromium |
 | `test_renderer.js`, `browser_*.js`, `test_bigfiles.js` | The renderer and the interface in headless Chromium (they save screenshots to `tests/shots/`), injection safety, large files |
 | `browser_ui_test.js` | Interface details: drop-down menus by mouse, drag and keyboard, the calculation-input file names, arrow keys in the lists, right-click deletion, running jobs, the transition-state tools of the Vibrations tab |
-| `browser_tauri_bridge_test.js` | The page side of the desktop program against a stand-in for Tauri: documents from the command line and later launches, reading on demand, the Open and Save dialogs, Open Babel, the clipboard, web links, the updater dialog, the self-test script |
+| `browser_tauri_bridge_test.js` | The page side of the desktop program against a stand-in for Tauri: documents from the command line and later launches, reading on demand, the Open and Save dialogs, Open Babel, the clipboard, web links, the updater dialog, the self-test script and its downloads |
 | `browser_15_test.js` | Version 1.5: plot zoom (box, buttons, double-click, selection, every plot type, exports), the energy-components plot, the loading dialog and Load other parts for outputs, XYZ, DCD and NetCDF, NetCDF after a prmtop |
 
 **Fixtures.**

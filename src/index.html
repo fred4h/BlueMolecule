@@ -1550,6 +1550,7 @@ ijaqVH/i//4/AwjfmJccfToAAAAASUVORK5CYII=">
   <symbol id="i-zoom-out" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m15.2 15.2 4.8 4.8M7.8 10.5h5.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
   <symbol id="i-zoom-fit" viewBox="0 0 24 24"><path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="m8.5 14 2.5-3 2 1.8 2.5-3.3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-plot" viewBox="0 0 24 24"><path d="M4 4.5v15h16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="m7.5 15 3.5-4.5 3 2.5 5-6.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7.5 17.5h-.7a3.8 3.8 0 0 1-.5-7.57 5.8 5.8 0 0 1 11.2-1.1 4.35 4.35 0 0 1 .3 8.67h-1.3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 11.5v8.6M8.9 17.1l3.1 3.1 3.1-3.1" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-logo" viewBox="0 0 64 64"><g stroke="#7cb2ff" stroke-width="4.5" stroke-linecap="round"><line x1="20" y1="40" x2="40" y2="21"/><line x1="40" y1="21" x2="47" y2="45"/></g><circle cx="20" cy="40" r="10" fill="#4f8cff"/><circle cx="40" cy="21" r="7.5" fill="#b4d2ff"/><circle cx="47" cy="45" r="6.5" fill="#2f6be0"/></symbol>
 </svg>
 
@@ -1559,6 +1560,7 @@ ijaqVH/i//4/AwjfmJccfToAAAAASUVORK5CYII=">
     <div class="tb-group">
       <button class="tb" id="btn-new" title="New molecule: an empty document for building"><svg class="ic"><use href="#i-new"/></svg><span>New</span></button>
       <button class="tb" id="btn-open" title="Open files (Ctrl/⌘+O)"><svg class="ic"><use href="#i-open"/></svg><span>Open</span></button>
+      <button class="tb" id="btn-fetch" title="Download a molecule from PubChem or a structure from the Protein Data Bank (off until you allow it)"><svg class="ic"><use href="#i-cloud"/></svg><span>Download</span></button>
       <div class="dropdown" id="dd-export">
         <button class="tb" data-dd title="Save geometry, inputs and images"><svg class="ic"><use href="#i-save"/></svg><span>Export</span><svg class="ic sm"><use href="#i-chev"/></svg></button>
         <div class="menu">
@@ -1662,6 +1664,7 @@ ijaqVH/i//4/AwjfmJccfToAAAAASUVORK5CYII=">
             <div class="empty-actions">
               <button class="primary" id="btn-open-2"><svg class="ic"><use href="#i-open"/></svg>Open files…</button>
               <button class="secondary" id="btn-new-2"><svg class="ic"><use href="#i-t-draw"/></svg>New molecule</button>
+              <button class="secondary" id="btn-fetch-2" title="From PubChem by name or CID, or from the Protein Data Bank by ID (off until you allow it)"><svg class="ic"><use href="#i-cloud"/></svg>PubChem or PDB…</button>
             </div>
             <p class="hint">or drop files anywhere in this window</p>
             <div class="smiles-start"><input type="text" id="empty-smiles" placeholder="Build from SMILES, e.g. CC(=O)Oc1ccccc1C(=O)O" spellcheck="false" aria-label="Build from SMILES"><button id="btn-smiles-2">Build</button></div>
@@ -1722,6 +1725,7 @@ ijaqVH/i//4/AwjfmJccfToAAAAASUVORK5CYII=">
 <script src="analysis.js"></script><!--BM:JS:analysis-->
 <script src="crystal.js"></script><!--BM:JS:crystal-->
 <script src="conformers.js"></script><!--BM:JS:conformers-->
+<script src="fetchdb.js"></script><!--BM:JS:fetchdb-->
 <script src="reps.js"></script><!--BM:JS:reps-->
 <script src="cartoon.js"></script><!--BM:JS:cartoon-->
 <script src="vibtools.js"></script><!--BM:JS:vibtools-->

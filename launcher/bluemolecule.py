@@ -38,7 +38,7 @@ import urllib.parse
 import webbrowser
 from pathlib import Path
 
-VERSION = '2.5.0'
+VERSION = '2.6.0'
 APP_ID = 'org.bluemolecule.BlueMolecule'   # window class, Wayland app_id, desktop file and icon name
 QT_SHELL = 'bluemolecule_qt.py'
 QT_BINDINGS = ('PyQt6', 'PySide6', 'PyQt5')   # in order of preference

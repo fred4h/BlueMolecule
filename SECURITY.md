@@ -2,10 +2,14 @@
 
 ## How BlueMolecule handles your files
 
-- **Everything runs on your computer.** BlueMolecule never uploads files. Its only use of the network is the
-  desktop program's update check, and only when you ask for it (**Help → Check for updates…**, or at start-up if you
-  tick that option): it asks GitHub for the latest release, and installs an update only after checking its signature
-  against BlueMolecule's own key ([Updates](docs/installation.md#updates)).
+- **Everything runs on your computer.** BlueMolecule never uploads files. It uses the network only when you ask:
+  - the desktop program's update check (**Help → Check for updates…**, or at start-up if you tick that option): it
+    asks GitHub for the latest release, and installs an update only after checking its signature against
+    BlueMolecule's own key ([Updates](docs/installation.md#updates));
+  - **Download** (PubChem and the PDB), which is off until you tick **Allow downloads** in its dialog. A download
+    sends only the name, CID or PDB ID you typed, as part of the address, to `pubchem.ncbi.nlm.nih.gov` or
+    `files.rcsb.org`, without cookies or a referrer, and only when you press **Download**. What comes back is read like a file you
+    opened ([Downloading](docs/user-guide.md#downloading-from-pubchem-and-the-pdb)).
 - **The desktop program** (2.0 and later):
   - reads only the files you opened (with the Open dialog, **Open with**, the command line or by dropping them on
     the window), and saves only where you choose in the Save dialog;
@@ -16,7 +20,7 @@
   before they are displayed. `tests/browser_xss_test.js` checks this with crafted files.
 - **Open Babel** is run as a separate program with an argument list, never through a shell. Format codes are
   validated, and options that could read or write other files are refused.
-- **The single HTML file** needs no network. **The launcher** of the Linux package (`launcher/bluemolecule.py`),
+- **The single HTML file** needs no network, except for downloads you ask for. **The launcher** of the Linux package (`launcher/bluemolecule.py`),
   which opens it in a browser window from the command line, runs a small web server that:
   - listens on `127.0.0.1` only, so other computers cannot reach it;
   - puts every address under a random token that changes each session;

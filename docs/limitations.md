@@ -6,7 +6,7 @@ been checked, what has not, and what the program does not do yet.
 
 ## What has been checked
 
-- **About 36,900 automated checks in 42 test suites** (24,500 of them cut example outputs as a running job would
+- **About 37,200 automated checks in 44 test suites** (24,500 of them cut example outputs as a running job would
   leave them), all passing for this release
   ([how to run them](developer-guide.md#tests)). They cover:
   - every reader and writer, including format detection and the units and conventions of each program;
@@ -80,6 +80,10 @@ been checked, what has not, and what the program does not do yet.
   a headless browser. It still needs confirmation on real desktops.
 - **The macromolecule views** were tested on generated protein, membrane, glycan and DNA structures, not yet on
   structures from the PDB or from simulation set-up tools.
+- **Downloads from the live services.** PubChem and the PDB could not be reached from the environment 2.6 was
+  written in. The tests answer in their place, with records in their formats (`tests/test_fetchdb.js`,
+  `tests/browser_fetch_test.js`); the addresses, answers and error codes follow the services' documentation. The
+  cloud builds try real downloads in each system's web engine and report them, without requiring them to pass.
 
 ## Known limitations
 
@@ -103,7 +107,7 @@ been checked, what has not, and what the program does not do yet.
 | fchk files | No ECD rotatory strengths and no orbital contributions of the excited states; no IRC paths. Q-Chem fchk files hold no energies, so their steps have none. A checkpoint file's optimisation history is used only for an optimisation or scan job whose last step is the current geometry |
 | Gaussian inputs | ONIOM layer columns in `.gjf` files are skipped; layers are read from outputs |
 | Clean-up | A generic force field for tidying sketches; not a published force field and not a physical method |
-| Building | No download from PubChem or the PDB |
+| Downloads | PubChem: the first compound a name matches, as its first 3D conformer. Compounds without one (salts, mixtures, large or very flexible molecules) are built from their SMILES by BlueMolecule's own builder. PDB: mmCIF only, and only the first biological assembly. A download is read whole into memory. BlueMolecule has no network settings of its own: downloads use those of the system or the browser |
 | Conformer search | Ring conformations are not explored, and the energies come from the generic clean-up force field, so the ranking is rough. Up to 300 atoms |
 | Crystal tools | Supercells repeat the cell along a, b and c (no other supercell matrices in the interface). Slabs are cut from the lattice of the cell as given: a conventional cell gives the surface cell of its lattice, which may be larger than the primitive one. The termination is chosen by a shift, not from a list of distinct terminations |
 | Browser-only use | The single HTML file has no Open Babel and is limited by the browser's memory |
