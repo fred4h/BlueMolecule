@@ -1,0 +1,8 @@
+20:14:47 151 MB | com.apple.WebKit.WebContent 110 (3) | com.apple.WebKit.Networking 39 (2) | bluemolecule 1 (1)
+20:14:49 266 MB | com.apple.WebKit.WebContent 129 (4) | com.apple.WebKit.Networking 58 (3) | bluemolecule 78 (1)
+20:14:51 283 MB | com.apple.WebKit.WebContent 138 (3) | com.apple.WebKit.Networking 45 (2) | bluemolecule 99 (1)
+20:14:54 338 MB | com.apple.WebKit.WebContent 163 (3) | com.apple.WebKit.Networking 45 (2) | com.apple.WebKit.GPU 29 (1) | bluemolecule 100 (1)
+20:14:57 520 MB | com.apple.WebKit.WebContent 318 (2) | com.apple.WebKit.Networking 46 (2) | com.apple.WebKit.GPU 38 (1) | bluemolecule 116 (1)
+20:15:00 853 MB | com.apple.WebKit.WebContent 625 (2) | com.apple.WebKit.Networking 46 (2) | com.apple.WebKit.GPU 38 (1) | bluemolecule 144 (1)
+20:15:02 971 MB | com.apple.WebKit.WebContent 744 (2) | com.apple.WebKit.Networking 45 (2) | com.apple.WebKit.GPU 38 (1) | bluemolecule 142 (1)
+20:15:05 1026 MB | com.apple.WebKit.WebContent 807 (2) | com.apple.WebKit.Networking 46 (2) | com.apple.WebKit.GPU 40 (1) | bluemolecule 132 (1)
