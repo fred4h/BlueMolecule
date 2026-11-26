@@ -59,6 +59,13 @@ been checked, what has not, and what the program does not do yet.
 - **ONIOM layers rebuilt from link atoms (2.6.1):** checked on a real Gaussian 09 ONIOM(B3LYP:UFF) optimisation and
   frequency output from the public test files of the garleek project. Its frequency job takes the molecule from the
   checkpoint, and the layers rebuilt from its link atom match those of its input.
+- **ONIOM layers from the population analysis (2.6.2):** checked on 50 real Gaussian 09 and 16 ONIOM outputs from
+  the public test files of the garleek and qmmm-namd projects (Gaussian's own MM and external MM, mechanical and
+  electronic embedding, QM regions of 3 to 22 atoms, an osmium complex among them), each with its molecule echo
+  replaced by a checkpoint structure. The layers were read for 29 of them, always the same as those of the input; for
+  the other 21 (embedded single points with nonzero MM charges, and outputs whose sub-calculation inputs are printed)
+  they were left unknown, never wrong. A real optimisation and frequency output with MM charges added to its tables
+  gave its layers from the charges that change between them.
 - **Downloads (2.6):** the self-test of the cloud builds downloaded from the live PubChem and PDB services in the web
   engine of each system (WebKitGTK on Linux, WebView2 on Windows, WebKit on macOS): aspirin's 3D conformer (21
   atoms, CID 2244), sodium chloride through its SMILES (PubChem has no 3D conformer for it), the 1CRN entry and its
@@ -110,7 +117,7 @@ been checked, what has not, and what the program does not do yet.
 | Negative Hessian eigenvalues | Counted from Gaussian and Q-Chem optimisation steps only; ORCA, Psi4 and the other programs do not get this plot |
 | fchk files | No ECD rotatory strengths and no orbital contributions of the excited states; no IRC paths. Q-Chem fchk files hold no energies, so their steps have none. A checkpoint file's optimisation history is used only for an optimisation or scan job whose last step is the current geometry |
 | Gaussian inputs | ONIOM layers are read from Cartesian inputs only, not from Z-matrix inputs |
-| Layers not in the output | A Gaussian job that takes its molecule from the checkpoint (`Geom=Check`) lists no layers; nor does an ORCA QM/MM output without `QMAtoms`. Layers are rebuilt from the link atoms only when the atoms bonded to their QM side are exactly as many as the program counted, which fails when part of the QM region is bonded to no link atom (waters, ions, a separate ligand). Otherwise they are taken from another open document with the same atoms ([QM/MM and ONIOM](qmmm-oniom.md#outputs-that-do-not-list-the-layers)) |
+| Layers not in the output | A Gaussian job that takes its molecule from the checkpoint (`Geom=Check`) lists no layers; nor does an ORCA QM/MM output without `QMAtoms`. For Gaussian they are read from the population analysis of the high-level calculation, which needs a second table at another geometry with electronic embedding (a single point with `EmbedCharge` cannot be read this way) and fails with `Pop=None`. Otherwise they are rebuilt from the link atoms only when the atoms bonded to their QM side are exactly as many as the program counted, which fails when part of the QM region is bonded to no link atom (waters, ions, a separate ligand). Otherwise they are taken from another file with the same atoms ([QM/MM and ONIOM](qmmm-oniom.md#outputs-that-do-not-list-the-layers)) |
 | Clean-up | A generic force field for tidying sketches; not a published force field and not a physical method |
 | Downloads | PubChem: the first compound a name matches, as its first 3D conformer. Compounds without one (salts, mixtures, large or very flexible molecules) are built from their SMILES by BlueMolecule's own builder. PDB: mmCIF only, and only the first biological assembly. A download is read whole into memory. BlueMolecule has no network settings of its own: downloads use those of the system or the browser |
 | Conformer search | Ring conformations are not explored, and the energies come from the generic clean-up force field, so the ranking is rough. Up to 300 atoms |

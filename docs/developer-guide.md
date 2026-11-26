@@ -83,8 +83,10 @@ The full shape is documented at `newDataset()` and `newFrame()` in `src/parsers.
   basis,           // fchk, Molden: { source, shells: [{ atom, center (Bohr), l, pure, exps, coefs }], nbf }
   mos,             // fchk, Molden: { restricted, alpha: { energies, occupations, symmetries, coeffs }, beta }
   layers,          // QM/MM and ONIOM: { scheme, atomLayer, frozen, active, linkAtoms, mmTypes, mmCharges, labels,
-                   //   source: 'input' | 'checkpoint' | 'rebuilt' | 'document' | null, rebuilt: {qm, links}, from }
-                   //   atomLayer null = not listed in the file (BM.qmRegionFromLinks rebuilds it when it can)
+                   //   source: 'input' | 'checkpoint' | 'population' | 'rebuilt' | 'document' | null,
+                   //   population: {how: 'charges' | 'changed', qm, mid, links, tables}, rebuilt: {qm, links}, from }
+                   //   atomLayer null = not listed in the file (BM.oniomLayersFromPopulation reads it from Gaussian's
+                   //   sub-calculation Mulliken charges, BM.qmRegionFromLinks rebuilds it from the link atoms, when they can)
   warnings         // shown as "Reader notes"
 }
 ```
@@ -278,7 +280,7 @@ Each suite can also be run alone, e.g. `node tests/test_parsers.js`.
 | `test_parsers.js`, `test_parsers2.js`, `test_readers_qc.js`, `test_readers_struct.js`, `test_qmmm.js` | Readers and format detection against `tests/fixtures/` (expected values in `expected.json` files) |
 | `test_readers_qc2.js` | The 2.3 readers: Molpro, Dalton, Turbomole programs, GAMESS punch files and point groups, fchk excited states and optimisation history; each fixture also cut at 59 places |
 | `test_orbitals.js`, `browser_orbitals_test.js` | Orbitals, densities and spin densities from fchk and Molden files against the values and overlaps of `tools/mini_scf.py`, in each program's convention; the solid harmonics up to l = 6; the Molden round trip; cut and damaged files; molecular surfaces against their analytic radii; the potential of point charges; in Chromium, the Surfaces tab, the workers and the potential colours |
-| `browser_layers_test.js` | Layers an output does not list: a Gaussian `Geom=AllCheck` ONIOM job rebuilt from its link atoms and shown with the QM/MM display, one that cannot be rebuilt, taking layers from another open document (only documents with the same atoms offered), a GaussView-style input with residues, ORCA without the QM atom list (the cases themselves are in `test_qmmm.js`) |
+| `browser_layers_test.js` | Layers an output does not list: a Gaussian `Geom=AllCheck` ONIOM job rebuilt from its link atoms and shown with the QM/MM display, one read from the population analysis, one that cannot be rebuilt (with its Contents item), taking layers from another open document (only documents with the same atoms offered) or from a file opened with **Open file with the layers…** (a file without layers copies nothing), a GaussView-style input with residues, ORCA without the QM atom list (the cases themselves are in `test_qmmm.js`) |
 | `test_fetchdb.js`, `browser_fetch_test.js` | Downloads with a stand-in for the network: the addresses asked for (names encoded), no cookies, the 3D conformer and SMILES paths, the older SMILES property, errors, time-outs, cancelling, progress across pieces of UTF-8; in Chromium, the dialog: nothing sent before the permission or for a bad ID, PubChem, the SMILES path, the PDB and its assembly, Cancel, unticking, the Info tab's source |
 | `test_crystal_conformers.js`, `browser_build25_test.js` | Lattice parameters, supercells and slabs of rock salt and of a triclinic crystal (layer spacings, unimodular bases, bulk distances, terminations), cell edits and boxes; rotatable bonds and conformer searches (butane, hexane, decane); in Chromium, the Crystal and Conformers sections with undo and Save as |
 | `test_writers.js`, `test_writers_struct.js`, `test_audit.js` | Writers, round trips, regression tests from the code audit |

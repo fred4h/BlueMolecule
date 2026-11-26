@@ -30,7 +30,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SRC, DIST, LAUNCHER = ROOT / 'src', ROOT / 'dist', ROOT / 'launcher'
 NATIVE = ROOT / 'native'
-VERSION = '2.6.1'
+VERSION = '2.6.2'
 APP_ID = 'org.bluemolecule.BlueMolecule'
 LINUX_ICON_SIZES = (48, 64, 128, 256, 512)
 ICON_SIZES = (16, 32, 48, 64, 128, 256, 512, 1024)   # native/icons/icon_N.png, rendered from tools/icon.svg

@@ -3,6 +3,24 @@
 BlueMolecule is [vibe-coded](docs/vibe-coding.md). Each version below was written by an AI assistant from the
 author's requests and bug reports.
 
+## 2.6.2 (November 2026): ONIOM layers from the population analysis
+
+A Gaussian ONIOM job that takes its molecule from the checkpoint (`Geom=AllCheck`) could still open without its
+layers in 2.6.1: the rebuild from the link atoms does not find QM atoms that are bonded to no link atom (a ligand,
+ions, waters), and then the layers stayed unknown.
+- **Layers read from the high-level calculation.** Gaussian prints a Mulliken charge for every atom in the
+  population analysis of the high-level calculation on the model system. The QM atoms have charges, the atoms
+  replaced by link atoms are printed with the link atom's element, and the other atoms have 0. With electronic
+  embedding they have their fixed MM charges instead, and the QM atoms are the ones whose charges change between the
+  tables of an optimisation and frequency job. BlueMolecule now reads the layers from there (3-layer jobs also from
+  the medium-level calculation) when the atoms found are exactly as many as Gaussian counted (`NActive`). This finds
+  every part of the QM region. Checked on 50 real Gaussian 09 and 16 outputs: the same layers as their inputs, or
+  none when they cannot be told.
+- **Open file with the layers…**: a button in the Info tab's **ONIOM layers** section. The file chosen opens, and
+  its layers are copied at once when it has the same atoms.
+- A file whose layers are not known now has an **ONIOM layers: not listed** item in the Info tab's Contents, which
+  leads to that section.
+
 ## 2.6.1 (November 2026): ONIOM layers that an output does not list
 
 Fixes for QM/MM and ONIOM files whose layers were not shown:

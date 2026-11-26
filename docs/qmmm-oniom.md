@@ -44,18 +44,33 @@ Some outputs do not say which atom is in which layer:
 - an ORCA QM/MM output whose input echo has no `QMAtoms` list, and no QM-region geometry to match;
 - an xtb ONIOM run whose inner region is given in a file, or a CP2K run whose QM atoms cannot be matched.
 
-BlueMolecule then tries to **rebuild the layers from the link atoms**. Gaussian prints each link atom
+For Gaussian, BlueMolecule first **reads the layers from the population analysis** of the high-level calculation on
+the model system. There Gaussian prints a Mulliken charge for every atom of the real system:
+- the QM atoms have their charges;
+- the atoms that link atoms replace are printed with the link atom's element (usually H);
+- the other atoms have 0 or, with electronic embedding (`EmbedCharge`), their fixed MM charges.
+
+With mechanical embedding, the atoms with a charge are the model system. With electronic embedding, the MM atoms
+keep the same charges from one geometry to the next while the QM charges change, so a job with two such tables (an
+optimisation and frequency job prints one at the start of the optimisation and one in the frequency step) gives the
+model system too. A 3-layer job also needs the medium-level calculation on the mid system. The result is used only
+when it has exactly as many atoms as Gaussian counted for that system (`NActive`), and **Reader notes** says where the
+layers came from. This also finds parts of the QM region that are bonded to no link atom (waters, ions, a ligand).
+
+Otherwise BlueMolecule tries to **rebuild the layers from the link atoms**. Gaussian prints each link atom
 (`ONIOM: Cut between`) and how many atoms the QM side has (`NQM`, with Gaussian's own MM: Amber, UFF, Dreiding);
 ORCA prints its link atoms and the number of QM atoms. The QM region is taken as the atoms covalently bonded to the
 QM side of the link atoms. It is used only when it has exactly the number of atoms the program counted, and
 **Reader notes** says that it was rebuilt. It cannot work when part of the QM region is bonded to no link atom: a
 water, an ion or a ligand on its own.
 
-Otherwise the layers are not shown (rather than guessed), and the Info tab's **ONIOM layers** (or **QM/MM layers**)
-section says so. **Take them from another document**: open a file of the same system that lists them, with the same
-atoms in the same order, for example the input or the first output of the Gaussian series. Then choose it in that
-section and click **Use**. The layers, link atoms and residue names are copied; the document keeps its own method
-labels, freeze codes and energies. The same works to replace rebuilt layers with the original assignment.
+Otherwise the layers are not shown (rather than guessed). The Info tab's Contents then has an **ONIOM layers: not
+listed** item, which leads to the **ONIOM layers** (or **QM/MM layers**) section. **Take them from another
+document**: click **Open file with the layers…** and choose a file of the same system that lists them, with the same
+atoms in the same order, for example the input or the first output of the Gaussian series. Its layers are copied at
+once. A file that is already open can be chosen under **From** instead, then **Use**. The layers, link atoms and
+residue names are copied; the document keeps its own method labels, freeze codes and energies. The same works to
+replace read or rebuilt layers with the original assignment.
 
 The geometries and energies are read in every case.
 

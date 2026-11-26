@@ -1,9 +1,11 @@
-// Browser checks of 2.6.1 in dist/BlueMolecule.html (headless Chromium): QM/MM layers that an output does not list.
+// Browser checks of 2.6.1 and 2.6.2 in dist/BlueMolecule.html (headless Chromium): QM/MM layers that an output does not list.
 //   - a Gaussian ONIOM job that took its molecule from the checkpoint (Geom=AllCheck): layers rebuilt from the link
 //     atoms and shown with the QM/MM display; when they cannot be rebuilt, the Info tab says so
 //   - Info tab "ONIOM layers": take the layers (and residue names) from an open document with the same atoms
 //   - a GaussView-style ONIOM input with residue information opens with its layers
 //   - ORCA QM/MM without the QM atom list: layers unknown (not every atom MM), then taken from another document
+//   - 2.6.2: layers read from the population analysis of the high-level calculation; "Open file with the layers…";
+//     the Contents item of a file without layers
 // Usage: node tests/browser_layers_test.js
 const { chromium } = require('playwright');
 const path = require('path');
@@ -29,6 +31,16 @@ function allcheck(text, nqm) {
   return (text.slice(0, head) + block + text.slice(end)).replace(/ %chk=job\.chk\n/, ' %oldchk=job0.chk\n %chk=job.chk\n')
     .replace(/geom=connectivity/, 'geom=allcheck')
     .replace(/NAtoms=\s+17 NQM=\s+\d+ NQMF=\s+\d+ NMMI=\s+\d+ NMMIF=\s+\d+/, 'NAtoms=     17 NQM=        ' + String(nqm).padStart(2) + ' NQMF=       0 NMMI=      9 NMMIF=      3');
+}
+
+/** The high-level model calculation's Mulliken table (every atom: QM atoms and the link atom, printed as H, with charges;
+ *  the others 0) added to the first step (see withPop in tests/test_qmmm.js). */
+function withPop(text, layers) {
+  const Z = [6, 1, 1, 1, 6, 1, 1, 6, 8, 8, 1, 8, 1, 1, 8, 1, 1], sym = ['', 'H', '', '', '', '', 'C', '', 'O'];
+  const rows = Z.map((z, a) => String(a + 1).padStart(6) + '  ' + (a === 0 ? 'H' : sym[z]).padEnd(2) + (layers[a] === 'H' || a === 0 ? 0.05 + 0.01 * a : 0).toFixed(6).padStart(11));
+  const k = text.indexOf(' ONIOM: calculating energy.');
+  return text.slice(0, k) + ' ONIOM: generating point  2 -- high level on model system.\n NAtoms=   17 NActive=    8 NUniq=    8 SFac= 1.00D+00 NAtFMM=   60 NAOKFM=F Big=F\n' +
+    ' Mulliken charges:\n               1\n' + rows.join('\n') + '\n Sum of Mulliken charges =   0.00000\n' + text.slice(k);
 }
 
 (async () => {
@@ -66,6 +78,8 @@ function allcheck(text, nqm) {
   check(s.notes.some(n => /does not list which atoms are in which ONIOM layer/.test(n)), 'reader note');
   sec = await info();
   check(/Not listed in this file/.test(sec) && /From\s+restart\.log/.test(sec), 'Info: not listed; the rebuilt document (same atoms) is offered: ' + sec);
+  check(await page.$eval('#panel .contents', e => { const b = [...e.querySelectorAll('.ct.warn')].find(x => /ONIOM layers/.test(x.textContent)); return !!b && b.dataset.goAnchor === 'sec-layers' && /not listed/.test(b.textContent); }),
+    'Contents: an "ONIOM layers: not listed" item that leads to the section');
   await open('water.log', rd('g16_water_optfreq.log'));        // other atoms: never offered
   await open('job0.log', amber);                               // the job that started the series
   await act('restart-water.log');
@@ -81,6 +95,34 @@ function allcheck(text, nqm) {
   check(/Layers taken from job0\.log: 7 high, 10 low, 1 link atom/.test(await page.$eval('#status', e => e.textContent)), 'status message');
   check(/Taken from job0\.log/.test(await info()), 'Info: taken from');
   check(await page.evaluate(() => { const d = BM.app.state.active; return d.data.layers.frozen && d.data.layers.frozen.filter(Boolean).length === 3; }), 'frozen atoms kept from this job');
+
+  // ------------------------------------------------------------ read from the population analysis of the high-level calculation
+  await open('restart-pop.log', withPop(allcheck(amber, 11), want));
+  s = await state();
+  check(s.layers === want && s.source === 'population' && s.preset === 'qmmm', 'population analysis: layers and the QM/MM display: ' + JSON.stringify(s));
+  sec = await info();
+  check(/Read from the population analysis of the high-level calculation/.test(sec) && /Open file with the layers/.test(sec), 'Info: read from the population analysis: ' + sec);
+
+  // ------------------------------------------------------------ "Open file with the layers…": the file opened gives its layers
+  await open('restart-open.log', allcheck(amber, 11));
+  s = await state();
+  check(s.layers === null, 'another job without layers: unknown');
+  await info();
+  let chooser = page.waitForEvent('filechooser');
+  await page.click('[data-act="layers-open"]');
+  await (await chooser).setFiles({ name: 'water.log', mimeType: 'text/plain', buffer: Buffer.from(rd('g16_water_optfreq.log')) });
+  await page.waitForFunction(() => BM.app.state.docs.filter(d => d.name === 'water.log').length === 2);
+  check(/water\.log does not list QM\/MM layers either: nothing was copied to restart-open\.log/.test(await page.$eval('#status', e => e.textContent)), 'a file without layers: nothing copied, and the status says so');
+  await act('restart-open.log');
+  check((await state()).layers === null, 'still unknown');
+  await info();
+  chooser = page.waitForEvent('filechooser');
+  await page.click('[data-act="layers-open"]');
+  await (await chooser).setFiles({ name: 'first-job.log', mimeType: 'text/plain', buffer: Buffer.from(amber) });
+  await page.waitForFunction(() => BM.app.state.active && BM.app.state.active.name === 'restart-open.log' && BM.app.state.active.data.layers.source === 'document');
+  s = await state();
+  check(s.layers === want && s.from === 'first-job.log' && s.preset === 'qmmm', 'the file opened gives its layers to the job: ' + JSON.stringify(s));
+  check(await page.evaluate(() => BM.app.state.docs.some(d => d.name === 'first-job.log')), 'the file stays open as its own document');
 
   // ------------------------------------------------------------ a GaussView-style input with residue information
   const gjf = ['%chk=test.chk', '#p oniom(b3lyp/6-31g(d):amber)=embedcharge opt geom=connectivity', '', 'GaussView-style ONIOM input', '', '0 1 0 1 0 1',

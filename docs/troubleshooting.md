@@ -88,9 +88,12 @@ manager's **Open With → Other application** dialog.
 ## A QM/MM or ONIOM output shows no layers
 
 The output does not say which atom is in which layer. This happens with a Gaussian job that takes its molecule from
-the checkpoint (`Geom=Check`, `Geom=AllCheck`), as in the second and later jobs of a series. When the layers cannot
-be rebuilt from the link atoms, open the input (`.gjf`, `.com`) or the output that started the series, then take
-its layers in the Info tab under **ONIOM layers** ([details](qmmm-oniom.md#outputs-that-do-not-list-the-layers)).
+the checkpoint (`Geom=Check`, `Geom=AllCheck`), as in the second and later jobs of a series. BlueMolecule reads the
+layers from the population analysis of the high-level calculation, or rebuilds them from the link atoms, when the
+atoms it finds are exactly as many as Gaussian counted. When neither works (for example a single point with
+electronic embedding, or `Pop=None`), click **ONIOM layers: not listed** in the Info tab, then **Open file with the
+layers…**, and choose the input (`.gjf`, `.com`) or the output that started the series
+([details](qmmm-oniom.md#outputs-that-do-not-list-the-layers)).
 
 ## The QM/MM energy graph looks wrong
 

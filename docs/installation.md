@@ -24,7 +24,7 @@ They all contain the same viewer. Everything runs on your computer and files are
 ### The .deb package (Ubuntu, Kubuntu, Debian…)
 
 ```bash
-sudo apt install ./BlueMolecule_2.6.1_amd64.deb
+sudo apt install ./BlueMolecule_2.6.2_amd64.deb
 ```
 
 This installs the `bluemolecule` command, a menu entry under Science / Education, and the chemistry file types:
@@ -39,8 +39,8 @@ Debian 12 and later. Uninstall with `sudo apt remove blue-molecule` (the package
 ### The AppImage (any distribution)
 
 ```bash
-chmod +x BlueMolecule_2.6.1_amd64.AppImage
-./BlueMolecule_2.6.1_amd64.AppImage calc.log
+chmod +x BlueMolecule_2.6.2_amd64.AppImage
+./BlueMolecule_2.6.2_amd64.AppImage calc.log
 ```
 
 It brings its own libraries and needs nothing installed. Tools such as AppImageLauncher or Gear Lever add it to the
@@ -55,7 +55,7 @@ new window.
 
 ## Windows
 
-1. Run `BlueMolecule_2.6.1_x64-setup.exe`. If Windows says it protected your PC, click **More info → Run anyway**.
+1. Run `BlueMolecule_2.6.2_x64-setup.exe`. If Windows says it protected your PC, click **More info → Run anyway**.
 2. The installer needs **no administrator rights**. It installs for your user, in `%LOCALAPPDATA%\BlueMolecule`,
    adds BlueMolecule to the **Start menu**, and adds **Open with → BlueMolecule** for chemistry files: Gaussian
    `.log`/`.gjf`, ORCA `.out`/`.inp`, `.xyz`, `.fchk`, `.cube`, `.molden`, `.pdb`, `.cif`, `.sdf`, `.mol2`, `.gro`
@@ -66,7 +66,7 @@ Uninstall in **Settings → Apps → Installed apps → BlueMolecule**. This als
 
 ## macOS
 
-1. Open `BlueMolecule_2.6.1_universal.dmg` and drag **BlueMolecule** to **Applications**.
+1. Open `BlueMolecule_2.6.2_universal.dmg` and drag **BlueMolecule** to **Applications**.
 2. The first time, macOS says it cannot check the app for malicious software (it is not notarized):
    - **macOS 15 Sequoia and later:** try to open it once, then go to **System Settings → Privacy & Security**,
      scroll down to the message about BlueMolecule and click **Open Anyway**.
