@@ -1,7 +1,0 @@
-run 44156851328
-commit 794351ed337731b5fa04d633d5e674fa79eca37c
-branch claude/2.0-desktop
-build result abandoned
-url https://github.com/fred4h/BlueMolecule/actions/runs/44156851328
-report-linux: exit=0 seconds=15
-report-windows: exit=0 seconds=14
