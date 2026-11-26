@@ -254,6 +254,156 @@ test('QM/MM outputs read from lines give the same datasets', () => {
   }
 });
 
+// ------------------------------------------------------------------ layers the output does not list (2.6.1)
+/**
+ * The Amber fixture as a job that takes its molecule from the checkpoint (Geom=AllCheck): Gaussian then prints
+ * "Structure from the checkpoint file" rows "El,freeze,x,y,z" without layers, as in real outputs, and NQM counts the
+ * model-system atoms other than link atoms (high layer + replaced atoms, with Gaussian's own MM). opts: nqm, route,
+ * rows (a function of the echo row tokens).
+ */
+function allcheck(text, opts) {
+  opts = opts || {};
+  const head = text.indexOf(' Symbolic Z-matrix:'), end = text.indexOf('\n \n', head);
+  const rows = text.slice(head, end).split('\n').filter(l => /^ [A-Z][a-z]?-/.test(l)).map(l => l.trim().split(/\s+/));
+  const row = opts.rows || (t => t[0].split('-')[0] + ',' + t[1] + ',' + t[2] + ',' + t[3] + ',' + t[4]);
+  const block = ' Structure from the checkpoint file:  "job0.chk"\n' +
+    ' Charge =  0 Multiplicity = 1 for low   level calculation on real  system.\n' +
+    ' Charge =  0 Multiplicity = 1 for high  level calculation on model system.\n' +
+    ' Charge =  0 Multiplicity = 1 for low   level calculation on model system.\n' +
+    ' Redundant internal coordinates found in file.\n' + rows.map(t => ' ' + row(t)).join('\n') + '\n Recover connectivity data from disk.';
+  let out = (text.slice(0, head) + block + text.slice(end)).replace(/ %chk=job\.chk\n/, ' %oldchk=job0.chk\n %chk=job.chk\n')
+    .replace(/geom=connectivity/, 'geom=allcheck')
+    .replace(/NAtoms=\s+17 NQM=\s+\d+ NQMF=\s+\d+ NMMI=\s+\d+ NMMIF=\s+\d+/, 'NAtoms=     17 NQM=        ' + String(opts.nqm || 8).padStart(2) + ' NQMF=       0 NMMI=      9 NMMIF=      3');
+  if (opts.route) out = out.replace(/oniom\(b3lyp\/6-31g\(d\):amber\)/, opts.route);
+  return out;
+}
+
+test('Gaussian ONIOM from the checkpoint (Geom=AllCheck): layers rebuilt from the link atoms', () => {
+  const f = 'g16_oniom_amber_opt.log', exp = EXP[f], text = allcheck(read(f));
+  ok(!/Symbolic Z-matrix/.test(text) && /Structure from the checkpoint file/.test(text), 'variant has no molecule echo');
+  const ds = load('restart.log', text);
+  common(ds, exp);
+  series(ds, exp);
+  const L = ds.layers;
+  eq(L.source, 'rebuilt', 'source');
+  eq(L.atomLayer.join(''), exp.atomLayer.join(''), 'high layer = the atoms bonded to the QM side of the link atom (NQM 8 = 7 + 1 replaced)');
+  same(L.rebuilt, { qm: 7, links: 1 }, 'rebuilt counts');
+  same(L.frozen, exp.frozen, 'frozen atoms from the freeze codes of the checkpoint rows');
+  same(L.linkAtoms.map(l => [l.atom, l.bondedTo, l.element]), [[0, 4, 'H']], 'link atom from "ONIOM: Cut between"');
+  eq(L.mmTypes, null, 'no MM types (not printed)');
+  same(L.labels, exp.labels, 'method labels from the route');
+  eq(L.chargeMult.length, 3, 'per-layer charge / multiplicity from the checkpoint block');
+  eq(ds.meta.oldchk, 'job0.chk', '%oldchk'); eq(ds.meta.chk, 'job.chk', '%chk');
+  eq(ds.warnings.length, 1, 'one reader note');
+  ok(/checkpoint file \(Geom=Check\).*rebuilt them from the 1 link atom: the 7 atoms.*continued from job0\.chk.*take its layers in the Info tab/.test(ds.warnings[0]), 'note: ' + ds.warnings[0]);
+  // read from lines (big files) the same
+  const ser = x => JSON.stringify(x, (k, v) => (ArrayBuffer.isView(v) ? Array.from(v) : v));
+  eq(ser(BM.parseLines('restart.log', text.split('\n'))), ser(ds), 'parseLines = parseFile');
+});
+
+test('Gaussian ONIOM from the checkpoint: layers left unknown when the link atoms cannot account for them', () => {
+  const f = 'g16_oniom_amber_opt.log', exp = EXP[f];
+  // a water in the QM region: 10 QM atoms, but only 7 are bonded to the link atom's QM end
+  let ds = load('restart.log', allcheck(read(f), { nqm: 11 }));
+  eq(ds.layers.atomLayer, null, 'not rebuilt: layers unknown, not guessed');
+  eq(ds.layers.source, null, 'no source');
+  same(ds.layers.frozen, exp.frozen, 'freeze codes still read');
+  eq(ds.layers.linkAtoms.length, 1, 'link atom still known');
+  ok(ds.warnings.length === 1 && /does not list which atoms.*1 link atom alone does not give the whole QM region.*continued from job0\.chk.*take its layers in the Info tab/.test(ds.warnings[0]), 'note: ' + ds.warnings[0]);
+  arrNear(ds.frames.map(x => x.energy), exp.energies, 1e-9, 'energies unchanged');
+  // QM:QM (no Gaussian MM low level): NQM is not the model-system count, so nothing is rebuilt
+  ds = load('restart.log', allcheck(read(f), { route: 'oniom(b3lyp/6-31g(d):pm6)' }));
+  eq(ds.layers.atomLayer, null, 'QM:QM: not rebuilt');
+  eq(ds.layers.labels.L, 'PM6', 'low level PM6');
+  // too many counted atoms in reach: a boundary bond without a link atom (the walk leaks): not rebuilt
+  ds = load('restart.log', allcheck(read(f), { nqm: 6 }));
+  eq(ds.layers.atomLayer, null, 'fewer QM atoms counted than bonded: not rebuilt');
+});
+
+test('Gaussian ONIOM: checkpoint rows that carry layers, and molecule echoes in Z-matrix form', () => {
+  const f = 'g16_oniom_amber_opt.log', exp = EXP[f], text = read(f);
+  // rows "El-Type-Charge,freeze,x,y,z,Layer[,link,host]" are read like the echo
+  let ds = load('restart.log', allcheck(text, { rows: t => t.slice(0, 5).concat(t.slice(5)).join(',') }));
+  eq(ds.layers.source, 'checkpoint', 'layers from the checkpoint rows');
+  eq(ds.layers.atomLayer.join(''), exp.atomLayer.join(''), 'H/L flags');
+  same(ds.layers.mmTypes, exp.mmTypes, 'MM types'); same(ds.layers.frozen, exp.frozen, 'frozen');
+  same(ds.layers.linkAtoms.map(l => [l.atom, l.bondedTo, l.type]), [[0, 4, 'HC']], 'link atom with its type');
+  eq(ds.warnings.length, 0, 'no note');
+  // an echo whose rows are a Z-matrix (no Cartesian coordinates): rebuilt from the link atoms as well
+  const zm = text.replace(/^( [A-Z][a-z]?-\S+\s+-?\d)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)( [HL])/gm, '$1   R1   A1   D1 $5')
+    .replace(/NAtoms=\s+17 NQM=\s+\d+/, 'NAtoms=     17 NQM=        8');
+  ds = load(f, zm);
+  eq(ds.layers.source, 'rebuilt', 'Z-matrix echo: rebuilt');
+  eq(ds.layers.atomLayer.join(''), exp.atomLayer.join(''), 'Z-matrix echo: H/L flags');
+  ok(/not in Cartesian form.*rebuilt them/.test(ds.warnings[0] || ''), 'note: ' + ds.warnings[0]);
+});
+
+test('BM.qmRegionFromLinks', () => {
+  // ethanol-like chain C0-C1-O2-H3 with H on C0 (4..6) and C1 (7, 8); link between C0 (MM) and C1 (QM)
+  const Z = [6, 6, 8, 1, 1, 1, 1, 1, 1];
+  const X = [0, 0, 0, 1.52, 0, 0, 2.0, 1.35, 0, 2.95, 1.35, 0, -0.36, 1.02, 0, -0.36, -0.51, 0.89, -0.36, -0.51, -0.89, 1.88, -0.51, 0.89, 1.88, -0.51, -0.89];
+  const qm = BM.qmRegionFromLinks(Z, X, [{ atom: 0, bondedTo: 1 }], 5);
+  same(qm, [1, 2, 3, 7, 8], 'QM side of the link: C1, O2, H3 and the two H on C1');
+  eq(BM.qmRegionFromLinks(Z, X, [{ atom: 0, bondedTo: 1 }], 6), null, 'count mismatch: null');
+  eq(BM.qmRegionFromLinks(Z, X, [], 5), null, 'no link atoms: null');
+  eq(BM.qmRegionFromLinks(Z, X, [{ atom: 0, bondedTo: 99 }], 5), null, 'bad index: null');
+  // a hydrogen 1.0 Å from another hydrogen (short contact) is no path
+  const Z2 = Z.concat([1, 8, 1]), X2 = X.concat([3.4, 2.2, 0, 4.0, 2.9, 0, 4.9, 2.6, 0]);
+  same(BM.qmRegionFromLinks(Z2, X2, [{ atom: 0, bondedTo: 1 }], 5), [1, 2, 3, 7, 8], 'the walk stops at hydrogens');
+});
+
+test('ORCA QM/MM without the QM atom list: rebuilt from the link atoms, else unknown (not all MM)', () => {
+  const f = 'orca6_qmmm_opt.out', exp = EXP[f], text = read(f);
+  const noList = text.replace(/^\|\s*\d+>\s*QMAtoms \{4:10\} end\n/m, '')
+    .replace(/-{33}\nCARTESIAN COORDINATES \(ANGSTROEM\)\n-{33}\n((?:  [A-Z][a-z]?\s+\S+\s+\S+\s+\S+\n){8})\n/g, '');
+  let ds = load(f, noList);
+  eq(ds.layers.source, 'rebuilt', 'rebuilt from the link atom rows and "Number of QM atoms"');
+  eq(ds.layers.atomLayer.join(''), exp.atomLayer.join(''), 'QM atoms');
+  ok(/not listed in this output.*rebuilt them from the 1 link atom: the 7 atoms/.test(ds.warnings.join(' ')), 'note');
+  ds = load(f, noList.replace(/^Link atom.*\n/gm, ''));
+  eq(ds.layers.atomLayer, null, 'without link atoms: unknown, not every atom MM');
+  ok(/not listed in this output.*take its layers in the Info tab/.test(ds.warnings.join(' ')), 'note: take them from another document');
+  eq(load(f).layers.source, 'input', 'with QMAtoms: source input');
+});
+
+test('Gaussian ONIOM inputs: layers, link atoms, freeze codes, residues (GaussView style)', () => {
+  const gjf = ['%chk=test.chk', '#p oniom(b3lyp/6-31g(d):amber)=embedcharge opt geom=connectivity', '', 'GaussView-style ONIOM input', '',
+    '0 1 0 1 0 1',
+    ' N-N3-0.1592(PDBName=N,ResName=SER,ResNum=1)     0   -1.200000    0.300000    0.000000 L',
+    ' H-H-0.1849(PDBName=H1,ResName=SER,ResNum=1)     0   -1.900000    1.000000    0.000000 L',
+    ' C-CX-0.0567(PDBName=CA,ResName=SER,ResNum=1)    0    0.000000    0.000000    0.000000 L H-HC 4',
+    ' C-2C-0.2596(PDBName=CB,ResName=SER,ResNum=1)    0    0.800000    1.300000    0.000000 H',
+    ' O-OH--0.6714(PDBName=OG,ResName=SER,ResNum=1)  -1    2.100000    1.100000    0.000000 H',
+    ' H-HO-0.4239(PDBName=HG,ResName=SER,ResNum=1)    0    2.500000    1.950000    0.000000 H',
+    '', ' 1 2 1.0 3 1.0', ' 2', ' 3 4 1.0', ' 4 5 1.0', ' 5 6 1.0', ' 6', '', ''].join('\n');
+  let ds = BM.parseFile('serine.gjf', gjf);
+  eq(ds.format, 'gaussian-input', 'opens (residue information with commas inside parentheses)');
+  same(Array.from(ds.frames[0].Z), [7, 1, 6, 6, 8, 1], 'elements');
+  const L = ds.layers;
+  eq(ds.meta.qmmm, true, 'qmmm'); eq(L.source, 'input', 'source');
+  eq(L.atomLayer.join(''), 'LLLHHH', 'layers');
+  same(L.linkAtoms.map(l => [l.atom, l.bondedTo, l.element, l.type]), [[2, 3, 'H', 'HC']], 'link atom');
+  same(L.frozen, [false, false, false, false, true, false], 'freeze code -1');
+  same(L.mmTypes, ['N3', 'H', 'CX', '2C', 'OH', 'HO'], 'MM types');
+  arrNear(L.mmCharges, [0.1592, 0.1849, 0.0567, 0.2596, -0.6714, 0.4239], 1e-12, 'MM charges');
+  same(L.chargeMult.map(c => c.level + '-' + c.system), ['low-real', 'high-model', 'low-model'], 'charge / multiplicity pairs');
+  eq(L.embedding, 'electronic', 'EmbedCharge');
+  same(ds.frames[0].resNames, ['SER', 'SER', 'SER', 'SER', 'SER', 'SER'], 'residue names');
+  same(ds.frames[0].atomNames, ['N', 'H1', 'CA', 'CB', 'OG', 'HG'], 'atom names');
+  eq(ds.warnings.length, 0, 'no warnings');
+  // the same rows separated by commas, and three layers with six charge / multiplicity pairs
+  const three = gjf.replace('amber)=embedcharge', 'pm6:amber)').replace('0 1 0 1 0 1', '0 1 0 1 0 1 0 1 0 1 0 1')
+    .replace(/(PDBName=N,ResName=SER,ResNum=1\))     0   -1.200000    0.300000    0.000000 L/, '$1,0,-1.2,0.3,0.0,M');
+  ds = BM.parseFile('three.gjf', three);
+  eq(ds.layers.atomLayer.join(''), 'MLLHHH', 'comma-separated row and a medium layer');
+  eq(ds.layers.nLayers, 3, 'three layers'); eq(ds.layers.labels.M, 'PM6', 'medium level');
+  same(ds.layers.chargeMult.map(c => c.level + '-' + c.system), ['low-real', 'med-mid', 'low-mid', 'high-model', 'med-model', 'low-model'], 'six pairs');
+  // a plain (non-ONIOM) input with residue information also opens, with its residues
+  ds = BM.parseFile('plain.gjf', ['#p b3lyp/6-31g(d) opt', '', 'plain', '', '0 1',
+    ' O(PDBName=O,ResName=HOH,ResNum=5)  0.0 0.0 0.117', ' H(PDBName=H1,ResName=HOH,ResNum=5) 0.0 0.757 -0.469', ' H(PDBName=H2,ResName=HOH,ResNum=5) 0.0 -0.757 -0.469', '', ''].join('\n'));
+  eq(ds.frames[0].Z.length, 3, 'plain input opens'); same(ds.frames[0].resNames, ['HOH', 'HOH', 'HOH'], 'plain input residues'); ok(!ds.layers && !ds.meta.qmmm, 'no layers');
+});
+
 test('non-QM/MM outputs are not flagged', () => {
   for (const f of ['g16_water_optfreq.log', 'orca5_water_optfreq.out']) {
     const ds = BM.parseFile(f, fs.readFileSync(path.join(__dirname, 'fixtures', f), 'utf8'));

@@ -8,7 +8,7 @@ BlueMolecule reads multi-layer calculations and shows each layer in its own styl
 
 | Program | Calculations | What is read |
 |---|---|---|
-| **Gaussian** | ONIOM with 2 or 3 layers: any QM:QM, QM:MM or QM:QM:MM combination, including Amber, UFF and Dreiding for the low layer; optimisations with microiterations; frequencies | The layer of every atom (H, M or L), link atoms with their element, type and the atom they are bonded to, MM atom types and charges, and freeze codes. For each optimisation step: the total (extrapolated) ONIOM energy and the layer energies (high-model, low-model, low-real, and for 3 layers also med-mid, med-model and low-mid) |
+| **Gaussian** | ONIOM with 2 or 3 layers: any QM:QM, QM:MM or QM:QM:MM combination, including Amber, UFF and Dreiding for the low layer; optimisations with microiterations; frequencies. Outputs (`.log`) and inputs (`.gjf`, `.com`) | The layer of every atom (H, M or L), link atoms with their element, type and the atom they are bonded to, MM atom types and charges, freeze codes, and residue names written by GaussView (`PDBName`, `ResName`, `ResNum`). For each optimisation step: the total (extrapolated) ONIOM energy and the layer energies (high-model, low-model, low-real, and for 3 layers also med-mid, med-model and low-mid) |
 | **ORCA** | QM/MM (ORCA 6), QM/XTB and QM/QM2 | The QM (and QM2) atoms, active and frozen atoms, and link atoms. For each step: the total energy and its components (QM, MM, QM–MM, or high-model, low-model and low-real for QM/QM2) |
 | **CP2K** | QM/MM | The QM atoms and link atoms; the energy of each optimisation step |
 | **xtb** | ONIOM (`--oniom`, e.g. GFN2-xTB:GFN-FF) | The inner-region atoms and the two methods |
@@ -35,9 +35,29 @@ ORCA usually prints only the QM region (its QM atoms, then its link atoms), not 
 with `*pdbfile` inputs, where ORCA writes the full system to its trajectory and PDB files. BlueMolecule then shows the
 QM region, marks its link atoms, and says so under **Reader notes**.
 
-When an output does not echo the molecule in Cartesian form, BlueMolecule cannot assign the layers and says so
-under **Reader notes**. For example, this happens with Gaussian `geom=check`, where the molecule is taken from the
-checkpoint. The geometries and energies are still read.
+## Outputs that do not list the layers
+
+Some outputs do not say which atom is in which layer:
+- a Gaussian job that takes its molecule from the checkpoint file (`Geom=Check` or `Geom=AllCheck`, often the
+  second and later jobs of a series started with `%OldChk`): Gaussian prints the coordinates and freeze codes, but
+  no layers;
+- an ORCA QM/MM output whose input echo has no `QMAtoms` list, and no QM-region geometry to match;
+- an xtb ONIOM run whose inner region is given in a file, or a CP2K run whose QM atoms cannot be matched.
+
+BlueMolecule then tries to **rebuild the layers from the link atoms**. Gaussian prints each link atom
+(`ONIOM: Cut between`) and how many atoms the QM side has (`NQM`, with Gaussian's own MM: Amber, UFF, Dreiding);
+ORCA prints its link atoms and the number of QM atoms. The QM region is taken as the atoms covalently bonded to the
+QM side of the link atoms. It is used only when it has exactly the number of atoms the program counted, and
+**Reader notes** says that it was rebuilt. It cannot work when part of the QM region is bonded to no link atom: a
+water, an ion or a ligand on its own.
+
+Otherwise the layers are not shown (rather than guessed), and the Info tab's **ONIOM layers** (or **QM/MM layers**)
+section says so. **Take them from another document**: open a file of the same system that lists them, with the same
+atoms in the same order, for example the input or the first output of the Gaussian series. Then choose it in that
+section and click **Use**. The layers, link atoms and residue names are copied; the document keeps its own method
+labels, freeze codes and energies. The same works to replace rebuilt layers with the original assignment.
+
+The geometries and energies are read in every case.
 
 ## Viewing the layers
 

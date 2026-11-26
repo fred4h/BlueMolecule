@@ -546,9 +546,24 @@
     if (m[4]) for (const kv of m[4].split(',')) { const e = kv.indexOf('='); if (e > 0) props[kv.slice(0, e).trim()] = kv.slice(e + 1).trim(); }
     return { el: m[1], Z: BM.el.toZ(m[1]), type, charge, props };
   }
-  /** One atom row of an ONIOM input echo: spec [freeze] x y z [H|M|L [link-spec bondedTo [factors...]]]. */
+  /** The fields of an atom row, split on spaces and on commas outside parentheses:
+   *  "N-N3-0.1592(PDBName=N,ResName=SER,ResNum=1),0,1.2,0.3,0.0,L" -> [spec, '0', '1.2', '0.3', '0.0', 'L']. */
+  function rowTokens(t) {
+    const out = [];
+    let cur = '', d = 0;
+    for (const ch of String(t)) {
+      if (ch === '(') d++; else if (ch === ')') d = Math.max(0, d - 1);
+      if (d === 0 && (ch === ',' || ch === ' ' || ch === '\t')) { if (cur) out.push(cur); cur = ''; continue; }
+      cur += ch;
+    }
+    if (cur) out.push(cur);
+    return out;
+  }
+  /** One atom row of an ONIOM input echo: spec [freeze] x y z [H|M|L [link-spec bondedTo [factors...]]]. The same
+   *  fields separated by commas are the rows of a structure taken from a checkpoint file ("C,0,x,y,z"). */
   function oniomAtomRow(t) {
-    const tk = t.split(/\s+/);
+    const tk = rowTokens(t);
+    if (!tk.length) return null;
     const a = oniomAtomSpec(tk[0]);
     if (!a) return null;
     let k = 1, freeze = null;
@@ -590,6 +605,84 @@
     }
     return { cm, atoms };
   }
+  /** "Structure from the checkpoint file:" (Geom=Check / AllCheck): a title, the charge / multiplicity lines and rows
+   *  "C,0,x,y,z" (element, freeze code, coordinates). Gaussian prints no ONIOM layers here; rows that carry them anyway
+   *  are read like the input echo. */
+  function readChkStructure(L, j) {
+    const cm = [], atoms = [];
+    const end = Math.min(L.length, j + 40);
+    let first = -1;
+    for (; j < end; j++) {          // up to the first row: title, charges, "Redundant internal coordinates found in file."
+      const t = L[j].trim();
+      const m = /^Charge\s*=\s*(-?\d+)\s+Multiplicity\s*=\s*(\d+)(?:\s+for\s+(\w+)\s+level\s+calculation\s+on\s+(\w+)\s+system)?/i.exec(t);
+      if (m) {
+        cm.push({ charge: int(m[1]), multiplicity: int(m[2]), level: m[3] ? (ONIOM_LEVEL[m[3].toLowerCase()] || m[3].toLowerCase()) : null,
+          system: m[4] ? (ONIOM_SYSTEM[m[4].toLowerCase()] || m[4].toLowerCase()) : null });
+        continue;
+      }
+      if (t.indexOf(',') > 0 && oniomAtomRow(t)) { first = j; break; }
+    }
+    if (first < 0) return { cm, atoms };
+    for (j = first; j < L.length; j++) {
+      const a = oniomAtomRow(L[j].trim());
+      if (!a) break;
+      atoms.push(a);
+    }
+    return { cm, atoms };
+  }
+  /**
+   * BM.qmRegionFromLinks(Z, xyz, links, nQM) -> sorted QM atom indices | null
+   * The QM region of a QM/MM partition that the output does not list atom by atom: the atoms covalently bonded (the
+   * viewer's own rule, radii + 0.4 Å) to the QM ends of the link atoms (links: [{atom: replaced MM atom, bondedTo: QM
+   * atom}]), never crossing a link bond or entering a replaced atom. A hydrogen ends the walk (one bond: short contacts
+   * to other atoms are no path). Accepted only when it has exactly nQM atoms; QM atoms bonded to no link atom (waters,
+   * ions, a ligand on its own) cannot be found this way, and the result is null.
+   */
+  function qmRegionFromLinks(Z, X, links, nQM) {
+    const N = Z ? Z.length : 0;
+    if (!N || !X || X.length < 3 * N || !links || !links.length || !(nQM > 0) || nQM >= N) return null;
+    const host = new Uint8Array(N), blocked = new Set();
+    for (const l of links) {
+      if (!(l.atom >= 0 && l.atom < N && l.bondedTo >= 0 && l.bondedTo < N)) return null;
+      host[l.atom] = 1;
+      blocked.add(l.atom * N + l.bondedTo); blocked.add(l.bondedTo * N + l.atom);
+    }
+    const cov = z => { const r = BM.el.covalent[z]; return r > 0 ? r : 1.5; };
+    let maxR = 0;
+    for (let a = 0; a < N; a++) if (Z[a] > 0) maxR = Math.max(maxR, cov(Z[a]));
+    const cell = 2 * maxR + 0.4, grid = new Map(), key = (i, j, k) => i + ',' + j + ',' + k;
+    const ci = a => [Math.floor(X[3 * a] / cell), Math.floor(X[3 * a + 1] / cell), Math.floor(X[3 * a + 2] / cell)];
+    for (let a = 0; a < N; a++) {
+      if (!(Z[a] > 0)) continue;
+      const c = ci(a), k = key(c[0], c[1], c[2]);
+      const l = grid.get(k); if (l) l.push(a); else grid.set(k, [a]);
+    }
+    const inQM = new Uint8Array(N), stack = [];
+    for (const l of links) if (!host[l.bondedTo] && !inQM[l.bondedTo]) { inQM[l.bondedTo] = 1; stack.push(l.bondedTo); }
+    let count = stack.length;
+    while (stack.length) {
+      const a = stack.pop();
+      if (Z[a] === 1) continue;
+      const c = ci(a), ra = cov(Z[a]);
+      for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) for (let dk = -1; dk <= 1; dk++) {
+        const l = grid.get(key(c[0] + di, c[1] + dj, c[2] + dk));
+        if (!l) continue;
+        for (const b of l) {
+          if (inQM[b] || host[b] || blocked.has(a * N + b)) continue;
+          const dx = X[3 * b] - X[3 * a], dy = X[3 * b + 1] - X[3 * a + 1], dz = X[3 * b + 2] - X[3 * a + 2], d2 = dx * dx + dy * dy + dz * dz;
+          const lim = ra + cov(Z[b]) + 0.4;
+          if (d2 < lim * lim && d2 > 0.16) {
+            inQM[b] = 1; stack.push(b);
+            if (++count > nQM) return null;   // the region leaks past the count: some boundary bond has no link atom
+          }
+        }
+      }
+    }
+    if (count !== nQM) return null;
+    const out = [];
+    for (let a = 0; a < N; a++) if (inQM[a]) out.push(a);
+    return out;
+  }
   /** Method labels {H, M, L} from "ONIOM(B3LYP/6-31G(d):Amber=SoftFirst)=EmbedCharge". */
   function oniomLabels(route) {
     const i = route.search(/oniom\s*\(/i);
@@ -618,26 +711,54 @@
     if (lab.length >= 3) { out.M = lab[1]; out.L = lab[2]; } else out.L = lab[1] || null;
     return out;
   }
-  function buildOniomLayers(route, echo, nReal, cuts, ee) {
-    const atoms = echo && echo.atoms.length === nReal ? echo.atoms : null;
+  /**
+   * The layers of a Gaussian ONIOM job (output or input). Per-atom layers come from, in this order:
+   *  - the molecule echo ("Symbolic Z-matrix:", or the rows of an input file), source 'input';
+   *  - a structure taken from the checkpoint file whose rows carry layers, source 'checkpoint';
+   *  - rebuilt (source 'rebuilt'): with Geom=Check / AllCheck Gaussian lists no layers, but prints the link atoms
+   *    ("ONIOM: Cut between") and NQM, the atoms of the model system other than link atoms (high-layer atoms plus the
+   *    atoms the link atoms replace, with Gaussian's own MM). The atoms bonded to the QM ends of the link atoms make the
+   *    high layer when their number matches (2-layer QM:MM only);
+   *  - otherwise atomLayer stays null (unknown).
+   * more: {chk: readChkStructure result, counts: {nAtoms, nqm}, frame: a full-system frame}.
+   */
+  function buildOniomLayers(route, echo, nReal, cuts, ee, more) {
+    more = more || {};
+    let atoms = echo && echo.atoms && echo.atoms.length === nReal ? echo.atoms : null, source = atoms ? 'input' : null;
+    const chk = more.chk && more.chk.atoms.length === nReal ? more.chk.atoms : null;
+    if (!atoms && chk && chk.some(a => a.layer)) { atoms = chk; source = 'checkpoint'; }
+    const typed = atoms || chk;      // freeze codes, MM types and charges also from a structure without layers
     const labels = oniomLabels(route);
-    const anyFreeze = atoms && atoms.some(a => a.freeze !== null && a.freeze !== 0);
-    const frozen = anyFreeze ? atoms.map(a => a.freeze === -1) : null;
+    const anyFreeze = typed && typed.some(a => a.freeze !== null && a.freeze !== 0);
+    const frozen = anyFreeze ? typed.map(a => a.freeze === -1) : null;
     let linkAtoms = [];
     if (atoms) atoms.forEach((a, k) => { if (a.link) linkAtoms.push({ atom: k, bondedTo: a.link.bondedTo, element: a.link.el, type: a.link.type || null, factors: a.link.factors.length ? a.link.factors : null }); });
     if (!linkAtoms.length && cuts.length) linkAtoms = cuts.map(c => ({ atom: c.atom, bondedTo: c.bondedTo, element: c.element, type: null, factors: c.factor ? [c.factor] : null }));
+    let atomLayer = atoms ? atoms.map(a => a.layer || 'H') : null, rebuilt = null;
+    const c = more.counts, fr = more.frame;
+    if (!atomLayer && c && fr && fr.Z.length === nReal && !labels.M && /^(amber|uff|dreiding)/i.test(labels.L || '') &&
+        c.nAtoms === nReal && c.nqm > 0 && c.nqm < nReal && linkAtoms.length) {
+      const hosts = new Set(linkAtoms.map(l => l.atom));
+      const qm = qmRegionFromLinks(fr.Z, fr.xyz, linkAtoms, c.nqm - hosts.size);
+      if (qm) {
+        const s = new Set(qm);
+        atomLayer = Array.from({ length: nReal }, (_, a) => (s.has(a) ? 'H' : 'L'));
+        source = 'rebuilt'; rebuilt = { qm: qm.length, links: linkAtoms.length };
+      }
+    }
     const layers = {
       scheme: 'oniom',
-      atomLayer: atoms ? atoms.map(a => a.layer || 'H') : null,
+      atomLayer,
       frozen, active: frozen ? frozen.map(f => !f) : null,
       linkAtoms,
-      mmTypes: atoms && atoms.some(a => a.type) ? atoms.map(a => a.type || null) : null,
-      mmCharges: atoms && atoms.some(a => a.charge !== null) ? atoms.map(a => (a.charge === null ? NaN : a.charge)) : null,
+      mmTypes: typed && typed.some(a => a.type) ? typed.map(a => a.type || null) : null,
+      mmCharges: typed && typed.some(a => a.charge !== null) ? typed.map(a => (a.charge === null ? NaN : a.charge)) : null,
       labels,
       nLayers: labels.M ? 3 : 2,
       embedding: ee ? 'electronic' : 'mechanical',
-      chargeMult: echo ? echo.cm.filter(c => c.level) : [],
-      freezeCodes: anyFreeze ? atoms.map(a => (a.freeze === null ? 0 : a.freeze)) : null
+      chargeMult: echo && echo.cm ? echo.cm.filter(x => x.level) : more.chk ? more.chk.cm.filter(x => x.level) : [],
+      freezeCodes: anyFreeze ? typed.map(a => (a.freeze === null ? 0 : a.freeze)) : null,
+      source, rebuilt
     };
     return layers;
   }
@@ -668,6 +789,7 @@
     // never stand in for it). Layer energies (gridpoints) go to frame.energies as 'high-model', 'low-real', ...
     let oniomJob = false, oniomOpt = false, oniomRoute = null, oniomEcho = null, nReal = 0, stepOpen = false, oniomEDone = false, oniomEE = false;
     let oniomSub = null;   // layer key of the sub-calculation being printed ("ONIOM: generating point 2 -- high level on model system.")
+    let oniomChk = null, oniomCounts = null;   // structure taken from the checkpoint (Geom=Check); "NAtoms= NQM=" counts
     const oniomFrames = new Map(), oniomCuts = [], oniomMM = new Map();   // ONIOM frame -> rank of its orientation; frame -> MM "Energy=" values
     const E = (kind, v) => { if (!oniomJob) sink.energy(kind, v); };   // sub-calculation energies: not in ONIOM jobs
     const closeStep = () => { stepOpen = false; oniomEDone = false; oniomSub = null; };
@@ -723,6 +845,11 @@
         continue;
       }
       inState = false;
+      if (c === '%' && routes === 0) {   // Link 0 commands of the first job: %chk, %oldchk (where Geom=Check reads from)
+        const m = /^%(old)?chk\s*=\s*(\S+)/i.exec(t);
+        if (m) { if (m[1]) meta.oldchk = m[2]; else meta.chk = m[2]; }
+        continue;
+      }
       if (c === '!') {
         // "! Initial / Optimized / Non-Optimized Parameters !" tables: scanned coordinates and their values
         const h = /^!\s*(Initial|Optimized|Non-Optimized)\s+Parameters\s*!/.exec(t);
@@ -813,6 +940,10 @@
         }
         continue;
       }
+      if (oniomJob && c === 'S' && t.startsWith('Structure from the checkpoint')) {
+        const s = readChkStructure(L, i + 1);    // rows are left to the main loop (charge lines are read there too)
+        if (s.atoms.length && !oniomChk) oniomChk = s;
+      }
       if (oniomJob && c === 'S' && t.startsWith('Symbolic Z-matrix')) {
         const echo = readOniomEcho(L, i + 1);   // rows are left to the main loop (charge lines are read there too)
         if (echo.atoms.length) nReal = echo.atoms.length;
@@ -891,7 +1022,7 @@
         if (m) { oniomSub = oniomKey(m[1], m[2]); continue; }
         if (t.startsWith('ONIOM: calculating energy')) { oniomSub = null; continue; }
         m = /^ONIOM: Cut between\s+([A-Za-z]+)\s*\/\s*([A-Za-z]+)\s+(\d+)\s+and\s+([A-Za-z]+)\s+(\d+)(?:\s+factor=\s*(\S+))?/.exec(t);
-        if (m && oniomRoute && !oniomEcho) { if (!oniomCuts.some(x => x.atom === int(m[3]) - 1)) oniomCuts.push({ atom: int(m[3]) - 1, bondedTo: int(m[5]) - 1, element: m[2], factor: m[6] ? num(m[6]) : null }); continue; }
+        if (m && oniomRoute && !(oniomEcho && oniomEcho.atoms.length)) { if (!oniomCuts.some(x => x.atom === int(m[3]) - 1)) oniomCuts.push({ atom: int(m[3]) - 1, bondedTo: int(m[5]) - 1, element: m[2], factor: m[6] ? num(m[6]) : null }); continue; }
         if (t.startsWith('ONIOM: generating point charges')) oniomEE = true;
         continue;
       }
@@ -906,6 +1037,8 @@
       }
       if (c === 'N' && t.startsWith('NAtoms=') && t.indexOf('NQM=') > 0) {
         if (oniomJob && !nReal) { const m = /^NAtoms=\s*(\d+)/.exec(t); if (m) nReal = int(m[1]); }
+        const q = oniomJob && !oniomCounts && /^NAtoms=\s*(\d+)\s+NQM=\s*(\d+)/.exec(t);
+        if (q) oniomCounts = { nAtoms: int(q[1]), nqm: int(q[2]) };
         continue;
       }
       if (t.startsWith('Counterpoise') && /corrected energy\s*=/.test(t)) { E('CP', num(t.split('=')[1])); continue; }
@@ -1130,14 +1263,27 @@
         }
       }
       if (!nReal) nReal = ds.frames[0].Z.length;
-      ds.layers = buildOniomLayers(oniomRoute, oniomEcho, nReal, oniomCuts, oniomEE);
+      const full = ds.frames.find(f => f.Z.length === nReal && f.xyz) || null;
+      ds.layers = buildOniomLayers(oniomRoute, oniomEcho, nReal, oniomCuts, oniomEE, { chk: oniomChk, counts: oniomCounts, frame: full });
       ds.meta.qmmm = true;
-      const at = oniomEcho && oniomEcho.atoms.length === nReal ? oniomEcho.atoms : null;
+      const at = oniomEcho && oniomEcho.atoms.length === nReal ? oniomEcho.atoms : oniomChk && oniomChk.atoms.length === nReal ? oniomChk.atoms : null;
       if (at && at.some(a => a.props.PDBName || a.props.ResName)) {
         const names = at.map(a => a.props.PDBName || null), res = at.map(a => a.props.ResName || null), ids = at.map(a => (a.props.ResNum ? int(a.props.ResNum) : null));
         for (const f of ds.frames) if (f.Z.length === nReal) { f.atomNames = names; f.resNames = res; f.resIds = ids; }
       }
-      if (!ds.layers.atomLayer) ds.warnings.push('The ONIOM layers could not be read: the molecule was not echoed in Cartesian form (e.g. taken from the checkpoint).');
+      const fromChk = !(oniomEcho && oniomEcho.atoms.length) && (oniomChk || /geom\s*=\s*\(?[\w,]*\b(all)?check/i.test(oniomRoute));
+      const series = meta.oldchk ? ' (this job continued from ' + meta.oldchk + ')' : '';
+      const why = fromChk ? 'Gaussian took this molecule from the checkpoint file (Geom=Check), so the output does not list which atoms are in which ONIOM layer'
+        : 'The molecule echo is not in Cartesian form, so the ONIOM layers could not be read from it';
+      const nl = ds.layers.linkAtoms.length, links = nl + (nl === 1 ? ' link atom' : ' link atoms');
+      if (ds.layers.source === 'rebuilt') {
+        ds.warnings.push(why + '. BlueMolecule rebuilt them from the ' + links + ': the ' + ds.layers.rebuilt.qm +
+          ' atoms bonded to their QM side are as many as the QM atoms Gaussian counted. To use the original assignment instead, open the input or output that started the series' +
+          series + ' and take its layers in the Info tab (ONIOM layers).');
+      } else if (!ds.layers.atomLayer) {
+        ds.warnings.push(why + (nl ? ', and the ' + links + (nl === 1 ? ' alone does' : ' alone do') + ' not give the whole QM region' : '') +
+          '. Open the input or output that started the series' + series + ', then take its layers in the Info tab (ONIOM layers).');
+      }
       const bad = ds.frames.filter(f => oniomFrames.has(f) && f.Z.length !== nReal).length;
       if (bad) ds.warnings.push(bad + ' ONIOM geometries do not have the ' + nReal + ' atoms of the real system.');
     }
@@ -1324,13 +1470,13 @@
     const spec = [];
     while (i < L.length && L[i].trim()) spec.push(L[i++]);
     if (!spec.length) throw err('The molecule specification is empty.');
-    const first = tok(spec[0].replace(/,/g, ' '));
+    const first = rowTokens(spec[0]);
     let cart = first.length >= 4 && ((isNumTok(first[1]) && isNumTok(first[2]) && isNumTok(first[3])));
-    const labels = [], rows = [];
+    const labels = [], rows = [], specOf = [];
     const tv = [];
     if (cart) {
       for (const s of spec) {
-        const t = tok(s.replace(/,/g, ' '));
+        const t = rowTokens(s);   // "N-N3-0.1592(PDBName=N,ResName=SER,ResNum=1) 0 x y z L": commas inside () kept
         if (!t.length) continue;
         let xyz = null;
         if (t.length >= 5 && isIntTok(t[1]) && int(t[1]) <= 0 && isNumTok(t[2]) && isNumTok(t[3]) && isNumTok(t[4])) {
@@ -1340,9 +1486,9 @@
           xyz = [num(t[1]), num(t[2]), num(t[3])];
         } else { cart = false; break; }   // mixed Cartesian / Z-matrix input: use the Z-matrix reader
         if (/^tv$/i.test(t[0])) { tv.push(xyz); continue; }
-        labels.push(t[0]); rows.push({ xyz });
+        labels.push(t[0]); rows.push({ xyz }); specOf.push(s);
       }
-      if (!cart) { labels.length = 0; rows.length = 0; tv.length = 0; }
+      if (!cart) { labels.length = 0; rows.length = 0; tv.length = 0; specOf.length = 0; }
     }
     if (!cart) {
       const zl = [], vl = [];
@@ -1385,8 +1531,8 @@
         return k;
       };
       zl.forEach((s, row) => {
-        const t = tok(s.replace(/,/g, ' '));
-        labels.push(t[0]);
+        const t = rowTokens(s);
+        labels.push(t[0]); specOf.push(null);
         if (t.length >= 5 && t[1] === '0' && isNumTok(t[2]) && isNumTok(t[3]) && isNumTok(t[4])) {
           rows.push({ xyz: [num(t[2]), num(t[3]), num(t[4])] }); return;
         }
@@ -1401,16 +1547,34 @@
       });
     }
     const X = zmatrixToCartesian(rows);
-    const Z = [], xyz = [];
+    const Z = [], xyz = [], kept = [];
     labels.forEach((lab, k) => {
       if (DUMMY_LABEL.test(lab)) return;
       if (/^tv$/i.test(lab)) { tv.push([X[3 * k], X[3 * k + 1], X[3 * k + 2]]); return; }
-      Z.push(gaussLabelZ(lab, ds)); xyz.push(X[3 * k], X[3 * k + 1], X[3 * k + 2]);
+      Z.push(gaussLabelZ(lab, ds)); xyz.push(X[3 * k], X[3 * k + 1], X[3 * k + 2]); kept.push(k);
     });
     if (!Z.length) throw err('No atoms found in the molecule specification.');
     const f = newFrame(Z, xyz);
     f.label = cart ? 'Input geometry' : 'Input geometry (from Z-matrix)';
     ds.frames.push(f);
+    // residue information written by GaussView: "C-CT--0.1(PDBName=CA,ResName=ALA,ResNum=12)"
+    const props = kept.map(k => { const a = oniomAtomSpec(labels[k]); return a ? a.props : {}; });
+    if (props.some(p => p.PDBName || p.ResName)) {
+      f.atomNames = props.map(p => p.PDBName || null); f.resNames = props.map(p => p.ResName || null);
+      f.resIds = props.map(p => (p.ResNum && isIntTok(p.ResNum) ? int(p.ResNum) : null));
+    }
+    if (/\boniom\s*\(/i.test(route)) {
+      // ONIOM: layers, link atoms, freeze codes, MM types and charges from the rows (Cartesian input)
+      const atoms = cart ? kept.map(k => oniomAtomRow(specOf[k])) : [];
+      const three = !!oniomLabels(route).M;
+      const order = three ? [['low', 'real'], ['med', 'mid'], ['low', 'mid'], ['high', 'model'], ['med', 'model'], ['low', 'model']] : [['low', 'real'], ['high', 'model'], ['low', 'model']];
+      const cmPairs = [];
+      for (let q = 0; q + 1 < cmv.length && q / 2 < order.length; q += 2) cmPairs.push({ charge: int(cmv[q]), multiplicity: int(cmv[q + 1]), level: order[q / 2][0], system: order[q / 2][1] });
+      const ok = atoms.length === Z.length && atoms.every(Boolean);
+      ds.layers = buildOniomLayers(route, { cm: cmPairs, atoms: ok ? atoms : [] }, Z.length, [], /embed/i.test(route) && !/noembed/i.test(route));
+      meta.qmmm = true;
+      if (!ok) ds.warnings.push('The ONIOM layers of this input could not be read' + (cart ? ' (some atom rows are not in the form "atom [freeze] x y z layer")' : ' (the molecule is a Z-matrix)') + '.');
+    }
     if (tv.length) ds.cell = padCell(tv);
     ds.program = null;
     return ds;
@@ -1593,6 +1757,13 @@
       if (r) { if (!qm) qm = r.qm; links = r.links; }
     }
     if (!links.length && q.summary.links.length) links = q.summary.links.filter(l => l.atom < N).map(l => ({ atom: l.atom, bondedTo: l.bondedTo, element: 'H', type: null }));
+    let rebuilt = false;
+    if (!qm && !subsystemOnly && X && links.length && q.summary.nQM > 0) {
+      // no QMAtoms in the input echo and no QM-region print to match: the atoms bonded to the QM ends of the link atoms,
+      // when they are as many as the QM atoms ORCA counts
+      const r = qmRegionFromLinks(f.Z, X, links, q.summary.nQM);
+      if (r) { qm = r; rebuilt = true; }
+    }
     if (!links.length && subsystemOnly && X && q.summary.nQM > 0 && q.summary.nLink > 0 && N === q.summary.nQM + q.summary.nLink) {
       // only the QM region is printed: its QM atoms, then its link atoms, each bonded to the nearest QM atom
       for (let a = q.summary.nQM; a < N; a++) {
@@ -1612,7 +1783,8 @@
     }
     const inQM = new Set(qm || []), inQM2 = new Set(q.qm2Atoms || []);
     const outer = q.scheme === 'qm-qm2' ? 'M' : 'L';
-    const atomLayer = subsystemOnly ? new Array(N).fill('H') : Array.from({ length: N }, (_, a) => (inQM.has(a) ? 'H' : inQM2.has(a) ? 'M' : outer));
+    // QM atoms not known: the layers stay unknown (null) rather than every atom shown as MM
+    const atomLayer = subsystemOnly ? new Array(N).fill('H') : qm ? Array.from({ length: N }, (_, a) => (inQM.has(a) ? 'H' : inQM2.has(a) ? 'M' : outer)) : null;
     let active = null, frozen = null;
     if (q.activeAtoms && !subsystemOnly) { const s = new Set(q.activeAtoms); active = Array.from({ length: N }, (_, a) => s.has(a)); frozen = active.map(x => !x); }
     if (q.fixedAtoms && !subsystemOnly) { frozen = frozen || new Array(N).fill(false); for (const a of q.fixedAtoms) if (a < N) frozen[a] = true; }
@@ -1625,7 +1797,8 @@
       labels: { H, M: qm2Label, L: mmLabel },
       nLayers: [H, qm2Label, mmLabel].filter(Boolean).length,
       embedding: q.embedding || (q.scheme === 'qm-qm2' ? null : q.scheme === 'external' ? 'point charges' : 'electronic'),
-      chargeMult: q.chargeMult, subsystemOnly: !!subsystemOnly, qmAtoms: qm, qm2Atoms: q.qm2Atoms || null
+      chargeMult: q.chargeMult, subsystemOnly: !!subsystemOnly, qmAtoms: qm, qm2Atoms: q.qm2Atoms || null,
+      source: subsystemOnly ? null : rebuilt ? 'rebuilt' : qm ? 'input' : null, rebuilt: rebuilt ? { qm: qm.length, links: links.length } : null
     };
   }
 
@@ -2233,6 +2406,10 @@
       ds.layers = orcaLayers(qmmm, qmmmSub ? qmmmSub.full : ds.frames.find(f => f.xyz) || ds.frames[0], qmmmSub ? qmmmSub.sub : null, meta, qmmmOnlySub);
       meta.qmmm = true;
       if (qmmmOnlySub) ds.warnings.push('This output prints only the QM region (with link atoms); ORCA writes the full-system geometries to its trajectory and PDB files.');
+      else if (ds.layers.source === 'rebuilt') ds.warnings.push('The QM atoms are not listed in this output (no QMAtoms in the input echo). BlueMolecule rebuilt them from the ' +
+        ds.layers.rebuilt.links + ' link atom' + (ds.layers.rebuilt.links === 1 ? '' : 's') + ': the ' + ds.layers.rebuilt.qm + ' atoms bonded to their QM side are as many as the QM atoms ORCA counted.');
+      else if (!ds.layers.atomLayer) ds.warnings.push('The QM atoms are not listed in this output (no QMAtoms in the input echo, and no QM-region geometry to match), so the layers are not shown. ' +
+        'Open the input or another output of the same system that lists them, then take its layers in the Info tab (QM/MM layers).');
     }
     return ds;
   }
@@ -3839,6 +4016,8 @@
   BM.parseFile = parseFile;
   BM.parseLines = parseLines;
   BM.qmmmMatch = qmmmMatch;
+  BM.qmRegionFromLinks = qmRegionFromLinks;
+  BM.oniomAtomRow = oniomAtomRow;
   BM.linesToText = asText;
   BM.maxJoinChars = 3e8;
   BM.zmatrixToCartesian = zmatrixToCartesian;

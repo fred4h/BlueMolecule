@@ -46,7 +46,7 @@ Opened for their geometry (and charge, multiplicity, route or keywords where pre
 
 | Program | Files | Notes |
 |---|---|---|
-| Gaussian | `.gjf` `.com` `.gau` `.gjc` | Cartesian and Z-matrix (including variables) geometries; ONIOM layer columns are skipped (layers are read from outputs) |
+| Gaussian | `.gjf` `.com` `.gau` `.gjc` | Cartesian and Z-matrix (including variables) geometries; ONIOM layers, link atoms, freeze codes, MM types and charges of Cartesian inputs; residue names written by GaussView (`PDBName`, `ResName`, `ResNum`) |
 | ORCA | `.inp` | `* xyz`, `* int` (internal coordinates) and `* xyzfile` blocks; `{name}` values from `%paras` (a scanned parameter takes its first value) |
 | GAMESS | `.inp` | Cartesian `$DATA`, with C1 or a point group (the symmetry-unique atoms are expanded) |
 | NWChem | `.nw` `.nwi` | `geometry` block |

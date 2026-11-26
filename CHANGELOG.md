@@ -3,6 +3,31 @@
 BlueMolecule is [vibe-coded](docs/vibe-coding.md). Each version below was written by an AI assistant from the
 author's requests and bug reports.
 
+## 2.6.1 (November 2026): ONIOM layers that an output does not list
+
+Fixes for QM/MM and ONIOM files whose layers were not shown:
+- **Gaussian jobs that take their molecule from the checkpoint** (`Geom=Check`, `Geom=AllCheck`, as in the second
+  and later jobs of a series started with `%OldChk`). Gaussian lists no layers there, so they were not shown.
+  - BlueMolecule now rebuilds them from the link atoms (`ONIOM: Cut between`): the atoms bonded to the QM side of
+    the link atoms make the high layer, when there are exactly as many as Gaussian counts (`NQM`, with Amber, UFF or
+    Dreiding as the low level).
+  - Freeze codes come from the checkpoint structure.
+  - When the layers cannot be rebuilt (for example a water or a ligand in the QM region that is bonded to no link
+    atom), the reader note says which file to open, naming the `%OldChk` file.
+- **Take the layers from another document**: a new section in the Info tab (**ONIOM layers** or **QM/MM layers**)
+  copies the layers, link atoms and residue names from an open document with the same atoms. Open the input or the
+  first output of the series, then choose it and click **Use**. It also replaces rebuilt layers with the original
+  ones.
+- **Gaussian ONIOM inputs** (`.gjf`, `.com`):
+  - Inputs written by GaussView with residue information (`N-N3-0.1592(PDBName=N,ResName=SER,ResNum=1)`) did not
+    open. They now open with their residue names.
+  - Layers, link atoms, freeze codes, MM types and charges, and the per-level charges and multiplicities are read,
+    so an input shows the same layer view as its output.
+- **ORCA QM/MM outputs without the QM atom list** (no `QMAtoms` in the input echo and no QM-region geometry) showed
+  every atom as MM. Their layers are now rebuilt from ORCA's link atoms and QM atom count, or left unknown, with a
+  reader note.
+- The CP2K and xtb notes about unknown QM regions say how to take the layers from another document.
+
 ## 2.6.0 (November 2026): downloads from PubChem and the PDB
 
 **Download** (issue #22), in the toolbar (the cloud icon) and on the start screen (**PubChem or PDB…**):

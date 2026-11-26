@@ -6,7 +6,7 @@ been checked, what has not, and what the program does not do yet.
 
 ## What has been checked
 
-- **About 37,200 automated checks in 44 test suites** (24,500 of them cut example outputs as a running job would
+- **About 37,300 automated checks in 45 test suites** (24,500 of them cut example outputs as a running job would
   leave them), all passing for this release
   ([how to run them](developer-guide.md#tests)). They cover:
   - every reader and writer, including format detection and the units and conventions of each program;
@@ -56,6 +56,9 @@ been checked, what has not, and what the program does not do yet.
 - **The desktop program:** every change is built on Linux, Windows and macOS by the cloud builds and started once
   there with a self-test: the 3D view (WebGL 2) in each system's web engine, a 900 MB log and a molecule opened
   through the native bridge, a save, and a picture of the view.
+- **ONIOM layers rebuilt from link atoms (2.6.1):** checked on a real Gaussian 09 ONIOM(B3LYP:UFF) optimisation and
+  frequency output from the public test files of the garleek project. Its frequency job takes the molecule from the
+  checkpoint, and the layers rebuilt from its link atom match those of its input.
 - **Downloads (2.6):** the self-test of the cloud builds downloaded from the live PubChem and PDB services in the web
   engine of each system (WebKitGTK on Linux, WebView2 on Windows, WebKit on macOS): aspirin's 3D conformer (21
   atoms, CID 2244), sodium chloride through its SMILES (PubChem has no 3D conformer for it), the 1CRN entry and its
@@ -106,7 +109,8 @@ been checked, what has not, and what the program does not do yet.
 | Images | No CMYK colour profile (convert in a layout program); WebP is written lossless only |
 | Negative Hessian eigenvalues | Counted from Gaussian and Q-Chem optimisation steps only; ORCA, Psi4 and the other programs do not get this plot |
 | fchk files | No ECD rotatory strengths and no orbital contributions of the excited states; no IRC paths. Q-Chem fchk files hold no energies, so their steps have none. A checkpoint file's optimisation history is used only for an optimisation or scan job whose last step is the current geometry |
-| Gaussian inputs | ONIOM layer columns in `.gjf` files are skipped; layers are read from outputs |
+| Gaussian inputs | ONIOM layers are read from Cartesian inputs only, not from Z-matrix inputs |
+| Layers not in the output | A Gaussian job that takes its molecule from the checkpoint (`Geom=Check`) lists no layers; nor does an ORCA QM/MM output without `QMAtoms`. Layers are rebuilt from the link atoms only when the atoms bonded to their QM side are exactly as many as the program counted, which fails when part of the QM region is bonded to no link atom (waters, ions, a separate ligand). Otherwise they are taken from another open document with the same atoms ([QM/MM and ONIOM](qmmm-oniom.md#outputs-that-do-not-list-the-layers)) |
 | Clean-up | A generic force field for tidying sketches; not a published force field and not a physical method |
 | Downloads | PubChem: the first compound a name matches, as its first 3D conformer. Compounds without one (salts, mixtures, large or very flexible molecules) are built from their SMILES by BlueMolecule's own builder. PDB: mmCIF only, and only the first biological assembly. A download is read whole into memory. BlueMolecule has no network settings of its own: downloads use those of the system or the browser |
 | Conformer search | Ring conformations are not explored, and the energies come from the generic clean-up force field, so the ranking is rough. Up to 300 atoms |
