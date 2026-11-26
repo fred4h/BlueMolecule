@@ -1,8 +1,0 @@
-run 44178041372
-commit b26d566f37001eb62d75c3a44289dd2e3679f8a4
-branch main
-build result success
-url https://github.com/fred4h/BlueMolecule/actions/runs/44178041372
-report-linux: exit=0 seconds=11 peak=1202MB
-report-macos: exit=0 seconds=22 peak=869MB
-report-windows: exit=0 seconds=19 peak=665MB
