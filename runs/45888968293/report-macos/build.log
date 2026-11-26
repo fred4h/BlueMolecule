@@ -1,0 +1,20 @@
+        Info Looking up installed tauri packages to check mismatched versions...
+[1m[92m    Updating[0m crates.io index
+[1m[92m   Compiling[0m bluemolecule v2.6.2 (/Users/runner/work/BlueMolecule/BlueMolecule/desktop/src-tauri)
+[1m[92m    Finished[0m `release` profile [optimized] target(s) in 2m 26s
+       Built application at: /Users/runner/work/BlueMolecule/BlueMolecule/desktop/src-tauri/target/release/bluemolecule
+    Bundling BlueMolecule.app (/Users/runner/work/BlueMolecule/BlueMolecule/desktop/src-tauri/target/release/bundle/macos/BlueMolecule.app)
+     Signing with identity "-"
+Signing with identity "-"
+Signing /Users/runner/work/BlueMolecule/BlueMolecule/desktop/src-tauri/target/release/bundle/macos/BlueMolecule.app/Contents/MacOS/bluemolecule
+/Users/runner/work/BlueMolecule/BlueMolecule/desktop/src-tauri/target/release/bundle/macos/BlueMolecule.app/Contents/MacOS/bluemolecule: replacing existing signature
+Signing with identity "-"
+Signing /Users/runner/work/BlueMolecule/BlueMolecule/desktop/src-tauri/target/release/bundle/macos/BlueMolecule.app
+/Users/runner/work/BlueMolecule/BlueMolecule/desktop/src-tauri/target/release/bundle/macos/BlueMolecule.app: replacing existing signature
+        Warn skipping app notarization, no APPLE_ID & APPLE_PASSWORD & APPLE_TEAM_ID or APPLE_API_KEY & APPLE_API_ISSUER & APPLE_API_KEY_PATH environment variables found
+    Bundling BlueMolecule_2.6.2_aarch64.dmg (/Users/runner/work/BlueMolecule/BlueMolecule/desktop/src-tauri/target/release/bundle/dmg/BlueMolecule_2.6.2_aarch64.dmg)
+     Running bundle_dmg.sh
+    Finished 2 bundles at:
+        /Users/runner/work/BlueMolecule/BlueMolecule/desktop/src-tauri/target/release/bundle/macos/BlueMolecule.app (6.47 MiB)
+        /Users/runner/work/BlueMolecule/BlueMolecule/desktop/src-tauri/target/release/bundle/dmg/BlueMolecule_2.6.2_aarch64.dmg (4.82 MiB)
+
