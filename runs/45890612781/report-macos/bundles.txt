@@ -1,5 +1,5 @@
 ## files
--rw-r--r--@ 1 runner  staff  4945391 Nov 17 21:43 desktop/src-tauri/target/release/bundle/dmg/BlueMolecule_2.0.0_aarch64.dmg
+-rw-r--r--@ 1 runner  staff  5048924 Nov 26 20:25 desktop/src-tauri/target/release/bundle/dmg/BlueMolecule_2.6.2_aarch64.dmg
 ## desktop/src-tauri/target/release/bundle/macos/BlueMolecule.app/Contents/Info.plist
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -20,9 +20,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.0.0</string>
+	<string>2.6.2</string>
 	<key>CFBundleVersion</key>
-	<string>2.0.0</string>
+	<string>2.6.2</string>
 	<key>CSResourcesFileMapped</key>
 	<true/>
 	<key>LSApplicationCategoryType</key>
@@ -214,15 +214,15 @@
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright (c) 2026 Frederico Henrique Do. C. R. Ferreira. MIT License.</string>
 </dict>
-</plist>total 12424
-drwxr-xr-x   11 runner  staff      352 Nov 17 21:43 .
-drwxr-xr-x    5 runner  staff      160 Nov 17 21:41 ..
--rw-r--r--    1 runner  staff        0 Nov 17 21:41 .cargo-artifact-lock
--rw-r--r--    1 runner  staff        0 Nov 17 21:41 .cargo-build-lock
--rw-r--r--    1 runner  staff        0 Nov 17 21:41 .cargo-lock
--rwxr-xr-x    1 runner  staff  5741408 Nov 17 21:43 bluemolecule
--rw-r--r--    1 runner  staff     1031 Nov 17 21:43 bluemolecule.d
-drwxr-xr-x  299 runner  staff     9568 Nov 17 21:41 build
-drwxr-xr-x    5 runner  staff      160 Nov 17 21:43 bundle
-drwxr-xr-x    2 runner  staff       64 Nov 17 21:41 examples
-drwxr-xr-x    2 runner  staff       64 Nov 17 21:41 incremental
+</plist>total 11416
+drwxr-xr-x   11 runner  staff      352 Nov 26 20:25 .
+drwxr-xr-x    5 runner  staff      160 Nov 26 20:23 ..
+-rw-r--r--    1 runner  staff        0 Nov 26 20:23 .cargo-artifact-lock
+-rw-r--r--    1 runner  staff        0 Nov 26 20:23 .cargo-build-lock
+-rw-r--r--    1 runner  staff        0 Nov 26 20:23 .cargo-lock
+-rwxr-xr-x    1 runner  staff  5840496 Nov 26 20:25 bluemolecule
+-rw-r--r--    1 runner  staff     1031 Nov 26 20:25 bluemolecule.d
+drwxr-xr-x  299 runner  staff     9568 Nov 26 20:23 build
+drwxr-xr-x    5 runner  staff      160 Nov 26 20:25 bundle
+drwxr-xr-x    2 runner  staff       64 Nov 26 20:23 examples
+drwxr-xr-x    2 runner  staff       64 Nov 26 20:23 incremental
