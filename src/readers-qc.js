@@ -1355,7 +1355,8 @@
       ds.layers = { scheme: 'oniom', atomLayer: inner ? Array.from({ length: N }, (_, a) => (inner.has(a) ? 'H' : 'L')) : null, frozen: null, active: null,
         linkAtoms: links, mmTypes: null, mmCharges: null, labels: { H: nm(lv[0]), M: null, L: nm(lv[1]) }, nLayers: 2, embedding: null };
       meta.qmmm = true;
-      if (!inner) ds.warnings.push('The ONIOM inner region is given in a file (' + (om[2] || 'not shown') + '); layers are not shown.');
+      if (!inner) ds.warnings.push('The ONIOM inner region is given in a file (' + (om[2] || 'not shown') + ') that the output does not list, so the layers are not shown. ' +
+        'Open a file of the same system that lists them, then take its layers in the Info tab (ONIOM layers).');
     }
     meta.normalTermination = normal;
     if (!ds.program) ds.program = 'xtb';
@@ -1637,7 +1638,8 @@
         ds.layers = { scheme: 'qmmm', atomLayer: r ? Array.from({ length: N }, (_, a) => (inQM.has(a) ? 'H' : 'L')) : null, frozen: null, active: null,
           linkAtoms: r ? r.links : [], mmTypes: null, mmCharges: null,
           labels: { H: [meta.method, meta.basis].filter(Boolean).join('/') || 'QM', M: null, L: 'MM (FIST)' }, nLayers: 2, embedding: null };
-        if (!r) ds.warnings.push('The QM atoms could not be located in the MM coordinates.');
+        if (!r) ds.warnings.push('The QM atoms could not be located in the MM coordinates, so the layers are not shown. ' +
+          'Open a file of the same system that lists them, then take its layers in the Info tab (QM/MM layers).');
       }
       meta.qmmm = true;
     }

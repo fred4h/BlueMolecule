@@ -17,7 +17,7 @@
     cartoon: { bg: 'white', material: 'flat', ao: 0, outline: 2, dof: 0, shadows: false, floor: false, gradient: false, fog: false }
   };
   const FX_KEYS = ['material', 'ao', 'outline', 'dof', 'shadows', 'floor', 'gradient'];
-  const VERSION = '2.6.0';
+  const VERSION = '2.6.1';
   const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const isNum = v => typeof v === 'number' && isFinite(v);
   const fx = (v, d) => (isNum(v) ? v.toFixed(d) : '—');
@@ -1642,6 +1642,63 @@
     return (d.data.format === 'gaussian-log' && !unrestricted ? 2 : 1) * t.coeff * t.coeff;
   }
 
+  // ---------------- QM/MM layers taken from another document ----------------
+  // Outputs that do not list their layers (Gaussian Geom=Check / AllCheck, ORCA without QMAtoms, xtb with the inner
+  // region in a file, CP2K when the QM atoms cannot be matched) take them from an open document with the same atoms.
+  const sameAtoms = (a, b) => a.length === b.length && a.every((z, i) => z === b[i]);
+  /** Open documents whose layers fit d: the same number of atoms with the same elements in the same order. */
+  function layerDonors(d) {
+    const f = curFrame(d), N = f.Z.length;
+    return state.docs.filter(o => o !== d && !o.pending && o.data.layers && o.data.layers.atomLayer && o.data.layers.atomLayer.length === N &&
+      o.data.frames.some(fr => fr.Z.length === N && sameAtoms(fr.Z, f.Z)));
+  }
+  function layersSourceHtml(d) {
+    const data = d.data, L = data.layers, m = data.meta || {};
+    if (!m.qmmm || !L || d.pending) return '';
+    const known = L.atomLayer && L.atomLayer.length === curFrame(d).Z.length;
+    if (known && L.source !== 'rebuilt' && L.source !== 'document') return '';
+    const title = L.scheme === 'oniom' ? 'ONIOM layers' : L.scheme === 'qm-qm2' ? 'QM/QM2 layers' : 'QM/MM layers';
+    const what = L.source === 'document' ? `Taken from <b>${esc(L.from)}</b>.` : L.source === 'rebuilt' ? 'Rebuilt from the link atoms (see the reader notes).' : 'Not listed in this file, so the layers are not shown.';
+    const donors = layerDonors(d);
+    const from = data.format === 'gaussian-log' ? 'the input (.gjf, .com) or output (.log) that started the series' + (m.oldchk ? ` (this job continued from ${esc(m.oldchk)})` : '') : 'the input or another output of the same system that lists them';
+    const pick = donors.length
+      ? `<div class="field"><span>From</span><select data-take-layers>${donors.map(o => `<option value="${o.id}">${esc(o.name)}</option>`).join('')}</select><button class="btn" data-take-layers-go title="Copy the layers (and residue names) of that document to this one">Use</button></div>`
+      : `<p class="note">Open ${from}, with the same ${curFrame(d).Z.length} atoms in the same order: it then appears here, and its layers can be copied to this document.</p>`;
+    return `<div class="sec" id="sec-layers"><h3>${title}</h3><p class="note">${what}${donors.length && L.source !== 'document' ? ' Take them from an open document with the same atoms:' : ''}</p>${pick}</div>`;
+  }
+  /** Copy the layers of document o to d (and residue names when d has none); d keeps its own method labels, freeze
+   *  codes, MM types and charges when it has them. */
+  function takeLayers(d, o) {
+    const f = curFrame(d), N = f.Z.length, src = o && o.data.layers;
+    const sf = o && o.data.frames.find(fr => fr.Z.length === N && sameAtoms(fr.Z, f.Z));
+    if (!src || !src.atomLayer || src.atomLayer.length !== N || !sf) { toast('The layers of ' + (o ? o.name : 'that document') + ' do not fit these atoms.', true); return; }
+    const old = d.data.layers || {}, ol = old.labels || {}, sl = src.labels || {};
+    const pick = (a, b) => (a !== null && a !== undefined ? a : b);
+    d.data.layers = Object.assign({}, src, {
+      scheme: old.scheme || src.scheme,
+      labels: { H: pick(ol.H, sl.H), M: pick(ol.M, sl.M), L: pick(ol.L, sl.L) },
+      nLayers: old.nLayers || src.nLayers,
+      embedding: old.embedding || src.embedding,
+      chargeMult: old.chargeMult && old.chargeMult.length ? old.chargeMult : src.chargeMult,
+      frozen: old.frozen || src.frozen, active: old.frozen ? old.active : src.active, freezeCodes: old.freezeCodes || src.freezeCodes || null,
+      mmTypes: old.mmTypes || src.mmTypes, mmCharges: old.mmCharges || src.mmCharges,
+      linkAtoms: src.linkAtoms && src.linkAtoms.length ? src.linkAtoms : (old.linkAtoms || []),
+      source: 'document', from: o.name, rebuilt: null
+    });
+    // the reader's note about the missing (or rebuilt) layers no longer applies
+    d.data.warnings = (d.data.warnings || []).filter(w => !/take its layers in the Info tab/.test(w));
+    if (sf.resNames && !f.resNames) {
+      for (const fr of d.data.frames) if (fr.Z.length === N) { fr.atomNames = sf.atomNames || null; fr.resNames = sf.resNames; fr.resIds = sf.resIds || null; if (sf.chains) fr.chains = sf.chains; }
+    }
+    d.bonds.clear(); d._rc = null; d.reps = null;
+    refreshScene(true); renderTabs(); renderPanel(); updateStatus();
+    const cnt = {};
+    for (const x of d.data.layers.atomLayer) cnt[x] = (cnt[x] || 0) + 1;
+    const nm = d.data.layers.scheme === 'oniom' ? { H: 'high', M: 'medium', L: 'low' } : { H: 'QM', M: 'QM2', L: 'MM' };
+    toast(`Layers taken from ${o.name}: ` + ['H', 'M', 'L'].filter(k => cnt[k]).map(k => `${cnt[k]} ${nm[k]}`).join(', ') +
+      (d.data.layers.linkAtoms.length ? `, ${d.data.layers.linkAtoms.length} link atom${d.data.layers.linkAtoms.length === 1 ? '' : 's'}` : ''));
+  }
+
   function panelInfo(d) {
     const data = d.data, m = data.meta || {}, f = curFrame(d);
     const nAtoms = f.Z.filter(z => z > 0).length;
@@ -1715,6 +1772,7 @@
       }
     }
     if (data.cell) html += cellHtml(data.cell);
+    html += layersSourceHtml(d);
     if (data.warnings && data.warnings.length) html += `<div class="sec" id="sec-warn"><h3>Reader notes</h3><ul class="warnings">${data.warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul></div>`;
     return html;
   }
@@ -3517,6 +3575,11 @@
     const panel = $('#panel');
     panel.addEventListener('click', e => {
       const d = state.active; if (!d) return;
+      if (e.target.closest('[data-take-layers-go]')) {
+        const sel = $('[data-take-layers]', panel);
+        takeLayers(d, sel ? state.docs.find(o => o.id === +sel.value) : null);
+        return;
+      }
       if (displayClick(e)) return;
       const go = e.target.closest('[data-go-plot]');
       if (go && (go.dataset.goPreset || go.dataset.goSelect)) {
@@ -3775,7 +3838,7 @@
     }
     loadLaunchFiles();
     BM.app = {
-      state, openText, openFile, openFiles, openDialog, loadLaunchFiles, openData, downloadDialog, openDownload, activate, selectVib, setFrame, setView, R: () => R, plot: () => plot, exportSimple, exportGaussian, exportOrca, exportCalc, plotCSV, displace, onAtomClick, editSet, undo,
+      state, openText, openFile, openFiles, openDialog, loadLaunchFiles, openData, downloadDialog, openDownload, takeLayers, layerDonors, activate, selectVib, setFrame, setView, R: () => R, plot: () => plot, exportSimple, exportGaussian, exportOrca, exportCalc, plotCSV, displace, onAtomClick, editSet, undo,
       saveAs, saveFile, saveContext, plotTypes, plotGroups, renderPlot, goTo, setJob, convFor, version: VERSION,
       curFrame, cellOf, topoFor, bondsFor, ordersFor, topoFrame, selectAll, editDelete, newMolecule: () => ui.newMolecule(), setTool: id => ui.setTool(id), ui: () => ui, kit,
       applyPreset, refreshReps, repCtx, selectBy, renderPanel, renderTabs

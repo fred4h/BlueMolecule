@@ -85,6 +85,13 @@ manager's **Open With → Other application** dialog.
 - **A NetCDF file is "a NetCDF 4 file"**: convert it to NetCDF 3 with `nccopy -k 64-bit-offset in.nc out.nc`
   ([details](large-files-and-trajectories.md#molecular-dynamics-trajectories)).
 
+## A QM/MM or ONIOM output shows no layers
+
+The output does not say which atom is in which layer. This happens with a Gaussian job that takes its molecule from
+the checkpoint (`Geom=Check`, `Geom=AllCheck`), as in the second and later jobs of a series. When the layers cannot
+be rebuilt from the link atoms, open the input (`.gjf`, `.com`) or the output that started the series, then take
+its layers in the Info tab under **ONIOM layers** ([details](qmmm-oniom.md#outputs-that-do-not-list-the-layers)).
+
 ## The QM/MM energy graph looks wrong
 
 BlueMolecule plots one total energy per optimisation step ([details](qmmm-oniom.md#energies-one-point-per-optimisation-step)).
