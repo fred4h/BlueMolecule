@@ -8,7 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 const ROOT = path.join(__dirname, '..');
-for (const f of ['elements.js', 'bigfile.js', 'parsers.js', 'readers-struct.js', 'writers.js', 'readers-qc.js', 'analysis.js']) require(path.join(ROOT, 'src', f));
+for (const f of ['elements.js', 'bigfile.js', 'parsers.js', 'readers-struct.js', 'writers.js', 'readers-qc.js', 'analysis.js', 'condense.js']) require(path.join(ROOT, 'src', f));
 const BM = globalThis.BM;
 const DIR = path.join(__dirname, 'fixtures', 'qmmm');
 const EXP = JSON.parse(fs.readFileSync(path.join(DIR, 'expected.json'), 'utf8'));
@@ -336,6 +336,136 @@ test('Gaussian ONIOM: checkpoint rows that carry layers, and molecule echoes in 
   eq(ds.layers.source, 'rebuilt', 'Z-matrix echo: rebuilt');
   eq(ds.layers.atomLayer.join(''), exp.atomLayer.join(''), 'Z-matrix echo: H/L flags');
   ok(/not in Cartesian form.*rebuilt them/.test(ds.warnings[0] || ''), 'note: ' + ds.warnings[0]);
+});
+
+/** Population analyses of QM sub-calculations added to a fixture: Gaussian prints a Mulliken charge for every atom of the
+ *  real system there. tables: [{step (0-based), sys ('high level on model' by default), q, el, nActive (null: no
+ *  "NActive=" line)}], each inserted before that step's "ONIOM: calculating energy.". */
+function withPop(text, tables) {
+  const parts = text.split(' ONIOM: calculating energy.\n');
+  for (const t of tables) {
+    const n = t.q.length, w = v => String(v).padStart(5);
+    parts[t.step] += ' ONIOM: generating point  2 -- ' + (t.sys || 'high level on model') + ' system.\n' +
+      (t.nActive === null ? '' : ' NAtoms=' + w(n) + ' NActive=' + w(t.nActive) + ' NUniq=' + w(t.nActive) + ' SFac= 1.00D+00 NAtFMM=   60 NAOKFM=F Big=F\n') +
+      ' Mulliken charges:\n               1\n' + t.q.map((q, a) => String(a + 1).padStart(6) + '  ' + t.el[a].padEnd(2) + q.toFixed(6).padStart(11)).join('\n') +
+      '\n Sum of Mulliken charges =   0.00000\n';
+  }
+  return parts.join(' ONIOM: calculating energy.\n');
+}
+/** Condensed reading (the big-file path) of text, then BM.parseLines. */
+function condensed(name, text) {
+  const c = BM.condense.create('gaussian-log', {});
+  const lines = text.split('\n');
+  for (let k = 0; k < lines.length - 1; k++) c.push(lines[k]);
+  return BM.parseLines(name, c.finish(lines[lines.length - 1]));
+}
+
+test('Gaussian ONIOM from the checkpoint: layers from the population analysis of the high-level calculation', () => {
+  const f = 'g16_oniom_amber_opt.log', exp = EXP[f], base = allcheck(read(f)), want = exp.atomLayer.join('');
+  const el = Array.from(load(f).frames[0].Z, z => BM.el.symbol(z));
+  const mmq = [0, 0.04, 0.04, 0.04, 0, 0, 0, 0, 0, 0, 0, -0.834, 0.417, 0.417, -0.834, 0.417, 0.417];
+  const qmq = [0.07, 0, 0, 0, -0.31, 0.15, 0.15, 0.62, -0.52, -0.58, 0.43];
+  // the model system's table: the QM atoms and the link atom (printed as H, atom 1) have charges, which change from
+  // step to step; the others have 0 (mechanical embedding) or their fixed MM charges (electronic embedding)
+  const table = (step, o) => {
+    o = o || {};
+    const e = el.slice(); if (!o.sameEl) e[0] = 'H';
+    return { step, el: e, nActive: o.nActive === undefined ? 8 : o.nActive,
+      q: el.map((_, a) => (want[a] === 'H' || a === 0 ? qmq[a] + step * 0.0013 * (a + 1) : o.ee ? mmq[a] : 0)) };
+  };
+  let text = withPop(base, [table(0)]);
+  let ds = load('restart.log', text);
+  common(ds, exp);
+  series(ds, exp);
+  let L = ds.layers;
+  eq(L.source, 'population', 'source');
+  eq(L.atomLayer.join(''), want, 'layers: the atoms with Mulliken charges in the model system, not the link atom (printed as H)');
+  same(L.population, { how: 'charges', qm: 7, mid: 0, links: 1, tables: 1 }, 'population summary');
+  same(L.linkAtoms.map(l => [l.atom, l.bondedTo, l.element]), [[0, 4, 'H']], 'link atom from "ONIOM: Cut between"');
+  same(L.frozen, exp.frozen, 'frozen atoms from the checkpoint rows');
+  eq(ds.warnings.length, 1, 'one reader note');
+  ok(/checkpoint file \(Geom=Check\).*read them from the high-level calculation on the model system: only the 7 QM atoms and the atom replaced by a link atom have Mulliken charges there, as many atoms as Gaussian counted.*continued from job0\.chk.*take its layers in the Info tab/.test(ds.warnings[0]), 'note: ' + ds.warnings[0]);
+  const ser = x => JSON.stringify(x, (k, v) => (ArrayBuffer.isView(v) ? Array.from(v) : v));
+  eq(ser(BM.parseLines('restart.log', text.split('\n'))), ser(ds), 'parseLines = parseFile');
+  eq(condensed('restart.log', text).layers.atomLayer.join(''), want, 'condensed reading (big files): the same layers');
+
+  // electronic embedding: the other atoms keep their MM charges, the QM charges change between the two tables
+  text = withPop(base, [table(0, { ee: true }), table(5, { ee: true })]);
+  ds = load('restart.log', text);
+  L = ds.layers;
+  eq(L.source, 'population', 'embedding: source');
+  eq(L.atomLayer.join(''), want, 'embedding: layers');
+  same(L.population, { how: 'changed', qm: 7, mid: 0, links: 1, tables: 2 }, 'embedding: the charges that change');
+  ok(/electronic embedding the other atoms keep their MM charges there, and the Mulliken charges that change from one geometry to the next \(2 tables\) are those of the 7 QM atoms and the atom replaced by a link atom, as many atoms as Gaussian counted/.test(ds.warnings[0]), 'embedding note: ' + ds.warnings[0]);
+  eq(condensed('restart.log', text).layers.population.how, 'changed', 'condensed reading: embedding');
+  // one table with embedding cannot tell MM charges from QM charges: the link-atom rebuild (NQM 8) applies instead
+  eq(load('restart.log', withPop(base, [table(0, { ee: true })])).layers.source, 'rebuilt', 'embedding, one table: link-atom rebuild');
+  // two tables of the same geometry: nothing changes, nothing is read (and the rebuild cannot account for NQM 11)
+  ds = load('restart.log', withPop(allcheck(read(f), { nqm: 11 }), [table(0, { ee: true }), Object.assign(table(0, { ee: true }), { step: 5 })]));
+  eq(ds.layers.atomLayer, null, 'embedding, unchanged charges: unknown');
+
+  // a water in the QM region, bonded to no link atom: the link-atom rebuild cannot find it, the population analysis does
+  const water = step => { const t = table(step, { nActive: 11 }); t.q = t.q.map((v, a) => (a >= 11 && a <= 13 ? [-0.8, 0.4, 0.4][a - 11] + 0.001 * step : v)); return t; };
+  ds = load('restart.log', withPop(allcheck(read(f), { nqm: 11 }), [water(0)]));
+  eq(ds.layers.source, 'population', 'water in the QM region: read from the population analysis');
+  eq(ds.layers.atomLayer.join(''), want.slice(0, 11) + 'HHH' + want.slice(14), 'the water is in the high layer');
+  // a link atom printed with its host's element is known from "ONIOM: Cut between"
+  eq(load('restart.log', withPop(base, [table(0, { sameEl: true })])).layers.atomLayer.join(''), want, 'same-element link atom');
+  // no "ONIOM: Cut between" lines: the link atom from the element printed, bonded to the nearest QM atom
+  ds = load('restart.log', withPop(base.replace(/^ ONIOM: Cut between.*\n/gm, ''), [table(0)]));
+  eq(ds.layers.atomLayer.join(''), want, 'no cut lines: layers');
+  same(ds.layers.linkAtoms.map(l => [l.atom, l.bondedTo, l.element]), [[0, 4, 'H']], 'no cut lines: link atom');
+  // the count must match Gaussian's: NActive, or NQM (Gaussian's own MM) when no NActive line is printed
+  eq(load('restart.log', withPop(base, [table(0, { nActive: 9 })])).layers.source, 'rebuilt', 'NActive differs: not used (link-atom rebuild)');
+  eq(load('restart.log', withPop(base, [table(0, { nActive: null })])).layers.source, 'population', 'no NActive line: NQM counts the model system');
+  // an input echo still comes first
+  eq(load(f, withPop(read(f), [table(0)])).layers.source, 'input', 'with the echo: source input');
+});
+
+test('Gaussian 3-layer ONIOM from the checkpoint: high and medium layers from the population analyses', () => {
+  const f = 'g16_oniom3_opt.log', exp = EXP[f], text = read(f), want = exp.atomLayer.join('');
+  const head = text.indexOf(' Symbolic Z-matrix:'), end = text.indexOf('\n \n', head), echo = text.slice(head, end).split('\n');
+  const rows = echo.filter(l => /^ [A-Z][a-z]?-/.test(l)).map(l => l.trim().split(/\s+/));
+  const base = text.slice(0, head) + ' Structure from the checkpoint file:  "job0.chk"\n' + echo.filter(l => /^ Charge =/.test(l)).join('\n') +
+    '\n Redundant internal coordinates found in file.\n' + rows.map(t => ' ' + t[0].split('-')[0] + ',0,' + t.slice(1, 4).join(',')).join('\n') +
+    '\n Recover connectivity data from disk.' + text.slice(end);
+  const el = Array.from(load(f).frames[0].Z, z => BM.el.symbol(z));
+  // mid system: H and M atoms, and atom 7 replaced by a link atom; model system: H atoms, and atom 4 replaced
+  const tab = (sys, nActive, inside, host) => ({ step: 0, sys, nActive, el: el.map((e, a) => (a === host ? 'H' : e)),
+    q: el.map((_, a) => (inside(a) || a === host ? 0.1 + 0.01 * a : 0)) });
+  let ds = load('restart3.log', withPop(base, [tab('med level on mid', 7, a => a < 6, 6), tab('high level on model', 4, a => a < 3, 3)]));
+  const L = ds.layers;
+  eq(L.source, 'population', 'source');
+  eq(L.atomLayer.join(''), want, 'high, medium and low layers');
+  same(L.population, { how: 'charges', qm: 3, mid: 3, links: 2, tables: 1 }, 'counts');
+  same(L.linkAtoms.map(l => [l.atom, l.bondedTo, l.element]), exp.linkAtoms.map(l => [l.atom, l.bondedTo, l.element]), 'link atoms, bonded to the nearest atom of the layer above');
+  ok(/high- and medium-level calculations: only the 3 high-layer and 3 medium-layer atoms and the 2 atoms replaced by link atoms have Mulliken charges there/.test(ds.warnings[0] || ''), 'note: ' + ds.warnings[0]);
+  ds = load('restart3.log', withPop(base, [tab('high level on model', 4, a => a < 3, 3)]));
+  eq(ds.layers.atomLayer, null, 'no medium-level table: unknown (medium cannot be told from low)');
+});
+
+test('BM.oniomLayersFromPopulation', () => {
+  const Z = [6, 1, 1, 6, 8, 1, 1], el = ['C', 'H', 'H', 'H', 'O', 'H', 'H'];   // atom 3 (C) replaced by a link atom (H)
+  const q0 = [-0.3, 0.1, 0.1, 0.1, 0, 0, 0];
+  const P = (q, e, nActive, extra) => ({ 'high-model': Object.assign({ q: Float64Array.from(q), el: e, nActive, tables: 1, changed: new Uint8Array(q.length) }, extra || {}) });
+  const F = BM.oniomLayersFromPopulation;
+  let r = F(Z, P(q0, el, 4));
+  eq(r && r.atomLayer.join(''), 'HHHLLLL', 'QM atoms: those with charges, without the link atom (element H)');
+  same(r && r.hosts, [{ atom: 3, element: 'H', system: 'model' }], 'replaced atom');
+  eq(F(Z, P(q0, el, 5)), null, 'count differs from NActive: null');
+  eq(F(Z, P(q0.slice(0, 6), el.slice(0, 6), 4)), null, 'table shorter than the system: null');
+  eq(F(Z, P(q0, ['??'].concat(el.slice(1)), 4)), null, 'unreadable element: null');
+  eq(F(Z, {}), null, 'no table: null');
+  eq(F(Z, P([0, 0, 0, 0.1, 0, 0, 0], el, 1)), null, 'only a link atom: null');
+  const ee = [-0.3, 0.1, 0.1, 0.1, -0.834, 0.417, 0.417];
+  r = F(Z, P(ee, el, 4, { tables: 2, changed: Uint8Array.from([1, 1, 1, 1, 0, 0, 0]) }));
+  eq(r && r.how + ' ' + r.atomLayer.join(''), 'changed HHHLLLL', 'embedding: the atoms whose charges changed');
+  eq(F(Z, P(ee, el, 4)), null, 'embedding, one table: null');
+  eq(F(Z, P(q0, el, null), { nModel: 4 }).qm, 3, 'no NActive: the model-system count (NQM) instead');
+  eq(F(Z, P(q0, el, null)), null, 'no count at all: null');
+  eq(F(Z, P(q0, ['C', 'H', 'H', 'C', 'O', 'H', 'H'], 4), { cutHosts: [3] }).atomLayer.join(''), 'HHHLLLL', 'replaced atom printed with its own element: from the cut lines');
+  eq(F(Z, P(q0, el, 4), { cutHosts: [4] }), null, 'a cut atom outside the model system: null');
+  eq(F(Z, P(q0, el, 4), { three: true }), null, '3 layers without the medium-level table: null');
 });
 
 test('BM.qmRegionFromLinks', () => {

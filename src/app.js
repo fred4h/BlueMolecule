@@ -17,7 +17,7 @@
     cartoon: { bg: 'white', material: 'flat', ao: 0, outline: 2, dof: 0, shadows: false, floor: false, gradient: false, fog: false }
   };
   const FX_KEYS = ['material', 'ao', 'outline', 'dof', 'shadows', 'floor', 'gradient'];
-  const VERSION = '2.6.1';
+  const VERSION = '2.6.2';
   const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const isNum = v => typeof v === 'number' && isFinite(v);
   const fx = (v, d) => (isNum(v) ? v.toFixed(d) : '—');
@@ -610,12 +610,13 @@
     status('Reading ' + src.name + '…');
     try {
       const ask = await chooseLoad(src, name, gz, size, null);
-      if (!ask) { toast('Opening ' + src.name + ' was cancelled.'); return null; }
+      if (!ask) { layersRequest = null; toast('Opening ' + src.name + ' was cancelled.'); return null; }
       const choice = ask.traj || ask.text || null;
       const t0 = performance.now();
       const { data, note } = await readSource(src, name, gz, size, choice, beginProgress);
       console.info(`[BlueMolecule] parsed ${name} (${data.format}) in ${(performance.now() - t0).toFixed(0)} ms`);
       const d = openData(name, data, note);
+      if (layersRequest) layersOpened(d);
       if (d && d.data === data && data.meta && data.meta.loaded && !gz && (src.kind === 'blob' || src.kind === 'chunks')) {
         d.loadSource = { src, name: src.name, size, choice: ask.text || { steps: { mode: 'all' }, modes: { mode: 'all' } } };
       }
@@ -624,6 +625,7 @@
       }
       return d;
     } catch (e) {
+      layersRequest = null;
       if (BIGF && BIGF.isAbort(e)) { toast('Opening ' + src.name + ' was cancelled.'); return null; }
       console.error(e);
       toast(conciseError(BIGF ? BIGF.describeError(e, src.name, size) : (e.message || String(e))), true);
@@ -715,11 +717,11 @@
   /** Open button, Ctrl/Cmd+O: the shell's own dialog when it has one (big files then arrive as chunk objects). */
   async function openDialog() {
     const nat = BM.native;
-    if (!nat || typeof nat.openDialog !== 'function') { $('#file-input').click(); return; }
+    if (!nat || typeof nat.openDialog !== 'function') { $('#file-input').click(); return 'input'; }
     let r;
     try { r = await nat.openDialog({ multiple: true }); }
     catch (e) { console.error(e); toast('The open dialog failed: ' + (e && e.message ? e.message : e), true); return; }
-    if (r === null) { $('#file-input').click(); return; }          // not handled by this host
+    if (r === null) { $('#file-input').click(); return 'input'; }          // not handled by this host
     if (r === undefined || typeof r === 'boolean') return;          // cancelled, or the files come through onOpenFile
     const list = Array.isArray(r) ? r : (typeof r === 'object' && typeof r.length === 'number' && !r.readChunk) ? Array.from(r) : [r];
     const items = [];
@@ -1655,16 +1657,43 @@
   function layersSourceHtml(d) {
     const data = d.data, L = data.layers, m = data.meta || {};
     if (!m.qmmm || !L || d.pending) return '';
-    const known = L.atomLayer && L.atomLayer.length === curFrame(d).Z.length;
-    if (known && L.source !== 'rebuilt' && L.source !== 'document') return '';
+    const N = curFrame(d).Z.length, known = L.atomLayer && L.atomLayer.length === N;
+    if (known && ['rebuilt', 'population', 'document'].indexOf(L.source) < 0) return '';
     const title = L.scheme === 'oniom' ? 'ONIOM layers' : L.scheme === 'qm-qm2' ? 'QM/QM2 layers' : 'QM/MM layers';
-    const what = L.source === 'document' ? `Taken from <b>${esc(L.from)}</b>.` : L.source === 'rebuilt' ? 'Rebuilt from the link atoms (see the reader notes).' : 'Not listed in this file, so the layers are not shown.';
+    const what = L.source === 'document' ? `Taken from <b>${esc(L.from)}</b>.`
+      : L.source === 'population' ? 'Read from the population analysis of the high-level calculation (see the reader notes).'
+      : L.source === 'rebuilt' ? 'Rebuilt from the link atoms (see the reader notes).' : 'Not listed in this file, so the layers are not shown.';
     const donors = layerDonors(d);
     const from = data.format === 'gaussian-log' ? 'the input (.gjf, .com) or output (.log) that started the series' + (m.oldchk ? ` (this job continued from ${esc(m.oldchk)})` : '') : 'the input or another output of the same system that lists them';
     const pick = donors.length
       ? `<div class="field"><span>From</span><select data-take-layers>${donors.map(o => `<option value="${o.id}">${esc(o.name)}</option>`).join('')}</select><button class="btn" data-take-layers-go title="Copy the layers (and residue names) of that document to this one">Use</button></div>`
-      : `<p class="note">Open ${from}, with the same ${curFrame(d).Z.length} atoms in the same order: it then appears here, and its layers can be copied to this document.</p>`;
-    return `<div class="sec" id="sec-layers"><h3>${title}</h3><p class="note">${what}${donors.length && L.source !== 'document' ? ' Take them from an open document with the same atoms:' : ''}</p>${pick}</div>`;
+      : '';
+    const hint = !known || L.source === 'rebuilt' ? `<p class="note">${donors.length ? 'Or open' : 'Open'} ${from}, with the same ${N} atoms in the same order: its layers are then copied to this document.</p>` : '';
+    const open = '<div class="btnrow" style="margin-top:6px"><button class="btn small" data-act="layers-open" title="Open a file with the same atoms: its layers are copied to this document">Open file with the layers…</button></div>';
+    return `<div class="sec" id="sec-layers"><h3>${title}</h3><p class="note">${what}${donors.length && L.source !== 'document' ? ' Take them from an open document with the same atoms:' : ''}</p>${pick}${hint}${open}</div>`;
+  }
+  // "Open file with the layers…": the next document opened from a file (within ten minutes) gives d its layers
+  let layersRequest = null;
+  async function openLayersFile(d) {
+    if (!d) return;
+    const req = layersRequest = { doc: d, until: Date.now() + 600e3 };
+    // the shell's own dialog returns once its files are open (or it was cancelled); the browser's file input later
+    if ((await openDialog()) !== 'input' && layersRequest === req) layersRequest = null;
+  }
+  /** A document was opened from a file: when it was opened for another document's layers, copy them there. */
+  function layersOpened(o) {
+    const r = layersRequest;
+    layersRequest = null;
+    if (!r || !o || o === r.doc || Date.now() > r.until || state.docs.indexOf(r.doc) < 0) return;
+    const d = r.doc;
+    if (layerDonors(d).indexOf(o) < 0) {
+      toast(o.data.layers && o.data.layers.atomLayer
+        ? `${o.name} does not have the same ${curFrame(d).Z.length} atoms in the same order as ${d.name}: its layers were not copied.`
+        : `${o.name} does not list QM/MM layers either: nothing was copied to ${d.name}.`, true);
+      return;
+    }
+    activate(d);
+    takeLayers(d, o);
   }
   /** Copy the layers of document o to d (and residue names when d has none); d keeps its own method labels, freeze
    *  codes, MM types and charges when it has them. */
@@ -1683,7 +1712,7 @@
       frozen: old.frozen || src.frozen, active: old.frozen ? old.active : src.active, freezeCodes: old.freezeCodes || src.freezeCodes || null,
       mmTypes: old.mmTypes || src.mmTypes, mmCharges: old.mmCharges || src.mmCharges,
       linkAtoms: src.linkAtoms && src.linkAtoms.length ? src.linkAtoms : (old.linkAtoms || []),
-      source: 'document', from: o.name, rebuilt: null
+      source: 'document', from: o.name, rebuilt: null, population: null
     });
     // the reader's note about the missing (or rebuilt) layers no longer applies
     d.data.warnings = (d.data.warnings || []).filter(w => !/take its layers in the Info tab/.test(w));
@@ -1828,12 +1857,15 @@
     // QM/MM layers and residue classes: a click applies the matching preset or selects the atoms
     const f = curFrame(d);
     if (!d.pending && f.Z.length) {
-      const c = repCtx(d), L = c.layers;
+      const c = repCtx(d), L = c.layers, DL = data.layers;
       if (L) {
         const cnt = {};
         for (const x of L.atomLayer) cnt[x] = (cnt[x] || 0) + 1;
         const nm = L.scheme === 'oniom' ? { H: 'High layer', M: 'Medium layer', L: 'Low layer' } : { H: 'QM region', M: 'QM2 region', L: 'MM region' };
         for (const k of ['H', 'M', 'L']) if (cnt[k]) it.push({ name: nm[k], count: cnt[k], sub: (L.labels && L.labels[k]) || 'layer ' + k, preset: 'qmmm', select: 'layer ' + k });
+      } else if (data.meta && data.meta.qmmm && DL) {
+        // a QM/MM file that does not list its layers: the way to take them from another file
+        it.push({ name: DL.scheme === 'oniom' ? 'ONIOM layers' : 'QM/MM layers', count: '', sub: 'not listed in this file: take them from another', warn: true, anchor: 'sec-layers' });
       }
       if (f.resNames) {
         const cc = REPS.contents(c), cl = cc.classes;
@@ -3476,6 +3508,7 @@
     $('#btn-fetch').onclick = () => downloadDialog();
     $('#btn-fetch-2').onclick = () => downloadDialog();
     $('#file-input').onchange = e => { openFiles(e.target.files); e.target.value = ''; };
+    $('#file-input').addEventListener('cancel', () => { layersRequest = null; });
     $('#btn-image').onclick = exportImage;
     $('#btn-help').onclick = showHelp;
     $('#btn-theme').onclick = () => { setView({ theme: state.view.theme === 'dark' ? 'light' : 'dark' }); renderPlotDraw(); };
@@ -3547,6 +3580,7 @@
         case 'plot-svg': if (state.active && state.active.plotType) saveFile(`${baseName(state.active)}_${state.active.plotType.replace(':', '_')}.svg`, plot.toSVG(960, 440), 'image/svg+xml'); break;
         case 'displace-plus': displace(1); break;
         case 'reload-part': reloadPart(state.active); break;
+        case 'layers-open': openLayersFile(state.active); break;
         case 'displace-minus': displace(-1); break;
         case 'vib-inputs': vibInputs(); break;
         case 'vib-imag': { const d = state.active, v = d && d.data.vibrations, st = v ? BM.vibtools.stationary(v) : null; if (st && st.imag.length) { selectVib(d, st.imag[0]); renderPanel(); } break; }

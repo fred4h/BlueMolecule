@@ -683,6 +683,74 @@
     for (let a = 0; a < N; a++) if (inQM[a]) out.push(a);
     return out;
   }
+  /**
+   * BM.oniomLayersFromPopulation(Z, pop, opts) -> {atomLayer, hosts: [{atom, element, system}], qm, mid, how} | null
+   * The layers of a Gaussian ONIOM job that does not list them (Geom=Check / AllCheck), from the population analysis
+   * of its QM sub-calculations. Gaussian prints a Mulliken charge for every atom of the real system there:
+   *  - the atoms of the sub-calculation's system (its QM atoms, and the atoms that link atoms replace, printed with
+   *    the link atom's element, usually H) have charges;
+   *  - the other atoms have 0 or, with electronic embedding, their fixed MM charges, the same in every table, while the
+   *    charges of the QM atoms change from one geometry to the next.
+   * pop: {'high-model': P, 'med-mid': P} with P = {el: element symbol per atom, q: the first table's charges,
+   * changed: per atom 1 when a later table differs, tables: count, nActive: Gaussian's atom count of that system}.
+   * opts: {cutHosts: atoms replaced by link atoms ("ONIOM: Cut between"), three: 3-layer job, nModel: model-system
+   * atoms when NActive is missing (NQM, with Gaussian's own MM)}. The atoms found must be exactly as many as Gaussian
+   * counts, or the result is null (nothing is guessed).
+   */
+  function oniomLayersFromPopulation(Z, pop, opts) {
+    opts = opts || {};
+    const N = Z ? Z.length : 0;
+    if (!N || !pop) return null;
+    const cut = new Set((opts.cutHosts || []).filter(a => a >= 0 && a < N));
+    const system = (p, alt) => {
+      if (!p || !p.q || p.q.length !== N || !p.el || p.el.length !== N) return null;
+      const target = p.nActive > 0 ? p.nActive : alt > 0 ? alt : 0;
+      if (!target || target > N) return null;
+      const elDiff = new Uint8Array(N);
+      for (let a = 0; a < N; a++) {
+        const z = BM.el.toZ(p.el[a]);
+        if (z < 0) return null;
+        if (z !== Z[a]) elDiff[a] = 1;
+      }
+      let act = new Uint8Array(N), n = 0, how = 'charges';
+      for (let a = 0; a < N; a++) if (p.q[a] !== 0) { act[a] = 1; n++; }
+      if (n !== target) {     // electronic embedding: MM charges on the other atoms, the same in every table
+        if (!(p.changed && p.tables > 1)) return null;
+        act = new Uint8Array(N); n = 0; how = 'changed';
+        for (let a = 0; a < N; a++) if (p.changed[a] || elDiff[a]) { act[a] = 1; n++; }
+        if (n !== target) return null;
+      }
+      return { act, elDiff, how, tables: p.tables || 1, el: p.el };
+    };
+    const m = system(pop['high-model'], opts.three ? 0 : opts.nModel);
+    if (!m) return null;
+    const hostM = new Uint8Array(N), layer = new Array(N).fill('L');
+    let qm = 0, mid = 0;
+    for (let a = 0; a < N; a++) {
+      if (!m.act[a]) continue;
+      if (m.elDiff[a] || cut.has(a)) hostM[a] = 1; else { layer[a] = 'H'; qm++; }
+    }
+    if (!qm) return null;
+    const hosts = [];
+    for (let a = 0; a < N; a++) if (hostM[a]) hosts.push({ atom: a, element: m.el[a], system: 'model' });
+    let how = m.how;
+    if (opts.three) {
+      // the medium layer: the mid system's own atoms that are not high; replaced atoms there are low-layer atoms
+      const i = system(pop['med-mid'], 0);
+      if (!i) return null;
+      for (let a = 0; a < N; a++) {
+        if (layer[a] === 'H') { if (!i.act[a]) return null; continue; }
+        if (!i.act[a]) continue;
+        if (i.elDiff[a] || (cut.has(a) && !hostM[a])) { if (!hostM[a]) hosts.push({ atom: a, element: i.el[a], system: 'mid' }); }
+        else { layer[a] = 'M'; mid++; }
+      }
+      if (!mid) return null;
+      if (i.how !== how) how = 'changed';
+    } else {
+      for (const a of cut) if (!m.act[a]) return null;   // every link atom belongs to the model system
+    }
+    return { atomLayer: layer, hosts, qm, mid, how, tables: m.tables };
+  }
   /** Method labels {H, M, L} from "ONIOM(B3LYP/6-31G(d):Amber=SoftFirst)=EmbedCharge". */
   function oniomLabels(route) {
     const i = route.search(/oniom\s*\(/i);
@@ -715,12 +783,15 @@
    * The layers of a Gaussian ONIOM job (output or input). Per-atom layers come from, in this order:
    *  - the molecule echo ("Symbolic Z-matrix:", or the rows of an input file), source 'input';
    *  - a structure taken from the checkpoint file whose rows carry layers, source 'checkpoint';
+   *  - the population analysis of the high-level (and medium-level) sub-calculations, source 'population': with
+   *    Geom=Check / AllCheck Gaussian lists no layers, but its Mulliken charges there cover exactly the atoms of the
+   *    model (mid) system (oniomLayersFromPopulation);
    *  - rebuilt (source 'rebuilt'): with Geom=Check / AllCheck Gaussian lists no layers, but prints the link atoms
    *    ("ONIOM: Cut between") and NQM, the atoms of the model system other than link atoms (high-layer atoms plus the
    *    atoms the link atoms replace, with Gaussian's own MM). The atoms bonded to the QM ends of the link atoms make the
    *    high layer when their number matches (2-layer QM:MM only);
    *  - otherwise atomLayer stays null (unknown).
-   * more: {chk: readChkStructure result, counts: {nAtoms, nqm}, frame: a full-system frame}.
+   * more: {chk: readChkStructure result, counts: {nAtoms, nqm}, frame: a full-system frame, pop: population analyses}.
    */
   function buildOniomLayers(route, echo, nReal, cuts, ee, more) {
     more = more || {};
@@ -734,8 +805,29 @@
     let linkAtoms = [];
     if (atoms) atoms.forEach((a, k) => { if (a.link) linkAtoms.push({ atom: k, bondedTo: a.link.bondedTo, element: a.link.el, type: a.link.type || null, factors: a.link.factors.length ? a.link.factors : null }); });
     if (!linkAtoms.length && cuts.length) linkAtoms = cuts.map(c => ({ atom: c.atom, bondedTo: c.bondedTo, element: c.element, type: null, factors: c.factor ? [c.factor] : null }));
-    let atomLayer = atoms ? atoms.map(a => a.layer || 'H') : null, rebuilt = null;
+    let atomLayer = atoms ? atoms.map(a => a.layer || 'H') : null, rebuilt = null, population = null;
     const c = more.counts, fr = more.frame;
+    if (!atomLayer && more.pop && fr && fr.Z.length === nReal) {
+      const r = oniomLayersFromPopulation(fr.Z, more.pop, { cutHosts: cuts.map(x => x.atom), three: !!labels.M,
+        nModel: c && c.nAtoms === nReal && c.nqm > 0 && c.nqm < nReal ? c.nqm : 0 });
+      if (r) {
+        atomLayer = r.atomLayer; source = 'population';
+        population = { how: r.how, qm: r.qm, mid: r.mid, links: r.hosts.length, tables: r.tables };
+        if (!linkAtoms.length && r.hosts.length) {
+          // no "ONIOM: Cut between" lines: each replaced atom is bonded to the nearest atom of the layer above it
+          const X = fr.xyz, lay = r.atomLayer;
+          linkAtoms = r.hosts.map(h => {
+            let best = -1, bd = Infinity;
+            for (let b = 0; b < nReal; b++) {
+              if (b === h.atom || !(h.system === 'model' ? lay[b] === 'H' : lay[b] !== 'L')) continue;
+              const dx = X[3 * b] - X[3 * h.atom], dy = X[3 * b + 1] - X[3 * h.atom + 1], dz = X[3 * b + 2] - X[3 * h.atom + 2], d2 = dx * dx + dy * dy + dz * dz;
+              if (d2 < bd) { bd = d2; best = b; }
+            }
+            return { atom: h.atom, bondedTo: best, element: h.element, type: null, factors: null };
+          });
+        }
+      }
+    }
     if (!atomLayer && c && fr && fr.Z.length === nReal && !labels.M && /^(amber|uff|dreiding)/i.test(labels.L || '') &&
         c.nAtoms === nReal && c.nqm > 0 && c.nqm < nReal && linkAtoms.length) {
       const hosts = new Set(linkAtoms.map(l => l.atom));
@@ -758,7 +850,7 @@
       embedding: ee ? 'electronic' : 'mechanical',
       chargeMult: echo && echo.cm ? echo.cm.filter(x => x.level) : more.chk ? more.chk.cm.filter(x => x.level) : [],
       freezeCodes: anyFreeze ? typed.map(a => (a.freeze === null ? 0 : a.freeze)) : null,
-      source, rebuilt
+      source, rebuilt, population
     };
     return layers;
   }
@@ -790,6 +882,9 @@
     let oniomJob = false, oniomOpt = false, oniomRoute = null, oniomEcho = null, nReal = 0, stepOpen = false, oniomEDone = false, oniomEE = false;
     let oniomSub = null;   // layer key of the sub-calculation being printed ("ONIOM: generating point 2 -- high level on model system.")
     let oniomChk = null, oniomCounts = null;   // structure taken from the checkpoint (Geom=Check); "NAtoms= NQM=" counts
+    // population analyses of the QM sub-calculations (see oniomLayersFromPopulation), by key ('high-model', 'med-mid')
+    const oniomPop = {};
+    const popOf = k => oniomPop[k] || (oniomPop[k] = { nActive: null, el: null, q: null, changed: null, tables: 0 });
     const oniomFrames = new Map(), oniomCuts = [], oniomMM = new Map();   // ONIOM frame -> rank of its orientation; frame -> MM "Energy=" values
     const E = (kind, v) => { if (!oniomJob) sink.energy(kind, v); };   // sub-calculation energies: not in ONIOM jobs
     const closeStep = () => { stepOpen = false; oniomEDone = false; oniomSub = null; };
@@ -1041,6 +1136,12 @@
         if (q) oniomCounts = { nAtoms: int(q[1]), nqm: int(q[2]) };
         continue;
       }
+      if (c === 'N' && oniomSub && t.startsWith('NAtoms=') && t.indexOf('NActive=') > 0) {
+        // "NAtoms=  127 NActive=   25 NUniq= ..." in a sub-calculation: the atoms of its system (QM and link atoms)
+        const m = /NActive=\s*(\d+)/.exec(t), p = popOf(oniomSub);
+        if (m && p.nActive === null) p.nActive = int(m[1]);
+        continue;
+      }
       if (t.startsWith('Counterpoise') && /corrected energy\s*=/.test(t)) { E('CP', num(t.split('=')[1])); continue; }
       if (t.startsWith('Total Energy, E(')) {
         // G16 "E(TD-HF/TD-DFT)", G09 "E(TD-HF/TD-KS)", CIS variants
@@ -1123,6 +1224,16 @@
           if (r.cols[0].length) {
             if (m[2] === 'spin densities') spins.Mulliken = r.cols[0];
             else { charges.Mulliken = r.cols[0]; if (two) spins.Mulliken = r.cols[1]; }
+            if (oniomSub && m[2] === 'charges') {   // the population analysis of an ONIOM sub-calculation: its atoms
+              const p = popOf(oniomSub), q = r.cols[0];
+              if (!p.q) {
+                p.q = Float64Array.from(q); p.el = []; p.changed = new Uint8Array(q.length); p.tables = 1;
+                for (let j = i + 2; j < r.end; j++) p.el.push(tok(L[j])[1]);
+              } else if (q.length === p.q.length) {
+                for (let k = 0; k < q.length; k++) if (q[k] !== p.q[k]) p.changed[k] = 1;
+                p.tables++;
+              }
+            }
           }
           i = r.end - 1;
         }
@@ -1264,7 +1375,7 @@
       }
       if (!nReal) nReal = ds.frames[0].Z.length;
       const full = ds.frames.find(f => f.Z.length === nReal && f.xyz) || null;
-      ds.layers = buildOniomLayers(oniomRoute, oniomEcho, nReal, oniomCuts, oniomEE, { chk: oniomChk, counts: oniomCounts, frame: full });
+      ds.layers = buildOniomLayers(oniomRoute, oniomEcho, nReal, oniomCuts, oniomEE, { chk: oniomChk, counts: oniomCounts, frame: full, pop: oniomPop });
       ds.meta.qmmm = true;
       const at = oniomEcho && oniomEcho.atoms.length === nReal ? oniomEcho.atoms : oniomChk && oniomChk.atoms.length === nReal ? oniomChk.atoms : null;
       if (at && at.some(a => a.props.PDBName || a.props.ResName)) {
@@ -1276,7 +1387,16 @@
       const why = fromChk ? 'Gaussian took this molecule from the checkpoint file (Geom=Check), so the output does not list which atoms are in which ONIOM layer'
         : 'The molecule echo is not in Cartesian form, so the ONIOM layers could not be read from it';
       const nl = ds.layers.linkAtoms.length, links = nl + (nl === 1 ? ' link atom' : ' link atoms');
-      if (ds.layers.source === 'rebuilt') {
+      if (ds.layers.source === 'population') {
+        const P = ds.layers.population, s = k => (k === 1 ? '' : 's');
+        const who = (P.mid ? `${P.qm} high-layer and ${P.mid} medium-layer atoms` : `${P.qm} QM atom${s(P.qm)}`) +
+          (P.links === 1 ? ' and the atom replaced by a link atom' : P.links ? ` and the ${P.links} atoms replaced by link atoms` : '');
+        const how = P.how === 'changed'
+          ? `with electronic embedding the other atoms keep their MM charges there, and the Mulliken charges that change from one geometry to the next (${P.tables} tables) are those of the ${who}`
+          : `only the ${who} ${P.qm + P.mid + P.links === 1 ? 'has a Mulliken charge' : 'have Mulliken charges'} there`;
+        ds.warnings.push(`${why}. BlueMolecule read them from the ${P.mid ? 'high- and medium-level calculations' : 'high-level calculation on the model system'}: ${how}, ` +
+          `as many atoms as Gaussian counted. To use the layers of another file of the series${series} instead, open it and take its layers in the Info tab (ONIOM layers).`);
+      } else if (ds.layers.source === 'rebuilt') {
         ds.warnings.push(why + '. BlueMolecule rebuilt them from the ' + links + ': the ' + ds.layers.rebuilt.qm +
           ' atoms bonded to their QM side are as many as the QM atoms Gaussian counted. To use the original assignment instead, open the input or output that started the series' +
           series + ' and take its layers in the Info tab (ONIOM layers).');
@@ -4017,6 +4137,7 @@
   BM.parseLines = parseLines;
   BM.qmmmMatch = qmmmMatch;
   BM.qmRegionFromLinks = qmRegionFromLinks;
+  BM.oniomLayersFromPopulation = oniomLayersFromPopulation;
   BM.oniomAtomRow = oniomAtomRow;
   BM.linesToText = asText;
   BM.maxJoinChars = 3e8;
