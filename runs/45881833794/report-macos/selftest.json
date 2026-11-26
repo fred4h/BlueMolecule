@@ -1,0 +1,77 @@
+{
+  "checks": {
+    "bridge": true,
+    "files": true,
+    "picture": true,
+    "save": true,
+    "webgl2": true
+  },
+  "downloads": {
+    "missing": {
+      "error": "The PDB has no entry 0XXX.",
+      "ms": 355,
+      "ok": false
+    },
+    "pdb": {
+      "atoms": 327,
+      "bytes": 69506,
+      "ms": 208,
+      "ok": true,
+      "title": "WATER STRUCTURE OF A HYDROPHOBIC PROTEIN AT ATOMIC RESOLUTION. PENTAGON RINGS OF WATER MOLECULES IN CRYSTALS OF CRAMBIN"
+    },
+    "pdbAssembly": {
+      "atoms": 327,
+      "ms": 418,
+      "ok": true
+    },
+    "pubchem": {
+      "atoms": 21,
+      "cid": "2244",
+      "formula": "C9H8O4",
+      "ms": 392,
+      "ok": true
+    },
+    "pubchemSmiles": {
+      "cid": "5234",
+      "conformer": false,
+      "ms": 281,
+      "ok": true,
+      "smiles": "[Na+].[Cl-]"
+    }
+  },
+  "errors": [],
+  "files": [
+    {
+      "atoms": 11,
+      "energy": null,
+      "frames": 1,
+      "name": "cisplatin.xyz",
+      "vibrations": 0,
+      "warnings": []
+    },
+    {
+      "atoms": 64,
+      "energy": -925.4183124,
+      "frames": 310,
+      "name": "big-opt.log",
+      "vibrations": 0,
+      "warnings": []
+    }
+  ],
+  "gpu": "Apple GPU",
+  "imageBytes": 49655,
+  "maxTexture": 16384,
+  "memory": {
+    "available": 3989536768,
+    "jsHeapLimit": null,
+    "total": 7516192768
+  },
+  "nativeKind": "tauri-app",
+  "ok": true,
+  "openSeconds": 3.94,
+  "seconds": 9.55,
+  "startSeconds": 2.32,
+  "started": "2026-11-26T19:14:23.859Z",
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)",
+  "version": "2.6.1"
+}
