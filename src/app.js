@@ -17,7 +17,7 @@
     cartoon: { bg: 'white', material: 'flat', ao: 0, outline: 2, dof: 0, shadows: false, floor: false, gradient: false, fog: false }
   };
   const FX_KEYS = ['material', 'ao', 'outline', 'dof', 'shadows', 'floor', 'gradient'];
-  const VERSION = '2.6.2';
+  const VERSION = '2.6.3';
   const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const isNum = v => typeof v === 'number' && isFinite(v);
   const fx = (v, d) => (isNum(v) ? v.toFixed(d) : '—');
@@ -62,7 +62,8 @@
         nums(b.conf, p.build.conf); nums(b.crys, p.build.crys);
       }
       if (p.sidebar) document.documentElement.style.setProperty('--sidebar-w', p.sidebar);
-      if (p.plotH) document.documentElement.style.setProperty('--plot-h', p.plotH);
+      // a plot height chosen by hand is kept as it is (the default is at most 40% of the window)
+      if (p.plotH) { document.documentElement.style.setProperty('--plot-h', p.plotH); document.documentElement.style.setProperty('--plot-max', 'none'); }
     } catch (e) { /* storage unavailable */ }
   }
   function savePrefs() {
@@ -2300,7 +2301,7 @@
       else { try { const p = kit.perceive(f.Z, f.xyz, t.pairs, null); bonds = p.bonds; fc = p.charges; } catch (e) { console.warn('[BlueMolecule] bond-order perception failed:', e); } }
     }
     const nf = {
-      Z: f.Z.slice(), xyz: Float64Array.from(d._animXyz && state.anim.kind === 'vib' ? d._animXyz : f.xyz), energy: null, energies: null, label: 'Edited', converged: false, opt: null,
+      Z: f.Z.slice(), xyz: Float64Array.from(f.xyz), energy: null, energies: null, label: 'Edited', converged: false, opt: null,
       atomNames: f.atomNames ? f.atomNames.slice() : null, resNames: f.resNames ? f.resNames.slice() : null, resIds: f.resIds ? f.resIds.slice() : null, edited: true,
       cell: (c => (c ? c.map(v => v.slice()) : null))(cellOf(d, f)),
       bonds: bonds || kit.pairsToList(t.pairs, null), formalCharges: fc ? fc.slice() : new Array(f.Z.length).fill(0)
@@ -2790,7 +2791,9 @@
     if (!form.querySelector('.dlg-body input, .dlg-body select, .dlg-body textarea')) { const pb = form.querySelector('.dlg-foot .btn.primary'); if (pb) pb.focus(); }
     if (onOpen) onOpen(form);
   }
-  function geomFor(d) { const f = curFrame(d); const xyz = d._animXyz && state.anim.kind === 'vib' ? d._animXyz : f.xyz; return { Z: f.Z, xyz, f }; }
+  /** The geometry that exports, inputs and surfaces use: the current geometry as stored, never the momentary picture
+   *  of a vibration being animated (a random point of its oscillation; Displace makes displaced geometries on purpose). */
+  function geomFor(d) { const f = curFrame(d); return { Z: f.Z, xyz: f.xyz, f }; }
   const TASK_NAMES = { sp: 'Single point', opt: 'Optimization', freq: 'Frequencies', optfreq: 'Optimization + frequencies' };
   function loadCalcPrefs() {
     const def = { program: 'gaussian', task: 'optfreq', nprocs: 8, memoryMB: 16000, methods: {}, bases: {} };
@@ -3306,14 +3309,23 @@
           : { label: 'Install and restart', primary: true, onClick: async f => {
             keep(f);
             status('Downloading and installing the update…');
-            try { await up.install(); } catch (e) { toast('The update was not installed: ' + ((e && e.message) || e), true); }
+            try { await up.install(); } catch (e) { const s = String((e && e.message) || e); toast('The update was not installed. ' + updateErrorText(s) + ' (' + s + ')', true); }
           } }]);
     } else {
       // (a build without the update key says so as a plain note: nothing went wrong)
       const msg = r.supported === false && r.error ? esc(r.error)
-        : r.error ? 'The check did not succeed: ' + esc(r.error) : `BlueMolecule ${esc(r.current)} is the latest version.`;
+        : r.error ? `${esc(updateErrorText(r.error))}</p><p class="note">The updater said: ${esc(r.error)}` : `BlueMolecule ${esc(r.current)} is the latest version.`;
       dialog('Updates', `<p>${msg}</p>${box}`, [{ label: 'Close', primary: true, onClick: f => { keep(f); } }]);
     }
+  }
+  /** Plain words for the updater's usual failures (its own messages are terse). */
+  function updateErrorText(s) {
+    s = String(s || '');
+    if (/valid release JSON|\b404\b/i.test(s)) return 'GitHub did not give the update information. A new release is probably still being prepared (its files appear about ten minutes after it is published): try again in a few minutes.';
+    if (/platform\b.*\bnot found|`platforms`/i.test(s)) return 'The newest release has no update for this system yet (its files may still be building): try again later.';
+    if (/signature|minisign/i.test(s)) return 'The update did not carry a valid BlueMolecule signature, so nothing was installed. Download the new version from the Releases page instead.';
+    if (/error sending request|dns|resolve|connect|network|timed? ?out|unreachable|offline|tls|certificate/i.test(s)) return 'BlueMolecule could not reach GitHub. Check the internet connection (and any proxy or firewall), then try again.';
+    return 'The check did not succeed.';
   }
 
   // ---------------- downloads from PubChem and the PDB (issue #22) ----------------
@@ -3817,7 +3829,12 @@
       });
     };
     drag($('#rz-side'), e => { const w = Math.max(240, Math.min(620, e.clientX)); document.documentElement.style.setProperty('--sidebar-w', w + 'px'); });
-    drag($('#rz-plot'), e => { const r = $('#center').getBoundingClientRect(); const h = Math.max(120, Math.min(r.height - 160, r.bottom - e.clientY)); document.documentElement.style.setProperty('--plot-h', h + 'px'); });
+    drag($('#rz-plot'), e => {
+      const r = $('#center').getBoundingClientRect(), head = $('.plot-head').offsetHeight || 38;
+      const h = Math.max(120, Math.min(r.height - 160, r.bottom - e.clientY)) - head + 38;   // --plot-h counts a one-line header
+      document.documentElement.style.setProperty('--plot-h', h + 'px');
+      document.documentElement.style.setProperty('--plot-max', 'none');
+    });
   }
   let surfTimer = 0;
   function scheduleSurfaces() { clearTimeout(surfTimer); surfTimer = setTimeout(() => refreshSurfaces(), 40); }

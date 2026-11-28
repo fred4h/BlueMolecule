@@ -21,7 +21,8 @@ geometries, using the plot panel and exporting. The specialised topics have thei
 | **Status bar** (bottom edge) | Messages, what is under the mouse (atom, residue, sugar, layer), and the atom count, formula and energy |
 
 Drag the borders between the sidebar, the 3D view and the plot panel to resize them. **⌃** at the right of the plot
-panel collapses it.
+panel collapses it. Until you resize it, the plot panel takes at most 40% of the window height; when it is narrow, its
+controls get a row of their own that scrolls sideways. When a file has many tabs, they continue on a second row.
 
 ## Opening files
 
@@ -267,6 +268,10 @@ The **Export** menu offers:
 - **Image…** (or the camera icon): the current view with its labels and legend, in the proportions of the view.
   For publications, choose a white background in the toolbar first. See [Saving images](#saving-images).
 - **Vibration animation**: the selected mode as a multi-frame XYZ file, which other viewers can play.
+
+While a vibration is being animated, **Save as…**, **Calculation input…** and the surfaces use the geometry as it is
+stored, not the moving picture. To save a geometry displaced along a mode, use **Displace along the selected mode**
+in the Vibrations tab.
 
 Saving opens the system's Save dialog: in the Linux, Windows and macOS versions, and in Chrome or Edge. Firefox and
 Safari save to the downloads folder. Geometries changed in the Build tab are saved as edited. The original file is

@@ -24,7 +24,7 @@ NODE_UNIT = ['test_parsers.js', 'test_parsers2.js', 'test_readers_qc.js', 'test_
              'test_readers_qc2.js', 'test_orbitals.js', 'test_crystal_conformers.js', 'test_fetchdb.js']
 PY_UNIT = ['test_launcher.py', 'test_native_packaging.py', 'test_windows_package.py']
 BROWSER = ['test_renderer.js', 'browser_test.js', 'browser_build_test.js', 'browser_formats_test.js', 'browser_reps_test.js',
-           'browser_ui_test.js', 'browser_15_test.js', 'browser_tauri_bridge_test.js', 'browser_xss_test.js', 'browser_windows_launch_test.js', 'browser_orbitals_test.js', 'browser_build25_test.js', 'browser_fetch_test.js', 'browser_layers_test.js', 'test_bigfiles.js']
+           'browser_ui_test.js', 'browser_15_test.js', 'browser_tauri_bridge_test.js', 'browser_xss_test.js', 'browser_windows_launch_test.js', 'browser_orbitals_test.js', 'browser_build25_test.js', 'browser_fetch_test.js', 'browser_layers_test.js', 'browser_263_test.js', 'test_bigfiles.js']
 
 
 def run(cmd, label):

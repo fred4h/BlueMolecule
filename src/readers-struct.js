@@ -1332,6 +1332,8 @@
     const P = get('POINTERS');
     if (!P || P.length < 12) throw err('No %FLAG POINTERS section.');
     const n = P[0], nres = P[11], ifbox = P[27] || 0;
+    const count = v => Number.isInteger(v) && v >= 0 && v <= 1e8;
+    if (!count(n) || !(n > 0) || !count(nres)) throw err('The %FLAG POINTERS section is damaged: its atom or residue count (' + P[0] + ', ' + P[11] + ') is not a usable number.');
     const ds = newDs('prmtop', fileName, 'Amber');
     const names = get('ATOM_NAME', n) || [];
     const anum = get('ATOMIC_NUMBER', n), mass = get('MASS', n), charge = get('CHARGE', n);

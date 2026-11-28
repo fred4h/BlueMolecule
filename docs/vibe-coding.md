@@ -27,11 +27,12 @@ with some AI help":
 Claude worked in a sandboxed workspace with an editor, a terminal and a headless browser, so it could run the tests
 and look at screenshots of the interface. The versions from 1.0 to 1.4.1 were made between 4 and 10 November 2026,
 1.4.2 and 1.5.0 on 16 November, 2.0.0 on 17 November, 2.0.1 on 18 November, 2.0.2 to 2.3.0 on 22 November, 2.4.0 to
-2.6.0 on 24 November, 2.6.1 on 25 November and 2.6.2 on 26 November (see the [changelog](../CHANGELOG.md)).
+2.6.0 on 24 November, 2.6.1 on 25 November, 2.6.2 on 26 November and 2.6.3 on 28 November (see the
+[changelog](../CHANGELOG.md)).
 
 ## How the program was checked
 
-- **Automated tests.** Every feature came with tests: about 37,400 checks in 45 suites, run with
+- **Automated tests.** Every feature came with tests: about 37,400 checks in 46 suites, run with
   `python3 tests/run_all.py --browser` ([developer guide](developer-guide.md#tests)). They cover:
   - the readers and writers of each format;
   - format detection;

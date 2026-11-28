@@ -289,6 +289,12 @@ test('Amber prmtop + inpcrd', () => {
   eq(ds.title, 'water and sodium', 'title');
   ds = BM.parseFile('w.prmtop', read('water.prmtop').replace(/%FLAG ATOMIC_NUMBER\n%FORMAT\(10I8\)\n.*\n/, ''));
   arrEq(ds.frames[0].Z, [8, 1, 1, 11], 'elements from masses');
+  // a damaged POINTERS section (a stray line shifts the counts): a plain message, not "Invalid array length"
+  for (const bad of [read('water.prmtop').replace('%FORMAT(10I8)\n       4', '%FORMAT(10I8)\nxxxxxxxx\n       4'), read('water.prmtop').replace('       4       3       2', '      -4       3       2')]) {
+    let msg = '';
+    try { BM.parseFile('w.prmtop', bad); } catch (e) { msg = e.message; }
+    ok(/POINTERS section is damaged/.test(msg) && !/Invalid array length/.test(msg), 'damaged POINTERS: ' + msg);
+  }
   ds = load('water.inpcrd');
   ok(ds.meta.needsTopology && ds.meta.natoms === 4 && ds.frames[0].Z === null, 'needsTopology');
   near(ds.frames[0].xyz[2], 0.1173, 1e-12, 'coordinates');
