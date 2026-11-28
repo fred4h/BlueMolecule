@@ -1,0 +1,16 @@
+## files
+-rwxr-xr-x 1 runneradmin 197121 2818763 Nov 28 16:51 desktop/src-tauri/target/release/bundle/nsis/BlueMolecule_2.6.3_x64-setup.exe
+total 9504
+drwxr-xr-x 1 runneradmin 197121       0 Nov 28 16:51 .
+drwxr-xr-x 1 runneradmin 197121       0 Nov 28 16:51 ..
+-rw-r--r-- 1 runneradmin 197121       0 Nov 28 16:47 .cargo-artifact-lock
+-rw-r--r-- 1 runneradmin 197121       0 Nov 28 16:47 .cargo-build-lock
+-rw-r--r-- 1 runneradmin 197121       0 Nov 28 16:47 .cargo-lock
+-rw-r--r-- 1 runneradmin 197121     728 Nov 28 16:51 bluemolecule.d
+-rwxr-xr-x 2 runneradmin 197121 6153216 Nov 28 16:51 bluemolecule.exe
+-rw-r--r-- 2 runneradmin 197121 3518464 Nov 28 16:51 bluemolecule.pdb
+drwxr-xr-x 1 runneradmin 197121       0 Nov 28 16:47 build
+drwxr-xr-x 1 runneradmin 197121       0 Nov 28 16:51 bundle
+drwxr-xr-x 1 runneradmin 197121       0 Nov 28 16:47 examples
+drwxr-xr-x 1 runneradmin 197121       0 Nov 28 16:47 incremental
+drwxr-xr-x 1 runneradmin 197121       0 Nov 28 16:51 nsis
