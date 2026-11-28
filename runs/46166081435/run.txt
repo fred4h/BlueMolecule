@@ -1,0 +1,8 @@
+run 46166081435
+commit e664d9f1dfccb4a19eebf3a805e2f18a435c4b83
+branch claude/2.6.3-bug-hunt
+build result success
+url https://github.com/fred4h/BlueMolecule/actions/runs/46166081435
+report-linux: exit=0 seconds=10 peak=1179MB
+report-macos: exit=0 seconds=18 peak=838MB
+report-windows: exit=0 seconds=20 peak=661MB

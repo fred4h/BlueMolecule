@@ -1,7 +1,0 @@
-run 44184561097
-commit b706020af02167c30b71d42e8f0ef1cfa7ae464b
-branch claude/2.0-desktop
-build result cancelled
-url https://github.com/fred4h/BlueMolecule/actions/runs/44184561097
-report-linux: exit=0 seconds=7 peak=1152MB
-report-windows: exit=0 seconds=20 peak=613MB
