@@ -110,8 +110,8 @@ not available.
 
 ## Status
 
-BlueMolecule 2.6.2 is the current release (1.4.1 was the first public one). The automated test suite has about
-37,400 checks in 45 suites, 24,500 of them from cutting example outputs as a running job would leave them:
+BlueMolecule 2.6.3 is the current release (1.4.1 was the first public one). The automated test suite has about
+37,400 checks in 46 suites, 24,500 of them from cutting example outputs as a running job would leave them:
 - format readers and writers against example files;
 - chemistry routines;
 - the selection language;

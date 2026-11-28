@@ -44,8 +44,12 @@ with `./uninstall.sh` from the unpacked 1.x folder ([details](installation.md#co
 
 - **"This is a test build of BlueMolecule, which does not look for updates":** only the installers from the
   Releases page update themselves; builds made elsewhere (for example the test builds of the cloud) do not.
-- **The check did not succeed:** the computer may be offline, or GitHub unreachable. Try again later, or download
-  the new version from the Releases page.
+- **"A new release is probably still being prepared"** or **"no update for this system yet":** a release's files
+  appear about ten minutes after it is published. Try again a little later.
+- **"BlueMolecule could not reach GitHub":** the computer is offline, or a proxy or firewall blocks GitHub. Try
+  again later, or download the new version from the Releases page.
+- **"The check did not succeed":** another failure; the dialog shows the updater's own message under it. Try again
+  later, or download the new version from the Releases page.
 
 ## Downloads from PubChem or the PDB
 

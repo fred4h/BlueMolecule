@@ -37,7 +37,7 @@ import types
 from pathlib import Path
 
 APP_ID = 'org.bluemolecule.BlueMolecule'
-VERSION = '2.6.2'
+VERSION = '2.6.3'
 BINDINGS = ('PyQt6', 'PySide6', 'PyQt5')
 INLINE_LIMIT = 32 * 1024 * 1024     # files below this size go to the page in one piece
 

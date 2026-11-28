@@ -3,6 +3,29 @@
 BlueMolecule is [vibe-coded](docs/vibe-coding.md). Each version below was written by an AI assistant from the
 author's requests and bug reports.
 
+## 2.6.3 (November 2026): fixes from a full review
+
+A review of the whole app found these problems: static checks (ESLint, TypeScript, Ruff), every example file opened
+with every tab and plot, damaged and re-encoded files, Save As round trips and screenshots at several window sizes.
+- **Exports while a vibration is animated.** Opening a transition state starts the animation of its imaginary mode.
+  Save as…, Export → XYZ/MOL/PDB, Calculation input… and the molecular surfaces then took the moving picture: a
+  random point of the oscillation, up to the amplitude (0.35 Å) away from the real geometry. They now always use the
+  geometry as stored. To save a displaced geometry, use **Displace along the selected mode**.
+- **Hidden tabs.** With Steps and Vibrations (or States), the side panel's last tabs (Surfaces, Build) were cut off
+  and could only be reached by scrolling the tab row sideways, with no sign that it could scroll. Tabs now continue
+  on a second row.
+- **Small windows** (the desktop app's smallest size is 820 × 560; also half of a 1080p screen):
+  - the plot panel's controls wrapped over the plot and left it a few pixels high. A narrow plot panel now puts its
+    controls on their own row, which scrolls sideways;
+  - the plot panel takes at most 40% of the window height until you resize it, so the 3D view keeps room;
+  - the start screen was cut off at both sides and at the bottom; it now fits the width and scrolls;
+  - the playbar no longer covers the build tools, and the side panel starts narrower below 1000 px.
+- **Updater messages.** "Could not fetch a valid release JSON from the remote" and the like now come with plain words:
+  a release still being prepared (its files appear about ten minutes after it is published), no update for this
+  system yet, or GitHub unreachable. The updater's own message is shown under them.
+- An Amber prmtop with a damaged `POINTERS` section said "Invalid array length"; it now says that the section is
+  damaged.
+
 ## 2.6.2 (November 2026): ONIOM layers from the population analysis
 
 A Gaussian ONIOM job that takes its molecule from the checkpoint (`Geom=AllCheck`) could still open without its
